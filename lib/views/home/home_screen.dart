@@ -51,37 +51,41 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final settings = context.read<SettingsProvider>();
     if (!settings.autoPasteClipboard) return;
 
-    final data = await Clipboard.getData('text/plain');
-    final text = data?.text ?? '';
-    final clean = UrlHelper.extractCleanUrl(text);
+    try {
+      final data = await Clipboard.getData('text/plain');
+      final text = data?.text ?? '';
+      final clean = UrlHelper.extractCleanUrl(text);
 
-    if (UrlHelper.isValidVideoUrl(clean) && clean != _urlController.text) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.link_rounded, color: Colors.white, size: 18),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text('Phát hiện liên kết video trong Clipboard!'),
-                ),
-              ],
+      if (UrlHelper.isValidVideoUrl(clean) && clean != _urlController.text) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.link_rounded, color: Colors.white, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text('Phát hiện liên kết video trong Clipboard!'),
+                  ),
+                ],
+              ),
+              action: SnackBarAction(
+                label: 'Dán & Tải',
+                textColor: AppColors.tiktokAccent,
+                onPressed: () {
+                  _urlController.text = clean;
+                  _onAnalyze();
+                },
+              ),
+              duration: const Duration(seconds: 4),
+              behavior: SnackBarBehavior.floating,
             ),
-            action: SnackBarAction(
-              label: 'Dán & Tải',
-              textColor: AppColors.tiktokAccent,
-              onPressed: () {
-                _urlController.text = clean;
-                _onAnalyze();
-              },
-            ),
-            duration: const Duration(seconds: 4),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+          );
+        }
       }
+    } catch (_) {
+      // Ignore clipboard permission errors on browser
     }
   }
 

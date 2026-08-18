@@ -1,4 +1,5 @@
 import 'package:http/http.dart' as http;
+import '../../core/utils/cors_helper.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -60,7 +61,7 @@ class GenericExtractor implements BaseVideoExtractor {
 
     try {
       final response = await http.get(
-        Uri.parse(cleanUrl),
+        Uri.parse(CorsHelper.wrap(cleanUrl)),
         headers: {
           'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',

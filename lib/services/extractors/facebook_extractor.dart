@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../core/utils/cors_helper.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -33,7 +34,7 @@ class FacebookExtractor implements BaseVideoExtractor {
     try {
       // 1. First strategy: Direct HTML scraping with Android / iOS User-Agent
       final response = await http.get(
-        Uri.parse(cleanUrl),
+        Uri.parse(CorsHelper.wrap(cleanUrl)),
         headers: {
           'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -144,7 +145,7 @@ class FacebookExtractor implements BaseVideoExtractor {
       }
 
       // 2. Second strategy: Fallback to Universal Rapid Web Extractor API
-      final fallbackApi = Uri.parse('https://api.cobalt.tools/api/json');
+      final fallbackApi = Uri.parse(CorsHelper.wrap('https://api.cobalt.tools/api/json'));
       final apiRes = await http.post(
         fallbackApi,
         headers: {

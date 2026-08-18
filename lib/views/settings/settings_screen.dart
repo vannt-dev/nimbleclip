@@ -24,7 +24,6 @@ class SettingsScreen extends StatelessWidget {
           _SectionHeader(title: 'Giao diện ứng dụng', isDark: isDark),
           Material(
             color: isDark ? AppColors.darkCard : AppColors.lightCard,
-            borderRadius: BorderRadius.circular(16),
             clipBehavior: Clip.antiAlias,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -67,7 +66,6 @@ class SettingsScreen extends StatelessWidget {
           _SectionHeader(title: 'Tải về & Lưu trữ', isDark: isDark),
           Material(
             color: isDark ? AppColors.darkCard : AppColors.lightCard,
-            borderRadius: BorderRadius.circular(16),
             clipBehavior: Clip.antiAlias,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -161,7 +159,6 @@ class SettingsScreen extends StatelessWidget {
           _SectionHeader(title: 'Thông tin ứng dụng', isDark: isDark),
           Material(
             color: isDark ? AppColors.darkCard : AppColors.lightCard,
-            borderRadius: BorderRadius.circular(16),
             clipBehavior: Clip.antiAlias,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),

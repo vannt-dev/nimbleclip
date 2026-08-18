@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../core/utils/cors_helper.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -18,7 +19,7 @@ class TikTokExtractor implements BaseVideoExtractor {
   Future<VideoMetadata> extract(String url) async {
     try {
       // Primary API: TikWM (high reliability, no watermark, fast HD stream)
-      final apiUrl = Uri.parse('https://www.tikwm.com/api/');
+      final apiUrl = Uri.parse(CorsHelper.wrap('https://www.tikwm.com/api/'));
       final response = await http.post(
         apiUrl,
         headers: {

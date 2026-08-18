@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../core/utils/cors_helper.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -31,7 +32,7 @@ class TwitterExtractor implements BaseVideoExtractor {
 
     try {
       // 1. Try FxTwitter API
-      final fxUrl = Uri.parse('https://api.fxtwitter.com/status/$tweetId');
+      final fxUrl = Uri.parse(CorsHelper.wrap('https://api.fxtwitter.com/status/$tweetId'));
       final response = await http.get(
         fxUrl,
         headers: {'User-Agent': 'SnapVideo/1.0', 'Accept': 'application/json'},
@@ -131,7 +132,7 @@ class TwitterExtractor implements BaseVideoExtractor {
       }
 
       // 2. Fallback: VxTwitter API
-      final vxUrl = Uri.parse('https://api.vxtwitter.com/Twitter/status/$tweetId');
+      final vxUrl = Uri.parse(CorsHelper.wrap('https://api.vxtwitter.com/Twitter/status/$tweetId'));
       final vxResponse = await http.get(vxUrl).timeout(const Duration(seconds: 10));
       if (vxResponse.statusCode == 200) {
         final vxJson = jsonDecode(vxResponse.body) as Map<String, dynamic>;

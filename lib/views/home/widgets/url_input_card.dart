@@ -21,20 +21,24 @@ class UrlInputCard extends StatelessWidget {
   });
 
   Future<void> _pasteFromClipboard(BuildContext context) async {
-    final data = await Clipboard.getData('text/plain');
-    if (data?.text != null && data!.text!.isNotEmpty) {
-      final clean = UrlHelper.extractCleanUrl(data.text!);
-      controller.text = clean;
-      onChanged(clean);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Đã dán link từ clipboard!'),
-            duration: Duration(seconds: 1),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+    try {
+      final data = await Clipboard.getData('text/plain');
+      if (data?.text != null && data!.text!.isNotEmpty) {
+        final clean = UrlHelper.extractCleanUrl(data.text!);
+        controller.text = clean;
+        onChanged(clean);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Đã dán link từ clipboard!'),
+              duration: Duration(seconds: 1),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
+    } catch (_) {
+      // Ignore clipboard read errors
     }
   }
 
