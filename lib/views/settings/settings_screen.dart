@@ -62,7 +62,70 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          // 2. Tải về & Lưu trữ (Download & Storage)
+          // 2. Chất lượng tải mặc định (Default Preferred Quality)
+          _SectionHeader(title: 'Chất lượng video ưu tiên', isDark: isDark),
+          Material(
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                width: 1,
+              ),
+            ),
+            child: Column(
+              children: [
+                _QualityRadioTile(
+                  title: 'Cao nhất (1080p / 2K / 4K)',
+                  subtitle: 'Tự động chọn độ phân giải sắc nét nhất',
+                  icon: Icons.hd_rounded,
+                  value: 'Highest',
+                  groupValue: settings.preferredQuality,
+                  onChanged: (val) => settings.setPreferredQuality(val!),
+                ),
+                const Divider(height: 1),
+                _QualityRadioTile(
+                  title: 'Chuẩn HD (720p)',
+                  subtitle: 'Cân bằng giữa chất lượng và dung lượng',
+                  icon: Icons.high_quality_rounded,
+                  value: '720p',
+                  groupValue: settings.preferredQuality,
+                  onChanged: (val) => settings.setPreferredQuality(val!),
+                ),
+                const Divider(height: 1),
+                _QualityRadioTile(
+                  title: 'Tiết kiệm dung lượng (480p SD)',
+                  subtitle: 'Dung lượng nhẹ, tải nhanh cho 3G/4G',
+                  icon: Icons.sd_rounded,
+                  value: '480p',
+                  groupValue: settings.preferredQuality,
+                  onChanged: (val) => settings.setPreferredQuality(val!),
+                ),
+                const Divider(height: 1),
+                _QualityRadioTile(
+                  title: 'Tiết kiệm tối đa (360p)',
+                  subtitle: 'Kích thước file nhỏ nhất',
+                  icon: Icons.data_saver_on_rounded,
+                  value: '360p',
+                  groupValue: settings.preferredQuality,
+                  onChanged: (val) => settings.setPreferredQuality(val!),
+                ),
+                const Divider(height: 1),
+                _QualityRadioTile(
+                  title: 'Chỉ tải âm thanh (Audio MP3/M4A)',
+                  subtitle: 'Tự động chọn định dạng nhạc MP3',
+                  icon: Icons.music_note_rounded,
+                  value: 'Audio',
+                  groupValue: settings.preferredQuality,
+                  onChanged: (val) => settings.setPreferredQuality(val!),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // 3. Tải về & Lưu trữ (Download & Storage)
           _SectionHeader(title: 'Tải về & Lưu trữ', isDark: isDark),
           Material(
             color: isDark ? AppColors.darkCard : AppColors.lightCard,
@@ -155,7 +218,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          // 3. Thông tin ứng dụng (About)
+          // 4. Thông tin ứng dụng (About)
           _SectionHeader(title: 'Thông tin ứng dụng', isDark: isDark),
           Material(
             color: isDark ? AppColors.darkCard : AppColors.lightCard,
@@ -257,6 +320,47 @@ class _ThemeRadioTile extends StatelessWidget {
           fontSize: 14,
           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
         ),
+      ),
+      trailing: isSelected
+          ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
+          : const Icon(Icons.circle_outlined, color: Colors.grey, size: 20),
+      onTap: () => onChanged(value),
+    );
+  }
+}
+
+class _QualityRadioTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final String value;
+  final String groupValue;
+  final ValueChanged<String?> onChanged;
+
+  const _QualityRadioTile({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.value,
+    required this.groupValue,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isSelected = value == groupValue;
+    return ListTile(
+      leading: Icon(icon, color: isSelected ? AppColors.primary : null),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(fontSize: 12),
       ),
       trailing: isSelected
           ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)

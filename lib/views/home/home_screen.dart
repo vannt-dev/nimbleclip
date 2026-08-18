@@ -93,7 +93,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final text = _urlController.text.trim();
     if (text.isNotEmpty) {
       FocusScope.of(context).unfocus();
-      context.read<VideoExtractorProvider>().analyzeUrl(text);
+      final preferred = context.read<SettingsProvider>().preferredQuality;
+      context
+          .read<VideoExtractorProvider>()
+          .analyzeUrl(text, preferredQuality: preferred);
     }
   }
 

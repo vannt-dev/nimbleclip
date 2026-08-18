@@ -17,7 +17,43 @@ class VideoExtractorProvider extends ChangeNotifier {
   String get currentUrl => _currentUrl;
   bool get hasResult => _metadata != null;
 
-  Future<bool> analyzeUrl(String url) async {
+  VideoQualityOption? _findBestMatchingQuality(
+      List<VideoQualityOption> options, String preferred) {
+    if (options.isEmpty) return null;
+
+    if (preferred == 'Audio') {
+      final audio = options.firstWhere(
+        (o) => o.isAudioOnly,
+        orElse: () => options.first,
+      );
+      return audio;
+    }
+
+    final videoOnly = options.where((o) => !o.isAudioOnly).toList();
+    if (videoOnly.isEmpty) return options.first;
+
+    if (preferred == '720p') {
+      return videoOnly.firstWhere(
+        (o) => o.quality.contains('720'),
+        orElse: () => videoOnly.first,
+      );
+    } else if (preferred == '480p') {
+      return videoOnly.firstWhere(
+        (o) => o.quality.contains('480'),
+        orElse: () => videoOnly.first,
+      );
+    } else if (preferred == '360p') {
+      return videoOnly.lastWhere(
+        (o) => o.quality.contains('360') || o.quality.contains('SD'),
+        orElse: () => videoOnly.last,
+      );
+    }
+
+    // Default 'Highest'
+    return videoOnly.first;
+  }
+
+  Future<bool> analyzeUrl(String url, {String preferredQuality = 'Highest'}) async {
     final cleanUrl = UrlHelper.extractCleanUrl(url);
     if (cleanUrl.isEmpty || !UrlHelper.isValidVideoUrl(cleanUrl)) {
       _errorMessage = 'Vui lòng nhập đường dẫn video hợp lệ (http/https).';
@@ -36,7 +72,10 @@ class VideoExtractorProvider extends ChangeNotifier {
       final meta = await ExtractorRegistry.extract(cleanUrl);
       _metadata = meta;
       if (meta.qualities.isNotEmpty) {
-        _selectedQuality = meta.bestQuality ?? meta.qualities.first;
+        _selectedQuality =
+            _findBestMatchingQuality(meta.qualities, preferredQuality) ??
+                meta.bestQuality ??
+                meta.qualities.first;
       }
       _isAnalyzing = false;
       notifyListeners();
