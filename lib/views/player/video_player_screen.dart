@@ -1,8 +1,8 @@
-import 'dart:io';
 import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/cors_helper.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final String title;
@@ -36,19 +36,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   Future<void> _initializePlayer() async {
     try {
-      if (widget.localFilePath != null && widget.localFilePath!.isNotEmpty) {
-        final file = File(widget.localFilePath!);
-        if (await file.exists()) {
-          _videoPlayerController = VideoPlayerController.file(file);
-        } else {
-          throw Exception('Video file not found at ${widget.localFilePath}');
-        }
-      } else if (widget.videoUrl != null && widget.videoUrl!.isNotEmpty) {
+      if (widget.videoUrl != null && widget.videoUrl!.isNotEmpty) {
+        final streamUrl = CorsHelper.wrap(widget.videoUrl!);
         _videoPlayerController = VideoPlayerController.networkUrl(
-          Uri.parse(widget.videoUrl!),
+          Uri.parse(streamUrl),
+        );
+      } else if (widget.localFilePath != null && widget.localFilePath!.isNotEmpty) {
+        final streamUrl = CorsHelper.wrap(widget.localFilePath!);
+        _videoPlayerController = VideoPlayerController.networkUrl(
+          Uri.parse(streamUrl),
         );
       } else {
-        throw Exception('No video source provided');
+        throw Exception('Không có nguồn video để phát');
       }
 
       await _videoPlayerController!.initialize();

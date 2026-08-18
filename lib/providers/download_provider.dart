@@ -1,6 +1,6 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import '../core/utils/platform_file.dart';
 import '../models/download_task.dart';
 import '../models/video_metadata.dart';
 import '../services/download_service.dart';
@@ -108,12 +108,7 @@ class DownloadProvider extends ChangeNotifier {
         _downloadService.cancelDownload(taskId);
       }
       if (deleteLocalFile && task.filePath != null) {
-        try {
-          final file = File(task.filePath!);
-          if (await file.exists()) {
-            await file.delete();
-          }
-        } catch (_) {}
+        await PlatformFileHelper.deleteFile(task.filePath!);
       }
       _tasks.removeAt(index);
       notifyListeners();

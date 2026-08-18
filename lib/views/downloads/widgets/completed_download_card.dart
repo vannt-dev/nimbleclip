@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
@@ -31,7 +30,7 @@ class CompletedDownloadCard extends StatelessWidget {
     final isFailed = task.status == DownloadStatus.failed ||
         task.status == DownloadStatus.cancelled;
 
-    final fileExists = task.filePath != null && File(task.filePath!).existsSync();
+    final isCompleted = task.status == DownloadStatus.completed;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -53,7 +52,7 @@ class CompletedDownloadCard extends StatelessWidget {
             children: [
               // Thumbnail / Play Button
               InkWell(
-                onTap: !isFailed && fileExists ? onPlay : null,
+                onTap: !isFailed && isCompleted ? onPlay : null,
                 borderRadius: BorderRadius.circular(12),
                 child: Stack(
                   alignment: Alignment.center,
@@ -84,7 +83,7 @@ class CompletedDownloadCard extends StatelessWidget {
                               ),
                       ),
                     ),
-                    if (!isFailed && fileExists)
+                    if (!isFailed && isCompleted)
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
@@ -217,7 +216,7 @@ class CompletedDownloadCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              if (!isFailed && fileExists) ...[
+              if (!isFailed && isCompleted) ...[
                 _ActionButton(
                   icon: Icons.play_circle_outline_rounded,
                   label: 'Xem',

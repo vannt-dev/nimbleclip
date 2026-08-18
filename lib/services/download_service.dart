@@ -1,8 +1,8 @@
-import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:open_filex/open_filex.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:flutter/foundation.dart';
 import '../core/constants/app_constants.dart';
+import '../core/utils/platform_file.dart';
+import '../core/utils/web_download_helper.dart';
 import '../models/download_task.dart';
 import 'storage_service.dart';
 
@@ -44,6 +44,36 @@ class DownloadService {
     required Function(DownloadTask task, String error) onError,
     bool autoSaveToGallery = true,
   }) async {
+    final safeTitle = _sanitizeFileName(task.title);
+    final ext = task.format.replaceAll('.', '');
+    final fileName = '${safeTitle}_${task.id.substring(0, 6)}.$ext';
+
+    // 1. Web Browser Handling
+    if (kIsWeb) {
+      task.status = DownloadStatus.downloading;
+      task.progress = 0.5;
+      onProgress(task, 0.5, 0, 0, 0);
+
+      try {
+        // Trigger browser native file download
+        triggerWebDownload(task.downloadUrl, fileName);
+
+        task.status = DownloadStatus.completed;
+        task.progress = 1.0;
+        task.downloadSpeed = 0.0;
+        task.filePath = fileName;
+        task.completedAt = DateTime.now();
+
+        onComplete(task, fileName);
+      } catch (e) {
+        task.status = DownloadStatus.failed;
+        task.errorMessage = e.toString();
+        onError(task, task.errorMessage!);
+      }
+      return;
+    }
+
+    // 2. Native Mobile & Desktop Handling (Android, iOS, Windows, macOS, Linux)
     final cancelToken = CancelToken();
     _cancelTokens[task.id] = cancelToken;
 
@@ -51,12 +81,9 @@ class DownloadService {
     task.errorMessage = null;
 
     final storage = StorageService();
-    final downloadDir = await storage.getDownloadDirectory();
+    final downloadDirPath = await storage.getDownloadDirectory();
 
-    final safeTitle = _sanitizeFileName(task.title);
-    final ext = task.format.replaceAll('.', '');
-    final fileName = '${safeTitle}_${task.id.substring(0, 6)}.$ext';
-    final savePath = '${downloadDir.path}/$fileName';
+    final savePath = downloadDirPath != null ? '$downloadDirPath/$fileName' : fileName;
     task.filePath = savePath;
 
     int lastBytes = 0;
@@ -138,29 +165,17 @@ class DownloadService {
   }
 
   void _cleanupFile(String? path) {
-    if (path == null) return;
-    try {
-      final file = File(path);
-      if (file.existsSync()) {
-        file.deleteSync();
-      }
-    } catch (_) {}
+    if (path == null || kIsWeb) return;
+    PlatformFileHelper.deleteFile(path);
   }
 
   /// Open file using system default application
   Future<void> openFile(String filePath) async {
-    final file = File(filePath);
-    if (await file.exists()) {
-      await OpenFilex.open(filePath);
-    }
+    await PlatformFileHelper.openFile(filePath);
   }
 
   /// Share file to other apps
   Future<void> shareFile(String filePath, {String? text}) async {
-    final file = File(filePath);
-    if (await file.exists()) {
-      // ignore: deprecated_member_use
-      await Share.shareXFiles([XFile(filePath)], text: text);
-    }
+    await PlatformFileHelper.shareFile(filePath, text: text);
   }
 }

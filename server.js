@@ -1,4 +1,5 @@
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
@@ -13,6 +14,7 @@ const MIME_TYPES = {
   '.css': 'text/css',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.gif': 'image/gif',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
@@ -21,13 +23,18 @@ const MIME_TYPES = {
   '.ttf': 'font/ttf',
   '.otf': 'font/otf',
   '.wasm': 'application/wasm',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mp3': 'audio/mpeg',
+  '.m4a': 'audio/mp4',
 };
 
 const server = http.createServer(async (req, res) => {
-  // Add CORS headers for all responses
+  // CORS Headers for all responses
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
   res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges, Content-Type');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -37,7 +44,7 @@ const server = http.createServer(async (req, res) => {
 
   const parsedUrl = url.parse(req.url, true);
 
-  // 1. CORS Proxy Endpoint: /cors-proxy?url=...
+  // 1. CORS Proxy & Video Streaming Endpoint: /cors-proxy?url=...
   if (parsedUrl.pathname === '/cors-proxy' || parsedUrl.pathname === '/proxy') {
     const targetUrl = parsedUrl.query.url;
     if (!targetUrl) {
@@ -53,6 +60,11 @@ const server = http.createServer(async (req, res) => {
         'Accept': '*/*',
         'Accept-Language': 'en-US,en;q=0.9',
       };
+
+      // Forward Range header for HTML5 video streaming and seeking
+      if (req.headers['range']) {
+        headers['Range'] = req.headers['range'];
+      }
 
       let body = undefined;
       if (req.method === 'POST') {
@@ -72,20 +84,44 @@ const server = http.createServer(async (req, res) => {
         body: body,
       });
 
-      const responseHeaders = {};
+      const responseHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Expose-Headers': 'Content-Range, Content-Length, Accept-Ranges, Content-Type',
+        'Accept-Ranges': 'bytes',
+      };
+
+      // Forward content headers
+      const passHeaders = [
+        'content-type',
+        'content-length',
+        'content-range',
+        'content-disposition',
+        'last-modified',
+        'etag',
+      ];
+
       response.headers.forEach((val, key) => {
-        if (!['content-encoding', 'content-length', 'transfer-encoding'].includes(key.toLowerCase())) {
+        if (passHeaders.includes(key.toLowerCase())) {
           responseHeaders[key] = val;
         }
       });
-      responseHeaders['Access-Control-Allow-Origin'] = '*';
 
       res.writeHead(response.status, responseHeaders);
-      const arrayBuffer = await response.arrayBuffer();
-      res.end(Buffer.from(arrayBuffer));
+
+      if (response.body) {
+        const reader = response.body.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(Buffer.from(value));
+        }
+      }
+      res.end();
     } catch (err) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: err.message }));
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
     }
     return;
   }
