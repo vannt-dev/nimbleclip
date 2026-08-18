@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.snapvideo.snap_video"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
