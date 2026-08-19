@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:nimble_clip/l10n/generated/app_localizations.dart';
 import 'package:nimble_clip/core/utils/formatters.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/providers/download_provider.dart';
@@ -12,6 +13,7 @@ import 'package:nimble_clip/services/extractors/registry.dart';
 import 'package:nimble_clip/views/home/home_screen.dart';
 
 void main() {
+  final l10n = lookupAppLocalizations(const Locale('en'));
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
@@ -48,7 +50,7 @@ void main() {
 
     test('rejects a non-http link before touching the network', () async {
       await expectLater(
-        ExtractorRegistry.extract('not a url'),
+        ExtractorRegistry.extract('not a url', l10n),
         throwsA(isA<Exception>()),
       );
     });
@@ -77,7 +79,10 @@ void main() {
   group('VideoExtractorProvider', () {
     test('rejects an invalid URL without clearing into a loading state', () async {
       final provider = VideoExtractorProvider();
-      final ok = await provider.analyzeUrl('definitely not a link');
+      final ok = await provider.analyzeUrl(
+        'definitely not a link',
+        l10n: l10n,
+      );
 
       expect(ok, isFalse);
       expect(provider.isAnalyzing, isFalse);
@@ -103,6 +108,8 @@ void main() {
           ChangeNotifierProvider(create: (_) => DownloadProvider()),
         ],
         child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: HomeScreen(onNavigateDownloads: () {}),
         ),
       ),
@@ -110,7 +117,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('NimbleClip'), findsOneWidget);
-    expect(find.text('Dán liên kết video'), findsOneWidget);
-    expect(find.text('Phân tích & Tải video'), findsOneWidget);
+    expect(find.text('Paste a video link'), findsOneWidget);
+    expect(find.text('Analyze & Download'), findsOneWidget);
   });
 }

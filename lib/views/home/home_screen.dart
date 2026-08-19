@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/url_helper.dart';
+import '../../l10n/l10n.dart';
 import '../../providers/download_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/video_extractor_provider.dart';
@@ -65,13 +66,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 children: [
                   const Icon(Icons.link_rounded, color: Colors.white, size: 18),
                   const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text('Phát hiện liên kết video trong Clipboard!'),
+                  Expanded(
+                    child: Text(context.l10n.clipboardVideoDetected),
                   ),
                 ],
               ),
               action: SnackBarAction(
-                label: 'Dán & Tải',
+                label: context.l10n.pasteAndDownload,
                 textColor: AppColors.tiktokAccent,
                 onPressed: () {
                   _urlController.text = clean;
@@ -96,7 +97,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final preferred = context.read<SettingsProvider>().preferredQuality;
       context
           .read<VideoExtractorProvider>()
-          .analyzeUrl(text, preferredQuality: preferred);
+          .analyzeUrl(
+            text,
+            preferredQuality: preferred,
+            l10n: context.l10n,
+          );
     }
   }
 
@@ -116,14 +121,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       context.read<DownloadProvider>().startNewDownload(
             metadata: meta,
             quality: quality,
+            l10n: context.l10n,
             autoSaveToGallery: settings.autoSaveGallery,
           );
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Đang tải: ${meta.title} (${quality.quality})'),
+          content: Text(context.l10n.downloadStarted(meta.title, quality.quality)),
           action: SnackBarAction(
-            label: 'Xem tiến trình',
+            label: context.l10n.viewProgress,
             textColor: AppColors.tiktokAccent,
             onPressed: widget.onNavigateDownloads,
           ),
@@ -206,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ),
                         ),
                         Text(
-                          AppConstants.appTagline,
+                          context.l10n.appTagline,
                           style: TextStyle(
                             fontSize: 12,
                             color: isDark
@@ -226,7 +232,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          'Hỗ trợ tải video từ ${platform.displayName} chất lượng cao!',
+                          context.l10n.platformSupported(platform.displayName),
                         ),
                         duration: const Duration(seconds: 2),
                         behavior: SnackBarBehavior.floating,
@@ -308,23 +314,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildHowToGuide(bool isDark) {
+    final l10n = context.l10n;
     final steps = [
       {
         'num': '1',
-        'title': 'Sao chép liên kết video',
-        'desc': 'Mở YouTube, TikTok, Facebook hoặc X và bấm "Sao chép liên kết".',
+        'title': l10n.guideCopyTitle,
+        'desc': l10n.guideCopyDescription,
         'icon': Icons.copy_rounded,
       },
       {
         'num': '2',
-        'title': 'Dán liên kết vào ứng dụng',
-        'desc': 'Bấm nút Dán hoặc nhập URL vào thanh tìm kiếm ở trên.',
+        'title': l10n.guidePasteTitle,
+        'desc': l10n.guidePasteDescription,
         'icon': Icons.paste_rounded,
       },
       {
         'num': '3',
-        'title': 'Chọn chất lượng & Tải về',
-        'desc': 'Xem trước video và tải về định dạng HD 1080p hoặc Âm thanh MP3.',
+        'title': l10n.guideDownloadTitle,
+        'desc': l10n.guideDownloadDescription,
         'icon': Icons.file_download_outlined,
       },
     ];
@@ -351,7 +358,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
               const SizedBox(width: 8),
               Text(
-                'Hướng dẫn sử dụng nhanh',
+                l10n.quickGuide,
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,

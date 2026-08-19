@@ -1,11 +1,11 @@
 {
-    "name": "NimbleClip — Trình tải video HD",
+    "name": "NimbleClip — HD Video Downloader",
     "short_name": "NimbleClip",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0F172A",
     "theme_color": "#6366F1",
-    "description": "Tải video & âm thanh HD từ YouTube, TikTok, Facebook, X và Instagram.",
+    "description": "Download public video and audio streams with NimbleClip.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

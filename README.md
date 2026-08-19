@@ -30,6 +30,8 @@ management, local playback, and gallery export.
 - Opens or shares downloaded files with other installed applications.
 - Persists download history and user preferences locally.
 - Supports light, dark, and system themes.
+- Supports English and Vietnamese, with automatic device-locale detection and
+  a persisted in-app language preference.
 - Includes a browser build backed by a local, SSRF-hardened CORS proxy.
 
 ## Supported sources
@@ -53,6 +55,16 @@ The repository contains Flutter targets for Android, iOS, Windows, macOS,
 Linux, and Web. Native targets provide the complete download workflow. The Web
 target has browser-specific limitations and requires the included Node.js
 server for cross-origin requests and downloads.
+
+## Languages
+
+- English (`en`)
+- Vietnamese (`vi`)
+- System default, with English used for unsupported device locales
+
+Translations are maintained as ARB files in `lib/l10n`. Flutter generates the
+typed localization API from these resources during dependency resolution and
+builds.
 
 ## Getting started
 

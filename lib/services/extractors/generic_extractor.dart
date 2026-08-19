@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../../core/utils/http_helper.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/text_unescape.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -35,13 +36,13 @@ class GenericExtractor extends BaseVideoExtractor {
   bool canHandle(String url) => true;
 
   @override
-  Future<VideoMetadata> extract(String url) async {
+  Future<VideoMetadata> extract(String url, AppLocalizations l10n) async {
     final cleanUrl = url.trim();
     final uri = Uri.parse(cleanUrl);
     final id = DateTime.now().millisecondsSinceEpoch.toString();
 
     final direct = _directMediaFormat(uri);
-    if (direct != null) return _directMedia(uri, cleanUrl, id, direct);
+    if (direct != null) return _directMedia(uri, cleanUrl, id, direct, l10n);
 
     final http.Response response;
     try {
@@ -50,7 +51,7 @@ class GenericExtractor extends BaseVideoExtractor {
         timeout: const Duration(seconds: 12),
       );
     } catch (e) {
-      throw ExtractionException('Không truy cập được liên kết: $e');
+      throw ExtractionException(l10n.linkAccessFailed(e.toString()));
     }
 
     // The URL had no media extension but the server says it is media anyway.
@@ -61,14 +62,14 @@ class GenericExtractor extends BaseVideoExtractor {
         id: id,
         originalUrl: cleanUrl,
         title: _fileNameOf(uri) ?? 'Media Stream ($id)',
-        description: 'Liên kết media trực tiếp',
+        description: l10n.directMediaLink,
         author: uri.host,
         coverUrl: '',
         platform: VideoPlatform.generic,
         qualities: [
           VideoQualityOption(
             id: 'gen_$id',
-            label: isAudio ? 'Âm thanh (Gốc)' : 'Video (Gốc)',
+            label: isAudio ? l10n.originalAudio : l10n.originalVideo,
             quality: 'Original',
             format: isAudio ? 'mp3' : 'mp4',
             downloadUrl: cleanUrl,
@@ -79,7 +80,7 @@ class GenericExtractor extends BaseVideoExtractor {
       );
     }
 
-    return _fromOpenGraph(response.body, uri, cleanUrl, id);
+    return _fromOpenGraph(response.body, uri, cleanUrl, id, l10n);
   }
 
   String? _directMediaFormat(Uri uri) {
@@ -90,20 +91,26 @@ class GenericExtractor extends BaseVideoExtractor {
     return null;
   }
 
-  VideoMetadata _directMedia(Uri uri, String url, String id, String format) {
+  VideoMetadata _directMedia(
+    Uri uri,
+    String url,
+    String id,
+    String format,
+    AppLocalizations l10n,
+  ) {
     final isAudio = _audioFormats.contains(format);
     return VideoMetadata(
       id: id,
       originalUrl: url,
       title: _fileNameOf(uri) ?? 'Direct_Media_$id',
-      description: 'Liên kết media trực tiếp',
+      description: l10n.directMediaLink,
       author: uri.host,
       coverUrl: '',
       platform: VideoPlatform.generic,
       qualities: [
         VideoQualityOption(
           id: 'gen_$id',
-          label: isAudio ? 'Âm thanh (Gốc)' : 'Video (Gốc)',
+          label: isAudio ? l10n.originalAudio : l10n.originalVideo,
           quality: 'Original',
           format: format,
           downloadUrl: url,
@@ -113,14 +120,17 @@ class GenericExtractor extends BaseVideoExtractor {
     );
   }
 
-  VideoMetadata _fromOpenGraph(String html, Uri uri, String url, String id) {
+  VideoMetadata _fromOpenGraph(
+    String html,
+    Uri uri,
+    String url,
+    String id,
+    AppLocalizations l10n,
+  ) {
     final videoUrl = _meta(html, ['og:video:secure_url', 'og:video:url', 'og:video']) ??
         _meta(html, ['twitter:player:stream']);
     if (videoUrl == null) {
-      throw const ExtractionException(
-        'Không tìm thấy video nào tại liên kết này. Hãy kiểm tra lại đường dẫn, '
-        'hoặc dán link trực tiếp tới file .mp4.',
-      );
+      throw ExtractionException(l10n.genericNoVideo);
     }
 
     // Open Graph URLs are often protocol-relative or site-relative.
@@ -141,7 +151,7 @@ class GenericExtractor extends BaseVideoExtractor {
       qualities: QualityHelper.sortedByQuality([
         VideoQualityOption(
           id: 'gen_og_$id',
-          label: 'Video nhúng (Web)',
+          label: l10n.embeddedVideo,
           quality: height != null ? '${height}p' : 'Original',
           format: 'mp4',
           downloadUrl: resolved,

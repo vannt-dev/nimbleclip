@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/url_helper.dart';
+import '../../../l10n/l10n.dart';
 import '../../../models/video_platform.dart';
 
 class UrlInputCard extends StatelessWidget {
@@ -29,9 +30,9 @@ class UrlInputCard extends StatelessWidget {
         onChanged(clean);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Đã dán link từ clipboard!'),
-              duration: Duration(seconds: 1),
+            SnackBar(
+              content: Text(context.l10n.clipboardPasted),
+              duration: const Duration(seconds: 1),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -86,7 +87,7 @@ class UrlInputCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Text(
-                'Dán liên kết video',
+                context.l10n.pasteVideoLink,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -149,12 +150,12 @@ class UrlInputCard extends StatelessWidget {
                     IconButton(
                       icon: const Icon(Icons.close_rounded, size: 18),
                       onPressed: onClear,
-                      tooltip: 'Xóa',
+                      tooltip: context.l10n.clear,
                     ),
                   IconButton(
                     icon: const Icon(Icons.content_paste_rounded, size: 18),
                     onPressed: () => _pasteFromClipboard(context),
-                    tooltip: 'Dán',
+                    tooltip: context.l10n.paste,
                   ),
                 ],
               ),
@@ -179,14 +180,14 @@ class UrlInputCard extends StatelessWidget {
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
-                : const Row(
+                : Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.download_rounded, size: 20),
-                      SizedBox(width: 8),
+                      const Icon(Icons.download_rounded, size: 20),
+                      const SizedBox(width: 8),
                       Text(
-                        'Phân tích & Tải video',
-                        style: TextStyle(
+                        context.l10n.analyzeAndDownload,
+                        style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                         ),

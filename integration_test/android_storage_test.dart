@@ -1,8 +1,10 @@
 import 'dart:io';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:nimble_clip/core/utils/platform_file.dart';
+import 'package:nimble_clip/l10n/generated/app_localizations.dart';
 import 'package:nimble_clip/models/download_task.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/services/download_service.dart';
@@ -42,6 +44,7 @@ DownloadTask fixtureTask({
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final l10n = lookupAppLocalizations(const Locale('en'));
 
   final service = DownloadService();
   late String downloadDir;
@@ -89,6 +92,7 @@ void main() {
 
       await service.startDownload(
         task: task,
+        l10n: l10n,
         autoSaveToGallery: false,
         onProgress: (_, _, _, _, _) {},
         onComplete: (_, _) {},
@@ -122,6 +126,7 @@ void main() {
       var sawResumeOffset = false;
       await service.startDownload(
         task: task,
+        l10n: l10n,
         autoSaveToGallery: false,
         onProgress: (_, _, received, _, _) {
           // Progress is reported on the whole-file scale, so the first callback
@@ -158,6 +163,7 @@ void main() {
 
       await service.startDownload(
         task: task,
+        l10n: l10n,
         autoSaveToGallery: false,
         onProgress: (_, _, _, _, _) {},
         onComplete: (_, _) {},
@@ -186,6 +192,7 @@ void main() {
 
       await service.startDownload(
         task: task,
+        l10n: l10n,
         autoSaveToGallery: false,
         onProgress: (_, _, _, _, _) {},
         onComplete: (_, _) {},
@@ -207,6 +214,7 @@ void main() {
 
       await service.startDownload(
         task: task,
+        l10n: l10n,
         autoSaveToGallery: true,
         onProgress: (_, _, _, _, _) {},
         onComplete: (_, _) {},

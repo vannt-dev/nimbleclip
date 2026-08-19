@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../l10n/l10n.dart';
 import '../../../models/download_task.dart';
 
 class CompletedDownloadCard extends StatelessWidget {
@@ -178,7 +179,9 @@ class CompletedDownloadCard extends StatelessWidget {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      task.errorMessage ?? 'Tải video thất bại',
+                      task.errorMessage == 'download_interrupted'
+                          ? context.l10n.downloadInterrupted
+                          : task.errorMessage ?? context.l10n.downloadFailed,
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.error,
@@ -195,9 +198,9 @@ class CompletedDownloadCard extends StatelessWidget {
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      child: const Text(
-                        'Thử lại',
-                        style: TextStyle(
+                      child: Text(
+                        context.l10n.retry,
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: AppColors.primary,
@@ -217,15 +220,15 @@ class CompletedDownloadCard extends StatelessWidget {
                 color: AppColors.info.withAlpha(20),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.download_done_rounded,
+                  const Icon(Icons.download_done_rounded,
                       size: 16, color: AppColors.info),
-                  SizedBox(width: 6),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Đã chuyển sang trình tải xuống của trình duyệt.',
-                      style: TextStyle(fontSize: 12, color: AppColors.info),
+                      context.l10n.browserDownloadStarted,
+                      style: const TextStyle(fontSize: 12, color: AppColors.info),
                     ),
                   ),
                 ],
@@ -244,7 +247,7 @@ class CompletedDownloadCard extends StatelessWidget {
               if (!isFailed && isCompleted) ...[
                 _ActionButton(
                   icon: Icons.play_circle_outline_rounded,
-                  label: 'Xem',
+                  label: context.l10n.view,
                   color: AppColors.primary,
                   onTap: onPlay,
                 ),
@@ -252,7 +255,9 @@ class CompletedDownloadCard extends StatelessWidget {
                   icon: task.isSavedToGallery
                       ? Icons.check_circle_rounded
                       : Icons.photo_library_outlined,
-                  label: task.isSavedToGallery ? 'Đã lưu' : 'Lưu Album',
+                  label: task.isSavedToGallery
+                      ? context.l10n.saved
+                      : context.l10n.saveToGallery,
                   color: task.isSavedToGallery
                       ? AppColors.success
                       : (isDark
@@ -262,7 +267,7 @@ class CompletedDownloadCard extends StatelessWidget {
                 ),
                 _ActionButton(
                   icon: Icons.share_outlined,
-                  label: 'Chia sẻ',
+                  label: context.l10n.share,
                   color: isDark
                       ? AppColors.darkTextSecondary
                       : AppColors.lightTextSecondary,
@@ -270,7 +275,7 @@ class CompletedDownloadCard extends StatelessWidget {
                 ),
                 _ActionButton(
                   icon: Icons.open_in_new_rounded,
-                  label: 'Mở bằng',
+                  label: context.l10n.openWith,
                   color: isDark
                       ? AppColors.darkTextSecondary
                       : AppColors.lightTextSecondary,
@@ -279,7 +284,7 @@ class CompletedDownloadCard extends StatelessWidget {
               ],
               _ActionButton(
                 icon: Icons.delete_outline_rounded,
-                label: 'Xóa',
+                label: context.l10n.delete,
                 color: AppColors.error,
                 onTap: onDelete,
               ),

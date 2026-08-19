@@ -1,4 +1,5 @@
 import '../../core/utils/url_helper.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 
@@ -23,5 +24,5 @@ abstract class BaseVideoExtractor {
   /// the platform table so the domain list lives in exactly one place.
   bool canHandle(String url) => UrlHelper.detectPlatform(url) == platform;
 
-  Future<VideoMetadata> extract(String url);
+  Future<VideoMetadata> extract(String url, AppLocalizations l10n);
 }

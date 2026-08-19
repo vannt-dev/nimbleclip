@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../l10n/l10n.dart';
 import '../../../models/download_task.dart';
 
 class ActiveDownloadCard extends StatelessWidget {
@@ -114,7 +115,7 @@ class ActiveDownloadCard extends StatelessWidget {
                   icon: const Icon(Icons.play_arrow_rounded, size: 22),
                   color: AppColors.success,
                   onPressed: onResume,
-                  tooltip: 'Tiếp tục tải',
+                  tooltip: context.l10n.resumeDownload,
                 )
               else if (!isPaused && onPause != null)
                 IconButton(
@@ -122,14 +123,14 @@ class ActiveDownloadCard extends StatelessWidget {
                   color: AppColors.warning,
                   onPressed:
                       task.status == DownloadStatus.downloading ? onPause : null,
-                  tooltip: 'Tạm dừng',
+                  tooltip: context.l10n.pauseDownload,
                 ),
 
               IconButton(
                 icon: const Icon(Icons.close_rounded, size: 20),
                 color: Colors.redAccent,
                 onPressed: onCancel,
-                tooltip: 'Hủy tải',
+                tooltip: context.l10n.cancelDownload,
               ),
             ],
           ),
@@ -167,7 +168,7 @@ class ActiveDownloadCard extends StatelessWidget {
               ),
               Text(
                 isPaused
-                    ? 'Đã tạm dừng'
+                    ? context.l10n.paused
                     : Formatters.formatSpeed(task.downloadSpeed),
                 style: TextStyle(
                   fontSize: 12,

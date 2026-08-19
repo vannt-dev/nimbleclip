@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/http_helper.dart';
 import '../../core/utils/quality_helper.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -20,7 +21,7 @@ class TikTokExtractor extends BaseVideoExtractor {
       path.startsWith('http') ? path : '$_apiBase$path';
 
   @override
-  Future<VideoMetadata> extract(String url) async {
+  Future<VideoMetadata> extract(String url, AppLocalizations l10n) async {
     final Map<String, dynamic> json;
     try {
       final response = await ExtractorHttp.post(
@@ -30,15 +31,13 @@ class TikTokExtractor extends BaseVideoExtractor {
         body: {'url': url, 'count': '12', 'cursor': '0', 'web': '1', 'hd': '1'},
       );
       if (response.statusCode != 200) {
-        throw ExtractionException(
-          'Dịch vụ TikTok trả về mã ${response.statusCode}. Hãy thử lại sau ít phút.',
-        );
+        throw ExtractionException(l10n.tiktokServiceStatus(response.statusCode));
       }
       json = jsonDecode(response.body) as Map<String, dynamic>;
     } on ExtractionException {
       rethrow;
     } catch (e) {
-      throw ExtractionException('Không kết nối được dịch vụ TikTok: $e');
+      throw ExtractionException(l10n.tiktokConnectionFailed(e.toString()));
     }
 
     if (json['code'] != 0 || json['data'] == null) {
@@ -46,7 +45,7 @@ class TikTokExtractor extends BaseVideoExtractor {
       throw ExtractionException(
         message != null && message.isNotEmpty
             ? 'TikTok: $message'
-            : 'Không đọc được dữ liệu video TikTok. Link có thể đã bị xoá hoặc ở chế độ riêng tư.',
+            : l10n.tiktokInvalidData,
       );
     }
 
@@ -61,7 +60,7 @@ class TikTokExtractor extends BaseVideoExtractor {
       qualities.add(
         VideoQualityOption(
           id: 'tt_hd_$id',
-          label: 'HD 1080p (Không logo)',
+          label: 'HD 1080p (${l10n.noWatermark})',
           quality: 'HD 1080p',
           format: 'mp4',
           downloadUrl: _absolute(hdPlay),
@@ -75,7 +74,7 @@ class TikTokExtractor extends BaseVideoExtractor {
       qualities.add(
         VideoQualityOption(
           id: 'tt_sd_$id',
-          label: '720p (Không logo)',
+          label: '720p (${l10n.noWatermark})',
           quality: '720p',
           format: 'mp4',
           downloadUrl: _absolute(play),
@@ -89,7 +88,7 @@ class TikTokExtractor extends BaseVideoExtractor {
       qualities.add(
         VideoQualityOption(
           id: 'tt_wm_$id',
-          label: '720p (Có logo TikTok)',
+          label: '720p (${l10n.withWatermark})',
           quality: '720p',
           format: 'mp4',
           downloadUrl: _absolute(wmPlay),
@@ -101,11 +100,11 @@ class TikTokExtractor extends BaseVideoExtractor {
     final music = data['music']?.toString();
     if (music != null && music.isNotEmpty) {
       final musicInfo = data['music_info'] as Map<String, dynamic>? ?? {};
-      final musicTitle = musicInfo['title']?.toString() ?? 'Nhạc gốc';
+      final musicTitle = musicInfo['title']?.toString() ?? l10n.originalSound;
       qualities.add(
         VideoQualityOption(
           id: 'tt_audio_$id',
-          label: 'Âm thanh MP3 ($musicTitle)',
+          label: l10n.audioMp3Label(musicTitle),
           quality: 'Audio MP3',
           format: 'mp3',
           downloadUrl: _absolute(music),
@@ -115,9 +114,7 @@ class TikTokExtractor extends BaseVideoExtractor {
     }
 
     if (qualities.isEmpty) {
-      throw const ExtractionException(
-        'TikTok không trả về luồng tải nào cho video này.',
-      );
+      throw ExtractionException(l10n.tiktokNoStreams);
     }
 
     final title = data['title']?.toString().trim();

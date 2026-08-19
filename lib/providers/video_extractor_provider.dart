@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/utils/quality_helper.dart';
 import '../core/utils/url_helper.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../models/video_metadata.dart';
 import '../services/extractors/registry.dart';
 
@@ -26,10 +27,11 @@ class VideoExtractorProvider extends ChangeNotifier {
   Future<bool> analyzeUrl(
     String url, {
     String preferredQuality = 'Highest',
+    required AppLocalizations l10n,
   }) async {
     final cleanUrl = UrlHelper.extractCleanUrl(url);
     if (!UrlHelper.isValidVideoUrl(cleanUrl)) {
-      _errorMessage = 'Vui lòng nhập đường dẫn video hợp lệ (http/https).';
+      _errorMessage = l10n.invalidVideoUrl;
       _metadata = null;
       _selectedQuality = null;
       notifyListeners();
@@ -45,7 +47,7 @@ class VideoExtractorProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final metadata = await ExtractorRegistry.extract(cleanUrl);
+      final metadata = await ExtractorRegistry.extract(cleanUrl, l10n);
       if (sequence != _requestSequence) return false;
 
       _metadata = metadata;
@@ -58,7 +60,7 @@ class VideoExtractorProvider extends ChangeNotifier {
     } catch (e) {
       if (sequence != _requestSequence) return false;
       _isAnalyzing = false;
-      _errorMessage = _readableError(e);
+      _errorMessage = _readableError(e, l10n.unableToAnalyze);
       notifyListeners();
       return false;
     }
@@ -66,12 +68,12 @@ class VideoExtractorProvider extends ChangeNotifier {
 
   /// Strips the `Exception:` prefixes Dart adds so the user sees the message the
   /// extractor actually wrote.
-  String _readableError(Object error) {
+  String _readableError(Object error, String fallbackErrorMessage) {
     var message = error.toString();
     while (message.startsWith('Exception:')) {
       message = message.substring('Exception:'.length).trim();
     }
-    return message.isEmpty ? 'Không phân tích được liên kết này.' : message;
+    return message.isEmpty ? fallbackErrorMessage : message;
   }
 
   void selectQuality(VideoQualityOption quality) {

@@ -4,6 +4,7 @@ import 'package:video_player/video_player.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/cors_helper.dart';
 import '../../core/utils/local_video_source.dart';
+import '../../l10n/l10n.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final String title;
@@ -27,12 +28,21 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
   bool _isLoading = true;
+  bool _hasInitialized = false;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _initializePlayer();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_hasInitialized) {
+      _hasInitialized = true;
+      _initializePlayer();
+    }
   }
 
   Future<void> _initializePlayer() async {
@@ -41,7 +51,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       if (localPath != null && localPath.isNotEmpty) {
         if (!localPlaybackSupported(localPath)) {
           throw Exception(
-            'Không tìm thấy file đã tải trên máy. File có thể đã bị xóa.',
+            context.l10n.localFileMissing,
           );
         }
         _videoPlayerController = createLocalVideoController(localPath);
@@ -52,7 +62,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           Uri.parse(CorsHelper.wrap(widget.videoUrl!)),
         );
       } else {
-        throw Exception('Không có nguồn video để phát');
+        throw Exception(context.l10n.noVideoSource);
       }
 
       await _videoPlayerController!.initialize();
@@ -82,7 +92,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                'Lỗi phát video: $errorMessage',
+                context.l10n.videoPlaybackError(errorMessage),
                 style: const TextStyle(color: Colors.white),
                 textAlign: TextAlign.center,
               ),
@@ -135,7 +145,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             IconButton(
               icon: const Icon(Icons.download_rounded, color: AppColors.primaryLight),
               onPressed: widget.onDownload,
-              tooltip: 'Tải video này',
+              tooltip: context.l10n.downloadThisVideo,
             ),
         ],
       ),
@@ -169,7 +179,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                               });
                               _initializePlayer();
                             },
-                            child: const Text('Thử lại'),
+                            child: Text(context.l10n.retry),
                           ),
                         ],
                       ),

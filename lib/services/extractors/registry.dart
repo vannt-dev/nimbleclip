@@ -1,4 +1,5 @@
 import '../../core/utils/url_helper.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
 import 'base_extractor.dart';
 import 'facebook_extractor.dart';
@@ -26,19 +27,18 @@ class ExtractorRegistry {
     return const GenericExtractor();
   }
 
-  static Future<VideoMetadata> extract(String rawUrl) async {
+  static Future<VideoMetadata> extract(
+    String rawUrl,
+    AppLocalizations l10n,
+  ) async {
     final cleanUrl = UrlHelper.extractCleanUrl(rawUrl);
     if (!UrlHelper.isValidVideoUrl(cleanUrl)) {
-      throw const ExtractionException(
-        'Đường dẫn không hợp lệ. Hãy nhập một liên kết video http/https.',
-      );
+      throw ExtractionException(l10n.invalidLink);
     }
 
-    final metadata = await getExtractorFor(cleanUrl).extract(cleanUrl);
+    final metadata = await getExtractorFor(cleanUrl).extract(cleanUrl, l10n);
     if (metadata.qualities.isEmpty) {
-      throw const ExtractionException(
-        'Không tìm thấy luồng tải nào cho liên kết này.',
-      );
+      throw ExtractionException(l10n.noDownloadStreams);
     }
     return metadata;
   }

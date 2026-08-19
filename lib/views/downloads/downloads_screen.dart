@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../l10n/l10n.dart';
 import '../../models/download_task.dart';
 import '../../providers/download_provider.dart';
 import '../player/video_player_screen.dart';
@@ -50,17 +51,17 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Xác nhận xóa'),
-        content: Text('Bạn có chắc muốn xóa "${task.title}"?'),
+        title: Text(context.l10n.confirmDeleteTitle),
+        content: Text(context.l10n.confirmDeleteMessage(task.title)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Hủy'),
+            child: Text(context.l10n.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Xóa'),
+            child: Text(context.l10n.delete),
           ),
         ],
       ),
@@ -69,9 +70,9 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     if (confirmed == true && context.mounted) {
       context.read<DownloadProvider>().deleteTask(task.id);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã xóa video.'),
-          duration: Duration(seconds: 1),
+        SnackBar(
+          content: Text(context.l10n.videoDeleted),
+          duration: const Duration(seconds: 1),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -87,7 +88,9 @@ class _DownloadsScreenState extends State<DownloadsScreen>
       task: task,
       onCancel: () => provider.cancelTask(task.id),
       onPause: kIsWeb ? null : () => provider.pauseTask(task.id),
-      onResume: kIsWeb ? null : () => provider.resumeTask(task),
+      onResume: kIsWeb
+          ? null
+          : () => provider.resumeTask(task, l10n: context.l10n),
     );
   }
 
@@ -95,20 +98,17 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Xóa mục đã xong'),
-        content: const Text(
-          'Xóa toàn bộ mục đã tải xong, thất bại và đã hủy khỏi danh sách? '
-          'File đã tải về máy vẫn được giữ lại.',
-        ),
+        title: Text(context.l10n.clearFinishedTitle),
+        content: Text(context.l10n.clearFinishedMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Hủy'),
+            child: Text(context.l10n.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Xóa'),
+            child: Text(context.l10n.delete),
           ),
         ],
       ),
@@ -131,11 +131,11 @@ class _DownloadsScreenState extends State<DownloadsScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Quản lý tải về'),
+        title: Text(context.l10n.downloadsTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.playlist_remove_rounded),
-            tooltip: 'Xóa mục đã xong',
+            tooltip: context.l10n.clearFinished,
             onPressed:
                 hasFinished ? () => _confirmClearFinished(context) : null,
           ),
@@ -150,12 +150,12 @@ class _DownloadsScreenState extends State<DownloadsScreen>
               : AppColors.lightTextSecondary,
           labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           tabs: [
-            Tab(text: 'Tất cả (${all.length})'),
+            Tab(text: context.l10n.tabAll(all.length)),
             Tab(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('Đang tải'),
+                  Text(context.l10n.tabDownloading),
                   if (active.isNotEmpty) ...[
                     const SizedBox(width: 6),
                     Container(
@@ -178,7 +178,7 @@ class _DownloadsScreenState extends State<DownloadsScreen>
                 ],
               ),
             ),
-            Tab(text: 'Đã tải (${completed.length})'),
+            Tab(text: context.l10n.tabDownloaded(completed.length)),
           ],
         ),
       ),
@@ -197,8 +197,8 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     if (tasks.isEmpty) {
       return _buildEmptyState(
         icon: Icons.cloud_download_outlined,
-        title: 'Không có tiến trình tải nào',
-        subtitle: 'Các video đang tải về sẽ xuất hiện ở đây.',
+        title: context.l10n.noActiveDownloads,
+        subtitle: context.l10n.noActiveDownloadsDescription,
       );
     }
 
@@ -213,8 +213,8 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     if (tasks.isEmpty) {
       return _buildEmptyState(
         icon: Icons.check_circle_outline_rounded,
-        title: 'Chưa có video nào đã tải',
-        subtitle: 'Dán liên kết video để bắt đầu tải về máy.',
+        title: context.l10n.noCompletedDownloads,
+        subtitle: context.l10n.noCompletedDownloadsDescription,
       );
     }
 
@@ -235,19 +235,25 @@ class _DownloadsScreenState extends State<DownloadsScreen>
                 SnackBar(
                   content: Text(
                     saved
-                        ? 'Đã lưu video vào Album ảnh!'
-                        : 'Không thể lưu vào Album. Vui lòng cấp quyền.',
+                        ? context.l10n.savedToGallery
+                        : context.l10n.gallerySaveFailed,
                   ),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
             }
           },
-          onShare: () => context.read<DownloadProvider>().shareFile(task),
+          onShare: () => context.read<DownloadProvider>().shareFile(
+                task,
+                context.l10n.shareFromNimbleClip(task.title),
+              ),
           onOpenExternal: () =>
               context.read<DownloadProvider>().openFile(task),
           onDelete: () => _confirmDelete(context, task),
-          onRetry: () => context.read<DownloadProvider>().retryTask(task),
+          onRetry: () => context.read<DownloadProvider>().retryTask(
+                task,
+                l10n: context.l10n,
+              ),
         );
       },
     );
@@ -258,8 +264,8 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     if (tasks.isEmpty) {
       return _buildEmptyState(
         icon: Icons.video_library_outlined,
-        title: 'Danh sách tải về trống',
-        subtitle: 'Bạn chưa tải video nào. Hãy bắt đầu ngay!',
+        title: context.l10n.emptyDownloadList,
+        subtitle: context.l10n.emptyDownloadListDescription,
       );
     }
 
@@ -283,19 +289,25 @@ class _DownloadsScreenState extends State<DownloadsScreen>
                   SnackBar(
                     content: Text(
                       saved
-                          ? 'Đã lưu video vào Album ảnh!'
-                          : 'Không thể lưu vào Album.',
+                          ? context.l10n.savedToGallery
+                          : context.l10n.gallerySaveFailedShort,
                     ),
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
               }
             },
-            onShare: () => context.read<DownloadProvider>().shareFile(task),
+            onShare: () => context.read<DownloadProvider>().shareFile(
+                  task,
+                  context.l10n.shareFromNimbleClip(task.title),
+                ),
             onOpenExternal: () =>
                 context.read<DownloadProvider>().openFile(task),
             onDelete: () => _confirmDelete(context, task),
-            onRetry: () => context.read<DownloadProvider>().retryTask(task),
+            onRetry: () => context.read<DownloadProvider>().retryTask(
+                  task,
+                  l10n: context.l10n,
+                ),
           );
         }
       },
@@ -357,7 +369,7 @@ class _DownloadsScreenState extends State<DownloadsScreen>
             ElevatedButton.icon(
               onPressed: widget.onNavigateHome,
               icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('Tải video mới'),
+              label: Text(context.l10n.newDownload),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),

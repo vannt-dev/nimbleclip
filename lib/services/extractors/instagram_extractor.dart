@@ -3,6 +3,7 @@ import '../../core/utils/http_helper.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/text_unescape.dart';
 import '../../core/utils/url_helper.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -27,7 +28,7 @@ class InstagramExtractor extends BaseVideoExtractor {
       _shortcodePattern.firstMatch(url)?.group(1);
 
   @override
-  Future<VideoMetadata> extract(String url) async {
+  Future<VideoMetadata> extract(String url, AppLocalizations l10n) async {
     var cleanUrl = url.trim();
     var shortcode = _extractShortcode(cleanUrl);
 
@@ -37,26 +38,24 @@ class InstagramExtractor extends BaseVideoExtractor {
     }
 
     if (shortcode == null) {
-      throw const ExtractionException(
-        'Không nhận diện được bài đăng Instagram. Hãy dùng link dạng '
-        'instagram.com/reel/<mã> hoặc instagram.com/p/<mã>.',
-      );
+      throw ExtractionException(l10n.instagramInvalidPost);
     }
 
-    final viaEmbed = await _fromEmbedPage(shortcode, cleanUrl);
+    final viaEmbed = await _fromEmbedPage(shortcode, cleanUrl, l10n);
     if (viaEmbed != null) return viaEmbed;
 
-    final viaPage = await _fromPostPage(shortcode, cleanUrl);
+    final viaPage = await _fromPostPage(shortcode, cleanUrl, l10n);
     if (viaPage != null) return viaPage;
 
-    throw const ExtractionException(
-      'Instagram yêu cầu đăng nhập để xem bài đăng này. Chỉ các Reels / video ở '
-      'chế độ công khai mới tải được.',
-    );
+    throw ExtractionException(l10n.instagramLoginRequired);
   }
 
   /// The embed player ships the media URL inside a `contextJSON` blob.
-  Future<VideoMetadata?> _fromEmbedPage(String shortcode, String url) async {
+  Future<VideoMetadata?> _fromEmbedPage(
+    String shortcode,
+    String url,
+    AppLocalizations l10n,
+  ) async {
     final String html;
     try {
       final response = await ExtractorHttp.get(
@@ -77,6 +76,7 @@ class InstagramExtractor extends BaseVideoExtractor {
     if (videoUrl == null) return null;
 
     return _build(
+      l10n: l10n,
       shortcode: shortcode,
       originalUrl: url,
       videoUrl: videoUrl,
@@ -102,7 +102,11 @@ class InstagramExtractor extends BaseVideoExtractor {
   }
 
   /// The post page still exposes an `og:video` tag for some public Reels.
-  Future<VideoMetadata?> _fromPostPage(String shortcode, String url) async {
+  Future<VideoMetadata?> _fromPostPage(
+    String shortcode,
+    String url,
+    AppLocalizations l10n,
+  ) async {
     final String html;
     try {
       final response = await ExtractorHttp.get(
@@ -122,6 +126,7 @@ class InstagramExtractor extends BaseVideoExtractor {
     if (videoUrl == null) return null;
 
     return _build(
+      l10n: l10n,
       shortcode: shortcode,
       originalUrl: url,
       videoUrl: videoUrl,
@@ -139,6 +144,7 @@ class InstagramExtractor extends BaseVideoExtractor {
   }
 
   VideoMetadata _build({
+    required AppLocalizations l10n,
     required String shortcode,
     required String originalUrl,
     required String videoUrl,
@@ -174,7 +180,7 @@ class InstagramExtractor extends BaseVideoExtractor {
       qualities: QualityHelper.sortedByQuality([
         VideoQualityOption(
           id: 'ig_$shortcode',
-          label: 'MP4 (Chất lượng gốc)',
+          label: l10n.originalMp4,
           quality: 'Original',
           format: 'mp4',
           downloadUrl: decodeHtmlEntities(decodeJsonEscapes(videoUrl)),

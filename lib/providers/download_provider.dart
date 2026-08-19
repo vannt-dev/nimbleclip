@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/utils/platform_file.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../core/utils/quality_helper.dart';
 import '../models/download_task.dart';
 import '../models/video_metadata.dart';
@@ -83,7 +84,7 @@ class DownloadProvider extends ChangeNotifier {
       // fromJson already demotes interrupted downloads to `failed`; give them a
       // message so the UI explains why they need a retry.
       if (task.status == DownloadStatus.failed && task.errorMessage == null) {
-        task.errorMessage = 'Tải bị gián đoạn khi ứng dụng đóng. Hãy thử lại.';
+        task.errorMessage = 'download_interrupted';
       }
     }
     _tasks
@@ -97,6 +98,7 @@ class DownloadProvider extends ChangeNotifier {
   Future<DownloadTask> startNewDownload({
     required VideoMetadata metadata,
     required VideoQualityOption quality,
+    required AppLocalizations l10n,
     bool autoSaveToGallery = true,
   }) async {
     // Do not let the asynchronous history restore clear a task that the user
@@ -123,16 +125,22 @@ class DownloadProvider extends ChangeNotifier {
     notifyListeners();
     await _saveHistory();
 
-    unawaited(_executeDownload(task, autoSaveToGallery: autoSaveToGallery));
+    unawaited(_executeDownload(
+      task,
+      l10n: l10n,
+      autoSaveToGallery: autoSaveToGallery,
+    ));
     return task;
   }
 
   Future<void> _executeDownload(
     DownloadTask task, {
+    required AppLocalizations l10n,
     bool autoSaveToGallery = true,
   }) async {
     await _downloadService.startDownload(
       task: task,
+      l10n: l10n,
       autoSaveToGallery: autoSaveToGallery,
       onProgress: (_, _, _, _, _) => _notifyProgress(),
       onComplete: (_, _) {
@@ -173,13 +181,18 @@ class DownloadProvider extends ChangeNotifier {
   /// supports byte ranges.
   Future<void> resumeTask(
     DownloadTask task, {
+    required AppLocalizations l10n,
     bool autoSaveToGallery = true,
   }) async {
     if (task.status != DownloadStatus.paused) return;
     task.status = DownloadStatus.queued;
     task.errorMessage = null;
     notifyListeners();
-    await _executeDownload(task, autoSaveToGallery: autoSaveToGallery);
+    await _executeDownload(
+      task,
+      l10n: l10n,
+      autoSaveToGallery: autoSaveToGallery,
+    );
   }
 
   /// Retries a failed or cancelled task.
@@ -191,6 +204,7 @@ class DownloadProvider extends ChangeNotifier {
   Future<void> retryTask(
     DownloadTask task, {
     bool autoSaveToGallery = true,
+    required AppLocalizations l10n,
   }) async {
     task.status = DownloadStatus.queued;
     task.progress = 0.0;
@@ -203,7 +217,7 @@ class DownloadProvider extends ChangeNotifier {
       await PlatformFileHelper.deleteFile(task.filePath!);
     }
 
-    final refreshedUrl = await _refreshDownloadUrl(task);
+    final refreshedUrl = await _refreshDownloadUrl(task, l10n);
     if (refreshedUrl != null) {
       final index = _tasks.indexWhere((t) => t.id == task.id);
       final refreshed = task.withRefreshedSource(
@@ -212,19 +226,30 @@ class DownloadProvider extends ChangeNotifier {
       );
       if (index != -1) _tasks[index] = refreshed;
       notifyListeners();
-      await _executeDownload(refreshed, autoSaveToGallery: autoSaveToGallery);
+      await _executeDownload(
+        refreshed,
+        l10n: l10n,
+        autoSaveToGallery: autoSaveToGallery,
+      );
       return;
     }
 
-    await _executeDownload(task, autoSaveToGallery: autoSaveToGallery);
+    await _executeDownload(
+      task,
+      l10n: l10n,
+      autoSaveToGallery: autoSaveToGallery,
+    );
   }
 
   /// Re-extracts [task]'s source link and returns the option matching the
   /// quality originally chosen, or null when re-extraction is not possible.
-  Future<VideoQualityOption?> _refreshDownloadUrl(DownloadTask task) async {
+  Future<VideoQualityOption?> _refreshDownloadUrl(
+    DownloadTask task,
+    AppLocalizations l10n,
+  ) async {
     if (task.originalUrl.isEmpty) return null;
     try {
-      final metadata = await ExtractorRegistry.extract(task.originalUrl);
+      final metadata = await ExtractorRegistry.extract(task.originalUrl, l10n);
       for (final option in metadata.qualities) {
         if (option.label == task.qualityLabel) return option;
       }
@@ -285,11 +310,11 @@ class DownloadProvider extends ChangeNotifier {
     await _downloadService.openFile(task.filePath!);
   }
 
-  Future<void> shareFile(DownloadTask task) async {
+  Future<void> shareFile(DownloadTask task, String message) async {
     if (task.filePath == null) return;
     await _downloadService.shareFile(
       task.filePath!,
-      text: 'Tải bằng NimbleClip: ${task.title}',
+      text: message,
     );
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
+import '../l10n/l10n.dart';
 import '../providers/download_provider.dart';
 import 'downloads/downloads_screen.dart';
 import 'home/home_screen.dart';
@@ -56,10 +57,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           indicatorColor: AppColors.primary.withAlpha(isDark ? 50 : 30),
           elevation: 0,
           destinations: [
-            const NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home_rounded, color: AppColors.primary),
-              label: 'Trang chủ',
+            NavigationDestination(
+              icon: const Icon(Icons.home_outlined),
+              selectedIcon: const Icon(Icons.home_rounded, color: AppColors.primary),
+              label: context.l10n.navHome,
             ),
             NavigationDestination(
               icon: Badge(
@@ -74,12 +75,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 backgroundColor: AppColors.primary,
                 child: const Icon(Icons.download_rounded, color: AppColors.primary),
               ),
-              label: 'Tải về',
+              label: context.l10n.navDownloads,
             ),
-            const NavigationDestination(
-              icon: Icon(Icons.settings_outlined),
-              selectedIcon: Icon(Icons.settings_rounded, color: AppColors.primary),
-              label: 'Cài đặt',
+            NavigationDestination(
+              icon: const Icon(Icons.settings_outlined),
+              selectedIcon: const Icon(Icons.settings_rounded, color: AppColors.primary),
+              label: context.l10n.navSettings,
             ),
           ],
         ),

@@ -5,19 +5,22 @@ import '../services/storage_service.dart';
 
 class SettingsProvider extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
+  Locale? _locale;
   bool _autoSaveGallery = true;
   bool _autoPasteClipboard = true;
   String _preferredQuality = 'Highest'; // Highest, 720p, 480p, Ask
   int _cacheSizeBytes = 0;
 
   ThemeMode get themeMode => _themeMode;
+  Locale? get locale => _locale;
   bool get autoSaveGallery => _autoSaveGallery;
   bool get autoPasteClipboard => _autoPasteClipboard;
   String get preferredQuality => _preferredQuality;
   int get cacheSizeBytes => _cacheSizeBytes;
+  late final Future<void> initialized;
 
   SettingsProvider() {
-    _loadSettings();
+    initialized = _loadSettings();
   }
 
   Future<void> _loadSettings() async {
@@ -34,6 +37,8 @@ class SettingsProvider extends ChangeNotifier {
     _autoSaveGallery = prefs.getBool(AppConstants.keyAutoSaveGallery) ?? true;
     _autoPasteClipboard = prefs.getBool(AppConstants.keyAutoPasteClipboard) ?? true;
     _preferredQuality = prefs.getString(AppConstants.keyPreferredQuality) ?? 'Highest';
+    final languageCode = prefs.getString(AppConstants.keyLanguageCode);
+    _locale = languageCode == null ? null : Locale(languageCode);
 
     await refreshCacheSize();
     notifyListeners();
@@ -49,6 +54,17 @@ class SettingsProvider extends ChangeNotifier {
             ? 'light'
             : 'system';
     await prefs.setString(AppConstants.keyThemeMode, themeStr);
+  }
+
+  Future<void> setLocale(Locale? locale) async {
+    _locale = locale;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    if (locale == null) {
+      await prefs.remove(AppConstants.keyLanguageCode);
+    } else {
+      await prefs.setString(AppConstants.keyLanguageCode, locale.languageCode);
+    }
   }
 
   Future<void> setAutoSaveGallery(bool value) async {

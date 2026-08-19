@@ -1,8 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:nimble_clip/core/utils/http_helper.dart';
+import 'package:nimble_clip/l10n/generated/app_localizations.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/services/extractors/facebook_extractor.dart';
 import 'package:nimble_clip/services/extractors/generic_extractor.dart';
@@ -15,6 +17,7 @@ String fixture(String name) =>
     File('test/fixtures/extractors/$name').readAsStringSync();
 
 void main() {
+  final l10n = lookupAppLocalizations(const Locale('en'));
   tearDown(ExtractorHttp.resetOverrides);
 
   test('TikTok parses the API fixture', () async {
@@ -22,7 +25,7 @@ void main() {
         http.Response(fixture('tiktok.json'), 200);
 
     final result =
-        await const TikTokExtractor().extract('https://www.tiktok.com/@u/video/1');
+        await const TikTokExtractor().extract('https://www.tiktok.com/@u/video/1', l10n);
 
     expect(result.platform, VideoPlatform.tiktok);
     expect(result.title, 'TikTok fixture');
@@ -35,7 +38,7 @@ void main() {
         (_, _) async => http.Response(fixture('twitter.json'), 200);
 
     final result = await const TwitterExtractor()
-        .extract('https://x.com/fixture/status/123456789');
+        .extract('https://x.com/fixture/status/123456789', l10n);
 
     expect(result.platform, VideoPlatform.twitter);
     expect(result.author, 'Fixture User');
@@ -48,7 +51,7 @@ void main() {
         (_, _) async => http.Response(fixture('facebook.html'), 200);
 
     final result = await const FacebookExtractor()
-        .extract('https://www.facebook.com/watch/?v=123456');
+        .extract('https://www.facebook.com/watch/?v=123456', l10n);
 
     expect(result.platform, VideoPlatform.facebook);
     expect(result.id, '123456');
@@ -61,7 +64,7 @@ void main() {
         (_, _) async => http.Response(fixture('instagram.html'), 200);
 
     final result = await const InstagramExtractor()
-        .extract('https://www.instagram.com/reel/fixture123/');
+        .extract('https://www.instagram.com/reel/fixture123/', l10n);
 
     expect(result.platform, VideoPlatform.instagram);
     expect(result.author, 'fixture_user');
@@ -73,7 +76,7 @@ void main() {
         (_, _) async => http.Response(fixture('youtube.html'), 200);
 
     final result = await const YouTubeExtractor(useNativeClient: false)
-        .extract('https://www.youtube.com/watch?v=abcdefghijk');
+        .extract('https://www.youtube.com/watch?v=abcdefghijk', l10n);
 
     expect(result.platform, VideoPlatform.youtube);
     expect(result.title, 'YouTube fixture');
@@ -88,7 +91,7 @@ void main() {
         );
 
     final result =
-        await const GenericExtractor().extract('https://fixture.example/post');
+        await const GenericExtractor().extract('https://fixture.example/post', l10n);
 
     expect(result.platform, VideoPlatform.generic);
     expect(result.title, 'Generic fixture');

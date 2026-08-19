@@ -7,6 +7,7 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt_lib;
 import '../../core/utils/http_helper.dart';
 import '../../core/utils/json_scanner.dart';
 import '../../core/utils/quality_helper.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -27,24 +28,25 @@ class YouTubeExtractor extends BaseVideoExtractor {
       _videoIdPattern.firstMatch(url)?.group(1);
 
   @override
-  Future<VideoMetadata> extract(String url) async {
+  Future<VideoMetadata> extract(String url, AppLocalizations l10n) async {
     // Native platforms get the real deal: youtube_explode_dart deciphers
     // signature-protected stream URLs, which plain HTML scraping cannot.
     if (!kIsWeb && useNativeClient) {
-      final native = await _extractNative(url);
+      final native = await _extractNative(url, l10n);
       if (native != null) return native;
     }
 
     final videoId = _extractVideoId(url);
     if (videoId == null) {
-      throw const ExtractionException(
-        'Không tìm thấy Video ID hợp lệ trong link YouTube.',
-      );
+      throw ExtractionException(l10n.youtubeInvalidId);
     }
-    return _extractFromWatchPage(url, videoId);
+    return _extractFromWatchPage(url, videoId, l10n);
   }
 
-  Future<VideoMetadata?> _extractNative(String url) async {
+  Future<VideoMetadata?> _extractNative(
+    String url,
+    AppLocalizations l10n,
+  ) async {
     final yt = yt_lib.YoutubeExplode();
     try {
       final video = await yt.videos.get(url);
@@ -55,7 +57,7 @@ class YouTubeExtractor extends BaseVideoExtractor {
         qualities.add(
           VideoQualityOption(
             id: 'yt_muxed_${stream.tag}',
-            label: '${stream.qualityLabel} (Video + Âm thanh)',
+            label: l10n.videoAndAudioLabel(stream.qualityLabel),
             quality: stream.qualityLabel,
             format: stream.container.name,
             downloadUrl: stream.url.toString(),
@@ -71,7 +73,7 @@ class YouTubeExtractor extends BaseVideoExtractor {
         qualities.add(
           VideoQualityOption(
             id: 'yt_audio_${bestAudio.tag}',
-            label: 'Âm thanh M4A ($kbps kbps)',
+            label: l10n.audioM4aLabel(kbps),
             quality: 'Audio ($kbps kbps)',
             format: 'm4a',
             downloadUrl: bestAudio.url.toString(),
@@ -106,14 +108,18 @@ class YouTubeExtractor extends BaseVideoExtractor {
     }
   }
 
-  Future<VideoMetadata> _extractFromWatchPage(String url, String videoId) async {
+  Future<VideoMetadata> _extractFromWatchPage(
+    String url,
+    String videoId,
+    AppLocalizations l10n,
+  ) async {
     final http.Response response;
     try {
       response = await ExtractorHttp.get(
         'https://www.youtube.com/watch?v=$videoId',
       );
     } catch (e) {
-      throw ExtractionException('Không tải được trang YouTube: $e');
+      throw ExtractionException(l10n.youtubeLoadFailed(e.toString()));
     }
 
     // A balanced-brace scan, not a non-greedy regex: the player response
@@ -121,24 +127,21 @@ class YouTubeExtractor extends BaseVideoExtractor {
     final blob =
         extractJsonAfterMarker(response.body, 'ytInitialPlayerResponse');
     if (blob == null) {
-      throw const ExtractionException(
-        'YouTube không trả về dữ liệu trình phát. Video có thể ở chế độ riêng tư '
-        'hoặc bị giới hạn độ tuổi.',
-      );
+      throw ExtractionException(l10n.youtubeNoPlayerData);
     }
 
     final Map<String, dynamic> json;
     try {
       json = jsonDecode(blob) as Map<String, dynamic>;
     } catch (e) {
-      throw ExtractionException('Dữ liệu YouTube không hợp lệ: $e');
+      throw ExtractionException(l10n.youtubeInvalidData(e.toString()));
     }
 
     final playability = json['playabilityStatus'] as Map<String, dynamic>?;
     final status = playability?['status']?.toString();
     if (status != null && status != 'OK') {
       final reason = playability?['reason']?.toString() ?? status;
-      throw ExtractionException('YouTube từ chối phát video này: $reason');
+      throw ExtractionException(l10n.youtubePlaybackRejected(reason));
     }
 
     final details = json['videoDetails'] as Map<String, dynamic>? ?? {};
@@ -168,7 +171,7 @@ class YouTubeExtractor extends BaseVideoExtractor {
       qualities.add(
         VideoQualityOption(
           id: 'yt_video_${videoId}_$i',
-          label: '$quality (Video + Âm thanh)',
+          label: l10n.videoAndAudioLabel(quality),
           quality: quality,
           format: mimeType.contains('webm') ? 'webm' : 'mp4',
           downloadUrl: directUrl,
@@ -200,7 +203,7 @@ class YouTubeExtractor extends BaseVideoExtractor {
       qualities.add(
         VideoQualityOption(
           id: 'yt_audio_$videoId',
-          label: 'Âm thanh M4A ($kbps kbps)',
+          label: l10n.audioM4aLabel(kbps),
           quality: 'Audio ($kbps kbps)',
           format: 'm4a',
           downloadUrl: bestAudio['url'].toString(),
@@ -213,9 +216,8 @@ class YouTubeExtractor extends BaseVideoExtractor {
     if (qualities.isEmpty) {
       throw ExtractionException(
         hasCipheredStreams
-            ? 'Video này dùng luồng có chữ ký bảo vệ, bản web không giải mã được. '
-                'Hãy dùng ứng dụng Android / iOS / Desktop để tải.'
-            : 'Không tìm thấy luồng tải nào cho video YouTube này.',
+            ? l10n.youtubeCipherUnsupported
+            : l10n.youtubeNoStreams,
       );
     }
 

@@ -3,6 +3,7 @@ import '../../core/utils/http_helper.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/text_unescape.dart';
 import '../../core/utils/url_helper.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -41,14 +42,14 @@ class FacebookExtractor extends BaseVideoExtractor {
   }
 
   @override
-  Future<VideoMetadata> extract(String url) async {
+  Future<VideoMetadata> extract(String url, AppLocalizations l10n) async {
     var cleanUrl = url.trim();
     if (UrlHelper.isShortLink(cleanUrl)) {
       cleanUrl = await ExtractorHttp.resolveRedirects(cleanUrl);
     }
 
     // Strategy 1: the watch page itself.
-    var result = await _fromPage(cleanUrl, cleanUrl);
+    var result = await _fromPage(cleanUrl, cleanUrl, l10n);
     if (result != null) return result;
 
     // Strategy 2: the embed player. It serves a much smaller page that still
@@ -56,7 +57,7 @@ class FacebookExtractor extends BaseVideoExtractor {
     // interstitial than the full watch page.
     final embedUrl =
         'https://www.facebook.com/plugins/video.php?href=${Uri.encodeComponent(cleanUrl)}';
-    result = await _fromPage(embedUrl, cleanUrl);
+    result = await _fromPage(embedUrl, cleanUrl, l10n);
     if (result != null) return result;
 
     // Strategy 3: the mobile site, which renders a plainer document.
@@ -67,19 +68,18 @@ class FacebookExtractor extends BaseVideoExtractor {
     result = await _fromPage(
       mobileUrl,
       cleanUrl,
+      l10n,
       userAgent: AppConstants.mobileUserAgent,
     );
     if (result != null) return result;
 
-    throw const ExtractionException(
-      'Không lấy được video từ liên kết Facebook. Hãy chắc chắn video ở chế độ '
-      'công khai (Public) — video riêng tư hoặc trong nhóm kín cần đăng nhập.',
-    );
+    throw ExtractionException(l10n.facebookNoVideo);
   }
 
   Future<VideoMetadata?> _fromPage(
     String pageUrl,
-    String originalUrl, {
+    String originalUrl,
+    AppLocalizations l10n, {
     String userAgent = AppConstants.defaultUserAgent,
   }) async {
     final String html;
@@ -101,7 +101,7 @@ class FacebookExtractor extends BaseVideoExtractor {
       if (hdUrl != null)
         VideoQualityOption(
           id: 'fb_hd_$id',
-          label: 'HD 720p (Chất lượng cao)',
+          label: l10n.highQuality720,
           quality: 'HD 720p',
           format: 'mp4',
           downloadUrl: hdUrl,
@@ -109,7 +109,7 @@ class FacebookExtractor extends BaseVideoExtractor {
       if (sdUrl != null && sdUrl != hdUrl)
         VideoQualityOption(
           id: 'fb_sd_$id',
-          label: 'SD 480p (Tiêu chuẩn)',
+          label: l10n.standardQuality480,
           quality: 'SD 480p',
           format: 'mp4',
           downloadUrl: sdUrl,

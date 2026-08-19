@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../l10n/l10n.dart';
 import '../../../models/video_metadata.dart';
 
 class VideoResultCard extends StatefulWidget {
@@ -304,7 +305,7 @@ class _VideoResultCardState extends State<VideoResultCard> {
                               ),
                               alignment: Alignment.center,
                               child: Text(
-                                'Video MP4 (${videoOptions.length})',
+                                context.l10n.videoOptions(videoOptions.length),
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
@@ -337,7 +338,7 @@ class _VideoResultCardState extends State<VideoResultCard> {
                               ),
                               alignment: Alignment.center,
                               child: Text(
-                                'Âm thanh MP3 (${audioOptions.length})',
+                                context.l10n.audioOptions(audioOptions.length),
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
@@ -356,9 +357,9 @@ class _VideoResultCardState extends State<VideoResultCard> {
                   ),
 
                 // 4. Quality Selector List
-                const Text(
-                  'Chọn chất lượng tải về:',
-                  style: TextStyle(
+                Text(
+                  context.l10n.selectDownloadQuality,
+                  style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
@@ -456,7 +457,7 @@ class _VideoResultCardState extends State<VideoResultCard> {
                     OutlinedButton.icon(
                       onPressed: widget.onPreview,
                       icon: const Icon(Icons.play_circle_outline_rounded, size: 18),
-                      label: const Text('Xem trước'),
+                      label: Text(context.l10n.preview),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 12),
@@ -472,9 +473,9 @@ class _VideoResultCardState extends State<VideoResultCard> {
                             ? widget.onDownload
                             : null,
                         icon: const Icon(Icons.file_download_rounded, size: 20),
-                        label: const Text(
-                          'Tải về ngay',
-                          style: TextStyle(
+                        label: Text(
+                          context.l10n.downloadNow,
+                          style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                           ),

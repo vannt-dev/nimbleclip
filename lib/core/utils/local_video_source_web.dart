@@ -4,8 +4,8 @@ import 'package:video_player/video_player.dart';
 /// path to it, so local playback is not offered.
 VideoPlayerController createLocalVideoController(String filePath) {
   throw UnsupportedError(
-    'Không phát được file cục bộ trên trình duyệt. Hãy mở file bằng trình quản '
-    'lý tải xuống của trình duyệt.',
+    'Local files cannot be played in the browser. Open the file from your '
+    'browser download manager instead.',
   );
 }
 

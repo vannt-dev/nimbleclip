@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../../core/utils/http_helper.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/url_helper.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -19,7 +20,7 @@ class TwitterExtractor extends BaseVideoExtractor {
       _tweetIdPattern.firstMatch(url)?.group(1);
 
   @override
-  Future<VideoMetadata> extract(String url) async {
+  Future<VideoMetadata> extract(String url, AppLocalizations l10n) async {
     var cleanUrl = url.trim();
     var tweetId = _extractTweetId(cleanUrl);
 
@@ -30,24 +31,23 @@ class TwitterExtractor extends BaseVideoExtractor {
     }
 
     if (tweetId == null) {
-      throw const ExtractionException(
-        'Không tìm thấy ID bài đăng trong link X / Twitter. '
-        'Hãy dùng link dạng x.com/<tài khoản>/status/<id>.',
-      );
+      throw ExtractionException(l10n.xInvalidPost);
     }
 
-    final viaFx = await _fromFxTwitter(tweetId, cleanUrl);
+    final viaFx = await _fromFxTwitter(tweetId, cleanUrl, l10n);
     if (viaFx != null) return viaFx;
 
-    final viaVx = await _fromVxTwitter(tweetId, cleanUrl);
+    final viaVx = await _fromVxTwitter(tweetId, cleanUrl, l10n);
     if (viaVx != null) return viaVx;
 
-    throw const ExtractionException(
-      'Bài đăng này không có video tải được, hoặc tài khoản đang ở chế độ bảo vệ.',
-    );
+    throw ExtractionException(l10n.xNoVideo);
   }
 
-  Future<VideoMetadata?> _fromFxTwitter(String tweetId, String url) async {
+  Future<VideoMetadata?> _fromFxTwitter(
+    String tweetId,
+    String url,
+    AppLocalizations l10n,
+  ) async {
     final Map<String, dynamic> json;
     try {
       final response =
@@ -102,7 +102,7 @@ class TwitterExtractor extends BaseVideoExtractor {
       qualities.add(
         VideoQualityOption(
           id: 'x_${tweetId}_default',
-          label: 'MP4 (Chất lượng gốc)',
+          label: l10n.originalMp4,
           quality: 'Original',
           format: 'mp4',
           downloadUrl: directUrl,
@@ -120,7 +120,7 @@ class TwitterExtractor extends BaseVideoExtractor {
       originalUrl: url,
       title: text != null && text.isNotEmpty
           ? text
-          : 'Bài đăng của @${author['screen_name'] ?? 'X'}',
+          : l10n.xPostBy((author['screen_name'] ?? 'X').toString()),
       description: text,
       author: author['name']?.toString() ??
           author['screen_name']?.toString() ??
@@ -139,7 +139,11 @@ class TwitterExtractor extends BaseVideoExtractor {
     );
   }
 
-  Future<VideoMetadata?> _fromVxTwitter(String tweetId, String url) async {
+  Future<VideoMetadata?> _fromVxTwitter(
+    String tweetId,
+    String url,
+    AppLocalizations l10n,
+  ) async {
     final Map<String, dynamic> json;
     try {
       final response = await ExtractorHttp.get(
@@ -170,7 +174,7 @@ class TwitterExtractor extends BaseVideoExtractor {
       qualities: [
         VideoQualityOption(
           id: 'vx_$tweetId',
-          label: 'MP4 (Chất lượng gốc)',
+          label: l10n.originalMp4,
           quality: 'Original',
           format: 'mp4',
           downloadUrl: videoUrls.first,

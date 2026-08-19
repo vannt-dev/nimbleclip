@@ -9,6 +9,7 @@ class AppConstants {
   static const String keyAutoSaveGallery = 'auto_save_gallery';
   static const String keyAutoPasteClipboard = 'auto_paste_clipboard';
   static const String keyPreferredQuality = 'preferred_quality';
+  static const String keyLanguageCode = 'language_code';
   static const String keyDownloadHistory = 'download_history_list';
 
   // Network timeouts

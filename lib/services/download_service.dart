@@ -5,6 +5,7 @@ import '../core/constants/app_constants.dart';
 import '../core/utils/cors_helper.dart';
 import '../core/utils/platform_file.dart';
 import '../core/utils/web_download_helper.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../models/download_task.dart';
 import 'storage_service.dart';
 
@@ -68,6 +69,7 @@ class DownloadService {
     required DownloadProgressCallback onProgress,
     required void Function(DownloadTask task, String filePath) onComplete,
     required void Function(DownloadTask task, String error) onError,
+    required AppLocalizations l10n,
     bool autoSaveToGallery = true,
   }) async {
     final fileName = buildFileName(task);
@@ -160,6 +162,7 @@ class DownloadService {
           ..totalBytes = 0;
         return startDownload(
           task: task,
+          l10n: l10n,
           onProgress: onProgress,
           onComplete: onComplete,
           onError: onError,
@@ -210,6 +213,7 @@ class DownloadService {
           ..totalBytes = 0;
         return startDownload(
           task: task,
+          l10n: l10n,
           onProgress: onProgress,
           onComplete: onComplete,
           onError: onError,
@@ -218,7 +222,7 @@ class DownloadService {
       }
 
       task.status = DownloadStatus.failed;
-      task.errorMessage = _describe(e);
+      task.errorMessage = _describe(e, l10n);
       await PlatformFileHelper.deleteFile(savePath);
       onError(task, task.errorMessage!);
     } catch (e) {
@@ -326,22 +330,22 @@ class DownloadService {
 
   bool isRunning(String taskId) => _cancelTokens.containsKey(taskId);
 
-  String _describe(DioException e) {
+  String _describe(DioException e, AppLocalizations l10n) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
-        return 'Hết thời gian chờ mạng. Kiểm tra kết nối rồi thử lại.';
+        return l10n.networkTimeout;
       case DioExceptionType.connectionError:
-        return 'Không kết nối được tới máy chủ.';
+        return l10n.serverConnectionFailed;
       case DioExceptionType.badResponse:
         final code = e.response?.statusCode;
         if (code == 403 || code == 401) {
-          return 'Liên kết tải đã hết hạn ($code). Hãy phân tích lại video.';
+          return l10n.downloadLinkExpired(code!);
         }
-        return 'Máy chủ trả về lỗi $code.';
+        return l10n.serverError(code?.toString() ?? 'unknown');
       default:
-        return e.message ?? 'Lỗi mạng không xác định.';
+        return e.message ?? l10n.unknownNetworkError;
     }
   }
 

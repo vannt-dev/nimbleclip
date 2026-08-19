@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/formatters.dart';
+import '../../l10n/l10n.dart';
 import '../../providers/settings_provider.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -12,16 +13,53 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final settings = context.watch<SettingsProvider>();
+    final l10n = context.l10n;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Cài đặt'),
+        title: Text(l10n.settingsTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // 1. Giao diện (Theme)
-          _SectionHeader(title: 'Giao diện ứng dụng', isDark: isDark),
+          _SectionHeader(title: l10n.languageSection, isDark: isDark),
+          Material(
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+              ),
+            ),
+            child: Column(
+              children: [
+                _LocaleRadioTile(
+                  title: l10n.languageSystem,
+                  value: null,
+                  groupValue: settings.locale,
+                  onChanged: settings.setLocale,
+                ),
+                const Divider(height: 1),
+                _LocaleRadioTile(
+                  title: l10n.languageEnglish,
+                  value: const Locale('en'),
+                  groupValue: settings.locale,
+                  onChanged: settings.setLocale,
+                ),
+                const Divider(height: 1),
+                _LocaleRadioTile(
+                  title: l10n.languageVietnamese,
+                  value: const Locale('vi'),
+                  groupValue: settings.locale,
+                  onChanged: settings.setLocale,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          _SectionHeader(title: l10n.appearanceSection, isDark: isDark),
           Material(
             color: isDark ? AppColors.darkCard : AppColors.lightCard,
             clipBehavior: Clip.antiAlias,
@@ -35,7 +73,7 @@ class SettingsScreen extends StatelessWidget {
             child: Column(
               children: [
                 _ThemeRadioTile(
-                  title: 'Giao diện tối (Dark)',
+                  title: l10n.themeDark,
                   icon: Icons.dark_mode_rounded,
                   value: ThemeMode.dark,
                   groupValue: settings.themeMode,
@@ -43,7 +81,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const Divider(height: 1),
                 _ThemeRadioTile(
-                  title: 'Giao diện sáng (Light)',
+                  title: l10n.themeLight,
                   icon: Icons.light_mode_rounded,
                   value: ThemeMode.light,
                   groupValue: settings.themeMode,
@@ -51,7 +89,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const Divider(height: 1),
                 _ThemeRadioTile(
-                  title: 'Theo hệ thống (System)',
+                  title: l10n.themeSystem,
                   icon: Icons.brightness_auto_rounded,
                   value: ThemeMode.system,
                   groupValue: settings.themeMode,
@@ -63,7 +101,7 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 24),
 
           // 2. Chất lượng tải mặc định (Default Preferred Quality)
-          _SectionHeader(title: 'Chất lượng video ưu tiên', isDark: isDark),
+          _SectionHeader(title: l10n.qualitySection, isDark: isDark),
           Material(
             color: isDark ? AppColors.darkCard : AppColors.lightCard,
             clipBehavior: Clip.antiAlias,
@@ -77,8 +115,8 @@ class SettingsScreen extends StatelessWidget {
             child: Column(
               children: [
                 _QualityRadioTile(
-                  title: 'Cao nhất (1080p / 2K / 4K)',
-                  subtitle: 'Tự động chọn độ phân giải sắc nét nhất',
+                  title: l10n.qualityHighestTitle,
+                  subtitle: l10n.qualityHighestDescription,
                   icon: Icons.hd_rounded,
                   value: 'Highest',
                   groupValue: settings.preferredQuality,
@@ -86,8 +124,8 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const Divider(height: 1),
                 _QualityRadioTile(
-                  title: 'Chuẩn HD (720p)',
-                  subtitle: 'Cân bằng giữa chất lượng và dung lượng',
+                  title: l10n.quality720Title,
+                  subtitle: l10n.quality720Description,
                   icon: Icons.high_quality_rounded,
                   value: '720p',
                   groupValue: settings.preferredQuality,
@@ -95,8 +133,8 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const Divider(height: 1),
                 _QualityRadioTile(
-                  title: 'Tiết kiệm dung lượng (480p SD)',
-                  subtitle: 'Dung lượng nhẹ, tải nhanh cho 3G/4G',
+                  title: l10n.quality480Title,
+                  subtitle: l10n.quality480Description,
                   icon: Icons.sd_rounded,
                   value: '480p',
                   groupValue: settings.preferredQuality,
@@ -104,8 +142,8 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const Divider(height: 1),
                 _QualityRadioTile(
-                  title: 'Tiết kiệm tối đa (360p)',
-                  subtitle: 'Kích thước file nhỏ nhất',
+                  title: l10n.quality360Title,
+                  subtitle: l10n.quality360Description,
                   icon: Icons.data_saver_on_rounded,
                   value: '360p',
                   groupValue: settings.preferredQuality,
@@ -113,8 +151,8 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const Divider(height: 1),
                 _QualityRadioTile(
-                  title: 'Chỉ tải âm thanh (Audio MP3/M4A)',
-                  subtitle: 'Tự động chọn định dạng nhạc MP3',
+                  title: l10n.qualityAudioTitle,
+                  subtitle: l10n.qualityAudioDescription,
                   icon: Icons.music_note_rounded,
                   value: 'Audio',
                   groupValue: settings.preferredQuality,
@@ -126,7 +164,7 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 24),
 
           // 3. Tải về & Lưu trữ (Download & Storage)
-          _SectionHeader(title: 'Tải về & Lưu trữ', isDark: isDark),
+          _SectionHeader(title: l10n.downloadStorageSection, isDark: isDark),
           Material(
             color: isDark ? AppColors.darkCard : AppColors.lightCard,
             clipBehavior: Clip.antiAlias,
@@ -142,10 +180,10 @@ class SettingsScreen extends StatelessWidget {
                 SwitchListTile(
                   secondary: const Icon(Icons.photo_library_outlined,
                       color: AppColors.primary),
-                  title: const Text('Tự động lưu vào Album ảnh'),
-                  subtitle: const Text(
-                    'Lưu trực tiếp vào Thư viện sau khi tải xong',
-                    style: TextStyle(fontSize: 12),
+                  title: Text(l10n.autoSaveGallery),
+                  subtitle: Text(
+                    l10n.autoSaveGalleryDescription,
+                    style: const TextStyle(fontSize: 12),
                   ),
                   value: settings.autoSaveGallery,
                   onChanged: (val) => settings.setAutoSaveGallery(val),
@@ -154,10 +192,10 @@ class SettingsScreen extends StatelessWidget {
                 SwitchListTile(
                   secondary: const Icon(Icons.content_paste_rounded,
                       color: AppColors.primary),
-                  title: const Text('Tự động nhận diện Clipboard'),
-                  subtitle: const Text(
-                    'Tự động kiểm tra liên kết video khi mở ứng dụng',
-                    style: TextStyle(fontSize: 12),
+                  title: Text(l10n.autoDetectClipboard),
+                  subtitle: Text(
+                    l10n.autoDetectClipboardDescription,
+                    style: const TextStyle(fontSize: 12),
                   ),
                   value: settings.autoPasteClipboard,
                   onChanged: (val) => settings.setAutoPasteClipboard(val),
@@ -166,7 +204,7 @@ class SettingsScreen extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.cleaning_services_rounded,
                       color: AppColors.warning),
-                  title: const Text('Dung lượng video đã tải'),
+                  title: Text(l10n.downloadedMediaSize),
                   subtitle: Text(
                     Formatters.formatBytes(settings.cacheSizeBytes),
                     style: const TextStyle(
@@ -177,20 +215,18 @@ class SettingsScreen extends StatelessWidget {
                       final confirmed = await showDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          title: const Text('Xóa bộ nhớ cache?'),
-                          content: const Text(
-                            'Toàn bộ video đã tải trong thư mục ứng dụng sẽ bị xóa.',
-                          ),
+                          title: Text(l10n.clearCacheTitle),
+                          content: Text(l10n.clearCacheMessage),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(ctx, false),
-                              child: const Text('Hủy'),
+                              child: Text(l10n.cancel),
                             ),
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.error),
                               onPressed: () => Navigator.pop(ctx, true),
-                              child: const Text('Xóa tất cả'),
+                              child: Text(l10n.deleteAll),
                             ),
                           ],
                         ),
@@ -199,17 +235,17 @@ class SettingsScreen extends StatelessWidget {
                         await settings.clearCache();
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Đã dọn dẹp bộ nhớ tạm.'),
+                            SnackBar(
+                              content: Text(l10n.cacheCleared),
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
                         }
                       }
                     },
-                    child: const Text(
-                      'Dọn dẹp',
-                      style: TextStyle(color: AppColors.error),
+                    child: Text(
+                      l10n.cleanUp,
+                      style: const TextStyle(color: AppColors.error),
                     ),
                   ),
                 ),
@@ -219,7 +255,7 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 24),
 
           // 4. Thông tin ứng dụng (About)
-          _SectionHeader(title: 'Thông tin ứng dụng', isDark: isDark),
+          _SectionHeader(title: l10n.aboutSection, isDark: isDark),
           Material(
             color: isDark ? AppColors.darkCard : AppColors.lightCard,
             clipBehavior: Clip.antiAlias,
@@ -235,25 +271,25 @@ class SettingsScreen extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.info_outline_rounded,
                       color: AppColors.primary),
-                  title: const Text('Phiên bản'),
+                  title: Text(l10n.version),
                   trailing: Text(
                     AppConstants.appVersion,
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
                 const Divider(height: 1),
-                const ListTile(
-                  leading: Icon(Icons.support_rounded, color: AppColors.accent),
-                  title: Text('Nền tảng hỗ trợ'),
+                ListTile(
+                  leading: const Icon(Icons.support_rounded, color: AppColors.accent),
+                  title: Text(l10n.supportedPlatforms),
                   subtitle: Text(
-                    'YouTube, TikTok (No Watermark), Facebook, Twitter/X, v.v.',
-                    style: TextStyle(fontSize: 12),
+                    l10n.supportedPlatformsDescription,
+                    style: const TextStyle(fontSize: 12),
                   ),
                 ),
                 const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.code_rounded, color: AppColors.primary),
-                  title: const Text('Mã nguồn GitHub'),
+                  title: Text(l10n.githubSource),
                   subtitle: const Text(
                     'github.com/vannt-dev/nimbleclip',
                     style: TextStyle(fontSize: 12),
@@ -314,6 +350,42 @@ class _ThemeRadioTile extends StatelessWidget {
     final isSelected = value == groupValue;
     return ListTile(
       leading: Icon(icon, color: isSelected ? AppColors.primary : null),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+        ),
+      ),
+      trailing: isSelected
+          ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
+          : const Icon(Icons.circle_outlined, color: Colors.grey, size: 20),
+      onTap: () => onChanged(value),
+    );
+  }
+}
+
+class _LocaleRadioTile extends StatelessWidget {
+  final String title;
+  final Locale? value;
+  final Locale? groupValue;
+  final ValueChanged<Locale?> onChanged;
+
+  const _LocaleRadioTile({
+    required this.title,
+    required this.value,
+    required this.groupValue,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isSelected = value?.languageCode == groupValue?.languageCode;
+    return ListTile(
+      leading: Icon(
+        value == null ? Icons.language_rounded : Icons.translate_rounded,
+        color: isSelected ? AppColors.primary : null,
+      ),
       title: Text(
         title,
         style: TextStyle(
