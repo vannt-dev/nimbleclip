@@ -1,194 +1,248 @@
-# 🚀 NimbleClip - Multi-Platform Video & Audio Downloader
+# NimbleClip
 
-Ứng dụng Flutter hiện đại, mượt mà hỗ trợ tải video chất lượng cao (HD 1080p, 720p, 480p) và trích xuất âm thanh MP3 từ các nền tảng phổ biến: **YouTube, TikTok (Không Watermark), Facebook, Twitter / X, Instagram** và nhiều liên kết trực tiếp khác.
+[![CI](https://github.com/vannt-dev/nimbleclip/actions/workflows/ci.yml/badge.svg)](https://github.com/vannt-dev/nimbleclip/actions/workflows/ci.yml)
+[![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)](https://flutter.dev/)
+[![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?logo=dart)](https://dart.dev/)
 
----
+**Save clips. Keep moments.**
 
-## 🌟 Tính năng nổi bật
+NimbleClip is a Flutter application for discovering and downloading publicly
+available video and audio streams from popular social platforms. It provides a
+single, polished interface for link detection, quality selection, download
+management, local playback, and gallery export.
 
-- **Đa nền tảng hỗ trợ**:
-  - 🎬 **YouTube**: Tải video các độ phân giải (1080p, 720p, 480p, 360p) và tách nhạc MP3/M4A chất lượng 320kbps thông qua thư viện xử lý trực tiếp.
-  - 🎵 **TikTok**: Tự động lấy video chất lượng Full HD không logo / không dính watermark (No Watermark) và trích xuất âm thanh gốc.
-  - 📘 **Facebook**: Hỗ trợ video HD, Reels, Watch và video công khai.
-  - 🐦 **Twitter / X**: Hỗ trợ tất cả độ phân giải và bitrate cao nhất từ tweet video.
-  - 📷 **Instagram**: Hỗ trợ Reels và video bài viết.
-  - 🔗 **Direct Links**: Hỗ trợ tải các liên kết video trực tiếp (.mp4, .webm, .mkv,...).
-- **Tự động nhận diện Clipboard**: Tự động phát hiện liên kết video khi vừa sao chép và mở ứng dụng.
-- **Trình phát Video tích hợp (In-App Player)**: Xem trước video trước khi tải về hoặc phát các video đã tải trực tiếp trong app với đầy đủ điều khiển tua, phóng to toàn màn hình.
-- **Quản lý tải về thông minh (Download Manager)**:
-  - Hiển thị phần trăm tiến trình thời gian thực.
-  - Hiển thị tốc độ tải (MB/s, KB/s) và dung lượng đã nhận / tổng dung lượng.
-  - **Tạm dừng & tiếp tục**: giữ lại phần đã tải và nối tiếp bằng HTTP Range
-    (tự động tải lại từ đầu nếu máy chủ không hỗ trợ Range).
-  - Hủy tiến trình tải và dọn sạch các mục đã xong.
-  - **Thử lại thông minh**: tự động phân tích lại link gốc để lấy URL mới, vì
-    link tải của YouTube / Facebook / Instagram có chữ ký hết hạn theo thời gian.
-- **Lưu trực tiếp vào Thư viện ảnh (Gallery/Album)**: Tự động hoặc thủ công lưu video đã tải vào ứng dụng Photos của thiết bị Android & iOS.
-- **Chia sẻ & Mở file**: Chia sẻ video nhanh chóng qua Zalo, Messenger, Telegram,... hoặc mở bằng trình phát mặc định của máy.
-- **Giao diện hiện đại & Tùy biến**:
-  - Hỗ trợ Dark Mode (Giao diện tối sang trọng) và Light Mode (Giao diện sáng).
-  - Quản lý bộ nhớ và dung lượng cache video đã tải.
+> NimbleClip is intended for content you own, content in the public domain, or
+> content you are authorized to download. You are responsible for complying
+> with the source platform's terms and applicable copyright laws.
 
----
+![NimbleClip application screenshot](screenshot.png)
 
-## 🏗️ Cấu trúc dự án
+## Features
 
-```
-lib/
-├── core/
-│   ├── constants/
-│   │   ├── app_colors.dart          # Bảng màu thương hiệu & hệ thống giao diện
-│   │   └── app_constants.dart       # Cấu hình hằng số & storage keys
-│   ├── theme/
-│   │   └── app_theme.dart           # Cấu hình Material 3 Light & Dark Theme
-│   └── utils/
-│       ├── cors_helper.dart         # Bọc URL qua proxy CORS khi chạy trên Web
-│       ├── formatters.dart          # Định dạng dung lượng bytes, thời lượng, số đếm
-│       ├── http_helper.dart         # HTTP dùng chung cho extractor (header, timeout, proxy)
-│       ├── json_scanner.dart        # Cắt object JSON cân bằng ngoặc từ HTML
-│       ├── local_video_source.dart  # Tạo controller phát file cục bộ (native / web)
-│       ├── platform_file.dart       # Thao tác file & thư viện ảnh (native / web)
-│       ├── quality_helper.dart      # Xếp hạng & chọn chất lượng theo pixel height
-│       ├── text_unescape.dart       # Giải mã escape JSON (\uXXXX) và HTML entity
-│       ├── url_helper.dart          # Lọc URL, nhận diện nền tảng theo host
-│       └── web_download_helper.dart # Kích hoạt tải file trên trình duyệt
-├── models/
-│   ├── download_task.dart           # Model quản lý trạng thái tải về
-│   ├── video_metadata.dart          # Model thông tin video & chất lượng
-│   └── video_platform.dart          # Enum nền tảng (YouTube, TikTok, FB, X,...)
-├── services/
-│   ├── download_service.dart        # Tiến trình tải luồng bằng Dio
-│   ├── storage_service.dart         # Lưu trữ file cục bộ & Gal (Thư viện ảnh)
-│   └── extractors/
-│       ├── base_extractor.dart      # Interface cơ sở + ExtractionException
-│       ├── facebook_extractor.dart  # Facebook & Reels (watch page → embed → m.facebook)
-│       ├── generic_extractor.dart   # Link trực tiếp & video nhúng qua Open Graph
-│       ├── instagram_extractor.dart # Instagram Reels & video bài viết công khai
-│       ├── registry.dart            # Quản lý & điều phối bộ bóc tách
-│       ├── tiktok_extractor.dart    # TikTok không watermark (HD) + nhạc gốc MP3
-│       ├── twitter_extractor.dart   # X / Twitter (FxTwitter → VxTwitter)
-│       └── youtube_extractor.dart   # YouTube: YoutubeExplode (native) / watch page (web)
-├── providers/
-│   ├── download_provider.dart       # Quản lý danh sách & trạng thái tải về
-│   ├── settings_provider.dart       # Quản lý cài đặt giao diện, cache, clipboard
-│   └── video_extractor_provider.dart# Quản lý trạng thái phân tích link video
-├── views/
-│   ├── home/                        # Màn hình chính (Dán link, phân tích, chọn chất lượng)
-│   ├── downloads/                   # Màn hình quản lý video đang tải và đã tải
-│   ├── player/                      # Trình phát video trong ứng dụng
-│   ├── settings/                    # Màn hình cài đặt & quản lý bộ nhớ
-│   └── main_navigation_screen.dart  # Thanh điều hướng chính (Bottom Navigation)
-└── main.dart                        # Điểm khởi chạy ứng dụng (MultiProvider)
+- Detects supported links pasted from the clipboard.
+- Extracts available video and audio qualities before downloading.
+- Tracks progress, transfer speed, and downloaded file size in real time.
+- Pauses and resumes native downloads when the source server supports HTTP
+  range requests.
+- Refreshes expired media URLs before retrying a failed download.
+- Previews remote media and plays downloaded files inside the app.
+- Saves completed media to the device gallery on Android and iOS.
+- Opens or shares downloaded files with other installed applications.
+- Persists download history and user preferences locally.
+- Supports light, dark, and system themes.
+- Includes a browser build backed by a local, SSRF-hardened CORS proxy.
 
-server.js                            # Web dev server: phục vụ build/web + CORS proxy
+## Supported sources
+
+| Source | Supported content |
+| --- | --- |
+| YouTube | Public videos and available M4A audio streams |
+| TikTok | Public videos, including watermark-free variants when exposed by the source, and audio |
+| Facebook | Public videos, Watch links, and Reels |
+| X / Twitter | Public posts containing video |
+| Instagram | Public video posts and Reels |
+| Direct URLs | Public video/audio files and pages exposing standard Open Graph media metadata |
+
+Extraction depends on public endpoints and page formats controlled by third
+parties. A platform change, regional restriction, authentication requirement,
+DRM protection, or expired signature may prevent a specific link from working.
+
+## Platform support
+
+The repository contains Flutter targets for Android, iOS, Windows, macOS,
+Linux, and Web. Native targets provide the complete download workflow. The Web
+target has browser-specific limitations and requires the included Node.js
+server for cross-origin requests and downloads.
+
+## Getting started
+
+### Prerequisites
+
+- [Flutter](https://docs.flutter.dev/get-started/install) on the stable channel
+- A platform toolchain for the target you want to run:
+  - Android Studio and an Android SDK for Android
+  - Xcode on macOS for iOS and macOS
+  - Visual Studio with Desktop development with C++ for Windows
+  - The Flutter Linux desktop prerequisites for Linux
+- Node.js 22 or later when running the Web build or server tests
+
+The exact Dart SDK constraint is defined in `pubspec.yaml`.
+
+### Install
+
+```bash
+git clone https://github.com/vannt-dev/nimbleclip.git
+cd nimbleclip
+flutter pub get
 ```
 
----
+### Verify the project
 
-## 🚀 Hướng dẫn cài đặt & Chạy ứng dụng
+```bash
+flutter analyze
+flutter test
+node --check server.js
+node --test test/server_test.js
+```
 
-### Yêu cầu hệ thống:
-- Flutter SDK `>= 3.12.0` (khuyến nghị Flutter 3.22 trở lên)
-- Dart SDK `^3.12.2`
-- Android Studio / VS Code / Xcode (nếu chạy trên macOS/iOS)
+### Run the app
 
-### Các bước chạy:
+List the available targets:
 
-1. **Clone repository**:
-   ```bash
-   git clone https://github.com/vannt-dev/nimbleclip.git
-   cd nimbleclip
-   ```
+```bash
+flutter devices
+```
 
-2. **Cài đặt các gói phụ thuộc (Dependencies)**:
-   ```bash
-   flutter pub get
-   ```
+Then launch NimbleClip on a selected target:
 
-3. **Chạy kiểm tra mã nguồn**:
-   ```bash
-   flutter analyze
-   flutter test
-   ```
+```bash
+flutter run -d <device-id>
+```
 
-   Kiểm thử trên thiết bị Android thật/emulator (storage, tải file, tạm dừng &
-   tiếp tục, lưu vào thư viện ảnh) — cần chạy fixture server trên máy host trước:
-   ```bash
-   node tool/fixture_server.js          # cửa sổ riêng
-   flutter test integration_test/android_storage_test.dart -d <device-id>
-   ```
+Examples:
 
-4. **Khởi chạy ứng dụng**:
-   - Chạy trên thiết bị Android hoặc máy ảo:
-     ```bash
-     flutter run
-     ```
-   - Chạy trên thiết bị iOS (trên macOS):
-     ```bash
-     flutter run -d ios
-     ```
-   - Chạy trên Windows:
-     ```bash
-     flutter run -d windows
-     ```
+```bash
+flutter run -d windows
+flutter run -d chrome
+```
 
----
+## Android integration test
 
-## 🌐 Chạy bản Web (kèm CORS proxy)
+The Android storage test uses a fixture server running on the host machine.
+Start it in a separate terminal before running the test on a device or emulator:
 
-Trình duyệt chặn request cross-origin tới YouTube/TikTok/Facebook, nên bản Web
-phải đi qua proxy cục bộ trong `server.js`.
+```bash
+node tool/fixture_server.js
+```
+
+```bash
+flutter test integration_test/android_storage_test.dart -d <device-id>
+```
+
+The test covers file storage, download progress, pause/resume behavior, and
+gallery export.
+
+## Web build
+
+Browsers block many cross-origin media requests made directly to social
+platforms. NimbleClip's Web build therefore uses the local proxy in `server.js`.
 
 ```bash
 flutter build web --release
-node server.js          # http://127.0.0.1:8080
+node server.js
 ```
 
-Cấu hình qua biến môi trường: `PORT` (mặc định `8080`) và `HOST` (mặc định
-`127.0.0.1`).
+Open `http://127.0.0.1:8080` by default. The server accepts two optional
+environment variables:
 
-Proxy cung cấp 2 endpoint:
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `HOST` | `127.0.0.1` | Address used by the local server |
+| `PORT` | `8080` | HTTP port used by the local server |
 
-| Endpoint | Công dụng |
-|---|---|
-| `GET/POST /cors-proxy?url=<url>` | Chuyển tiếp request, forward `Range` để tua video. Thêm `&filename=<tên>` để trả `Content-Disposition: attachment` — đây là cách duy nhất trình duyệt lưu được video cross-origin. |
-| `GET /resolve?url=<url>` | Theo redirect phía server và trả về URL cuối, dùng để mở rộng link rút gọn (`t.co`, `fb.watch`, `vm.tiktok.com`). |
+### Proxy endpoints
 
-**Bảo mật:** proxy chỉ bind loopback, chỉ chấp nhận `http`/`https` trên cổng
-80/443, và từ chối mọi hostname phân giải ra địa chỉ loopback / private /
-link-local (chặn SSRF tới dịch vụ nội bộ và endpoint metadata của cloud). Mỗi
-bước redirect đều được kiểm tra lại. Phần phục vụ file tĩnh chỉ đọc trong
-`build/web`.
+| Endpoint | Purpose |
+| --- | --- |
+| `GET/POST /cors-proxy?url=<url>` | Proxies an HTTP request and forwards range headers for media seeking. Add `filename=<name>` to return a download response. |
+| `GET /resolve?url=<url>` | Resolves redirects for shortened links such as `t.co`, `fb.watch`, and `vm.tiktok.com`. |
 
-> ⚠️ Bản Web chỉ tải được video có luồng công khai. Video YouTube dùng
-> `signatureCipher` cần giải mã bằng JS của YouTube — hãy dùng bản Android /
-> iOS / Desktop cho những video đó.
+The proxy only accepts HTTP and HTTPS destinations on ports 80 and 443. It
+validates every redirect and rejects loopback, private, link-local, and other
+non-public destination addresses to reduce SSRF risk. Static files are served
+only from `build/web`.
 
----
+Some YouTube streams use `signatureCipher`, which requires YouTube's JavaScript
+signature transformation and is not currently handled by the Web extractor.
+Use a native build when a stream is unavailable in the browser.
 
-## 📱 Cấu hình quyền (Permissions)
+## Build artifacts
 
-### Android (`android/app/src/main/AndroidManifest.xml`):
-- `INTERNET` & `ACCESS_NETWORK_STATE`
-- `WRITE_EXTERNAL_STORAGE` chỉ tới Android 10 (API 29), theo yêu cầu của `gal`
-  khi xuất file vào thư viện trên thiết bị cũ. Android 11+ dùng MediaStore và
-  không yêu cầu quyền đọc ảnh/video của người dùng.
-- HTTP thường bị tắt mặc định qua `res/xml/network_security_config.xml`; chỉ vài
-  CDN video còn phục vụ cleartext mới được mở riêng, thay vì bật
-  `usesCleartextTraffic` cho toàn ứng dụng.
-- **Không dùng `requestLegacyExternalStorage`**: app ghi file vào thư mục external
-  riêng của chính nó (`Android/data/<package>/files/NimbleClip`) và đưa video vào
-  thư viện ảnh qua MediaStore (`gal`). Cả hai đều tuân thủ scoped storage, nên
-  không cần chế độ lưu trữ cũ (chế độ này cũng bị Android 11+ bỏ qua).
+```bash
+# Android APK
+flutter build apk --release
 
-### iOS (`ios/Runner/Info.plist`):
-- `NSPhotoLibraryUsageDescription`
-- `NSPhotoLibraryAddUsageDescription`
-- `NSAppTransportSecurity` (Allows Arbitrary Loads cho video streams)
+# Android App Bundle
+flutter build appbundle --release
 
----
+# Web
+flutter build web --release
 
-## 📄 Bản quyền
+# Windows, macOS, or Linux (run on the matching host OS)
+flutter build windows
+flutter build macos
+flutter build linux
+```
 
-Dự án được xây dựng phục vụ mục đích học tập và chia sẻ mã nguồn mã nguồn mở.
-Repository: [https://github.com/vannt-dev/nimbleclip](https://github.com/vannt-dev/nimbleclip)
+Release builds may require platform-specific signing configuration before they
+can be distributed through an app store.
+
+## Project structure
+
+```text
+lib/
+|-- core/
+|   |-- constants/       App-wide values and storage keys
+|   |-- theme/           Material themes and colors
+|   `-- utils/           URL, HTTP, parsing, quality, and file helpers
+|-- models/              Video metadata and download task models
+|-- providers/           Application state and workflow coordination
+|-- services/
+|   |-- extractors/      Platform-specific media extractors and registry
+|   |-- download_service.dart
+|   `-- storage_service.dart
+|-- views/               Home, downloads, player, and settings screens
+`-- main.dart            Application entry point
+
+integration_test/        Device-level Android storage tests
+test/                    Flutter unit, widget, fixture, and Node server tests
+tool/                    Local integration-test fixture server
+server.js                Web static server, URL resolver, and CORS proxy
+```
+
+## Storage and permissions
+
+### Android
+
+- `INTERNET` and `ACCESS_NETWORK_STATE` are required for extraction and
+  downloads.
+- `WRITE_EXTERNAL_STORAGE` is limited to Android 10 and earlier for legacy
+  gallery export support.
+- Android 11 and later use scoped storage and MediaStore.
+- Active files are stored under the app-specific external directory at
+  `Android/data/com.vannt.nimbleclip/files/NimbleClip` before optional gallery
+  export.
+- Cleartext HTTP is disabled by default and only explicitly allowed for the
+  small set of media CDNs declared in the network security configuration.
+
+### iOS
+
+NimbleClip declares photo-library usage descriptions for saving downloaded
+media. App Transport Security exceptions are configured for remote media
+streams that do not support the default policy.
+
+## Continuous integration
+
+The GitHub Actions workflow runs on every pull request and every push to
+`main`. It performs Flutter dependency resolution, static analysis, unit/widget
+tests, a release Web build, JavaScript syntax validation, and Node server tests.
+
+## Contributing
+
+Issues and pull requests are welcome. Before submitting a change, run:
+
+```bash
+flutter analyze
+flutter test
+node --test test/server_test.js
+```
+
+Keep extractor changes focused and include a sanitized fixture test whenever a
+third-party response format is involved. Never commit authentication tokens,
+cookies, private media, or personal account data.
+
+## Disclaimer
+
+NimbleClip is not affiliated with, endorsed by, or sponsored by YouTube,
+TikTok, Meta, Instagram, Facebook, or X. Product names and trademarks belong to
+their respective owners.
