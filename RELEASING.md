@@ -14,6 +14,9 @@ configures the required GitHub Actions secrets:
 .\tool\setup_android_signing.ps1
 ```
 
+Add `-VerifyBuild` to also build a release APK locally, verify its certificate,
+and remove the temporary `android/key.properties` file afterward.
+
 The configured secrets are:
 
 - `ANDROID_KEYSTORE_BASE64`: the keystore file encoded as a single Base64 line

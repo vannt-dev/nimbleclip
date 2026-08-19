@@ -1,6 +1,7 @@
 param(
     [string]$Repository = "vannt-dev/nimbleclip",
-    [string]$KeytoolPath
+    [string]$KeytoolPath,
+    [switch]$VerifyBuild
 )
 
 $ErrorActionPreference = "Stop"
@@ -138,6 +139,64 @@ Set-RepositorySecret "ANDROID_KEYSTORE_BASE64" $keystoreBase64
 Set-RepositorySecret "ANDROID_KEYSTORE_PASSWORD" $credentials["ANDROID_KEYSTORE_PASSWORD"]
 Set-RepositorySecret "ANDROID_KEY_PASSWORD" $credentials["ANDROID_KEY_PASSWORD"]
 Set-RepositorySecret "ANDROID_KEY_ALIAS" $credentials["ANDROID_KEY_ALIAS"]
+
+if ($VerifyBuild) {
+    $keyPropertiesFile = Join-Path $repositoryRoot "android\key.properties"
+    if (Test-Path -LiteralPath $keyPropertiesFile) {
+        throw "$keyPropertiesFile already exists. Refusing to overwrite it for verification."
+    }
+
+    try {
+        [System.IO.File]::WriteAllLines(
+            $keyPropertiesFile,
+            @(
+                "storePassword=$($credentials['ANDROID_KEYSTORE_PASSWORD'])",
+                "keyPassword=$($credentials['ANDROID_KEY_PASSWORD'])",
+                "keyAlias=$($credentials['ANDROID_KEY_ALIAS'])",
+                "storeFile=$($keystoreFile.Replace('\', '/'))"
+            ),
+            $utf8NoBom
+        )
+
+        Push-Location $repositoryRoot
+        try {
+            & flutter.bat build apk --release
+            if ($LASTEXITCODE -ne 0) {
+                throw "Flutter failed to build the signed release APK."
+            }
+        } finally {
+            Pop-Location
+        }
+
+        $apkFile = Join-Path $repositoryRoot "build\app\outputs\flutter-apk\app-release.apk"
+        $androidSdk = if ($env:ANDROID_HOME) {
+            $env:ANDROID_HOME
+        } elseif ($env:ANDROID_SDK_ROOT) {
+            $env:ANDROID_SDK_ROOT
+        } else {
+            Join-Path $env:LOCALAPPDATA "Android\Sdk"
+        }
+        $apkSigner = Get-ChildItem (Join-Path $androidSdk "build-tools") -Filter apksigner.bat -Recurse |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+        if (-not $apkSigner) {
+            throw "apksigner was not found under $androidSdk."
+        }
+
+        $certificate = & $apkSigner verify --print-certs $apkFile
+        if ($LASTEXITCODE -ne 0 -or -not $certificate) {
+            throw "The release APK signature could not be verified."
+        }
+        if ($certificate -match "CN=Android Debug") {
+            throw "The release APK was signed with the Android debug key."
+        }
+        Write-Output "Signed release APK verification passed."
+    } finally {
+        if (Test-Path -LiteralPath $keyPropertiesFile) {
+            Remove-Item -LiteralPath $keyPropertiesFile -Force
+        }
+    }
+}
 
 Write-Output "Android signing is configured for $Repository."
 Write-Output "Keystore: $keystoreFile"
