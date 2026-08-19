@@ -6,8 +6,15 @@ archive, generates SHA-256 checksums, and attaches them to a GitHub Release.
 
 ## One-time repository setup
 
-Create an Android upload keystore and add these GitHub Actions repository
-secrets:
+Run the setup script from PowerShell. It creates the Android upload key and its
+recovery credentials under the Git-ignored `dist/release` directory, then
+configures the required GitHub Actions secrets:
+
+```powershell
+.\tool\setup_android_signing.ps1
+```
+
+The configured secrets are:
 
 - `ANDROID_KEYSTORE_BASE64`: the keystore file encoded as a single Base64 line
 - `ANDROID_KEYSTORE_PASSWORD`
@@ -15,7 +22,8 @@ secrets:
 - `ANDROID_KEY_ALIAS`
 
 Keep the keystore and passwords backed up securely. Future APK updates must be
-signed with the same key.
+signed with the same key. The ignored files in `dist/release` are the local
+source of truth; rerunning the script reuses them instead of rotating the key.
 
 ## Create a release
 
