@@ -90,8 +90,11 @@ class ActiveDownloadCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(task.platform.icon,
-                            size: 13, color: task.platform.brandColor),
+                        Icon(
+                          task.platform.icon,
+                          size: 13,
+                          color: task.platform.brandColor,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           task.qualityLabel,
@@ -121,8 +124,9 @@ class ActiveDownloadCard extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.pause_rounded, size: 22),
                   color: AppColors.warning,
-                  onPressed:
-                      task.status == DownloadStatus.downloading ? onPause : null,
+                  onPressed: task.status == DownloadStatus.downloading
+                      ? onPause
+                      : null,
                   tooltip: context.l10n.pauseDownload,
                 ),
 

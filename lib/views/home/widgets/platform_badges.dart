@@ -29,7 +29,10 @@ class PlatformBadges extends StatelessWidget {
               onTap: () => onPlatformTap?.call(p),
               borderRadius: BorderRadius.circular(24),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: isDark
                       ? p.brandColor.withAlpha(35)
@@ -43,11 +46,7 @@ class PlatformBadges extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      p.icon,
-                      size: 18,
-                      color: p.brandColor,
-                    ),
+                    Icon(p.icon, size: 18, color: p.brandColor),
                     const SizedBox(width: 6),
                     Text(
                       p.displayName,

@@ -50,9 +50,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       final localPath = widget.localFilePath;
       if (localPath != null && localPath.isNotEmpty) {
         if (!localPlaybackSupported(localPath)) {
-          throw Exception(
-            context.l10n.localFileMissing,
-          );
+          throw Exception(context.l10n.localFileMissing);
         }
         _videoPlayerController = createLocalVideoController(localPath);
       } else if (widget.videoUrl != null && widget.videoUrl!.isNotEmpty) {
@@ -143,7 +141,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         actions: [
           if (widget.onDownload != null)
             IconButton(
-              icon: const Icon(Icons.download_rounded, color: AppColors.primaryLight),
+              icon: const Icon(
+                Icons.download_rounded,
+                color: AppColors.primaryLight,
+              ),
               onPressed: widget.onDownload,
               tooltip: context.l10n.downloadThisVideo,
             ),
@@ -154,37 +155,37 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           child: _isLoading
               ? const CircularProgressIndicator(color: AppColors.primary)
               : _errorMessage != null
-                  ? Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.error_outline_rounded,
-                            size: 48,
-                            color: Colors.redAccent,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            _errorMessage!,
-                            style: const TextStyle(color: Colors.white70),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                _isLoading = true;
-                                _errorMessage = null;
-                              });
-                              _initializePlayer();
-                            },
-                            child: Text(context.l10n.retry),
-                          ),
-                        ],
+              ? Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline_rounded,
+                        size: 48,
+                        color: Colors.redAccent,
                       ),
-                    )
-                  : Chewie(controller: _chewieController!),
+                      const SizedBox(height: 16),
+                      Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.white70),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _isLoading = true;
+                            _errorMessage = null;
+                          });
+                          _initializePlayer();
+                        },
+                        child: Text(context.l10n.retry),
+                      ),
+                    ],
+                  ),
+                )
+              : Chewie(controller: _chewieController!),
         ),
       ),
     );

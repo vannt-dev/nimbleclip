@@ -124,8 +124,10 @@ class YouTubeExtractor extends BaseVideoExtractor {
 
     // A balanced-brace scan, not a non-greedy regex: the player response
     // contains nested objects and strings that truncate `({.+?});` early.
-    final blob =
-        extractJsonAfterMarker(response.body, 'ytInitialPlayerResponse');
+    final blob = extractJsonAfterMarker(
+      response.body,
+      'ytInitialPlayerResponse',
+    );
     if (blob == null) {
       throw ExtractionException(l10n.youtubeNoPlayerData);
     }
@@ -183,7 +185,8 @@ class YouTubeExtractor extends BaseVideoExtractor {
     // The adaptive list carries a dozen audio renditions; only the highest
     // bitrate one is worth offering.
     Map<String, dynamic>? bestAudio;
-    for (final entry in streamingData?['adaptiveFormats'] as List<dynamic>? ?? []) {
+    for (final entry
+        in streamingData?['adaptiveFormats'] as List<dynamic>? ?? []) {
       final format = entry as Map<String, dynamic>;
       if (!(format['mimeType']?.toString() ?? '').startsWith('audio/')) {
         continue;

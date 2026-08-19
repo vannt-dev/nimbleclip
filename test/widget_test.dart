@@ -33,14 +33,18 @@ void main() {
       };
 
       expected.forEach((url, platform) {
-        expect(ExtractorRegistry.getExtractorFor(url).platform, platform,
-            reason: url);
+        expect(
+          ExtractorRegistry.getExtractorFor(url).platform,
+          platform,
+          reason: url,
+        );
       });
     });
 
     test('every platform except generic has an extractor registered', () {
-      final registered =
-          ExtractorRegistry.extractors.map((e) => e.platform).toSet();
+      final registered = ExtractorRegistry.extractors
+          .map((e) => e.platform)
+          .toSet();
       expect(registered, containsAll(VideoPlatform.values));
     });
 
@@ -70,25 +74,30 @@ void main() {
         '03:45',
       );
       expect(
-        Formatters.formatDuration(const Duration(hours: 1, minutes: 2, seconds: 3)),
+        Formatters.formatDuration(
+          const Duration(hours: 1, minutes: 2, seconds: 3),
+        ),
         '01:02:03',
       );
     });
   });
 
   group('VideoExtractorProvider', () {
-    test('rejects an invalid URL without clearing into a loading state', () async {
-      final provider = VideoExtractorProvider();
-      final ok = await provider.analyzeUrl(
-        'definitely not a link',
-        l10n: l10n,
-      );
+    test(
+      'rejects an invalid URL without clearing into a loading state',
+      () async {
+        final provider = VideoExtractorProvider();
+        final ok = await provider.analyzeUrl(
+          'definitely not a link',
+          l10n: l10n,
+        );
 
-      expect(ok, isFalse);
-      expect(provider.isAnalyzing, isFalse);
-      expect(provider.errorMessage, isNotNull);
-      expect(provider.hasResult, isFalse);
-    });
+        expect(ok, isFalse);
+        expect(provider.isAnalyzing, isFalse);
+        expect(provider.errorMessage, isNotNull);
+        expect(provider.hasResult, isFalse);
+      },
+    );
 
     test('clear() resets every field', () {
       final provider = VideoExtractorProvider()..clear();

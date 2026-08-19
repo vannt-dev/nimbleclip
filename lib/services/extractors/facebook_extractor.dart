@@ -95,8 +95,8 @@ class FacebookExtractor extends BaseVideoExtractor {
     final sdUrl = _firstMatch(html, _sdPatterns);
     if (hdUrl == null && sdUrl == null) return null;
 
-    final id = _videoId(html) ??
-        DateTime.now().millisecondsSinceEpoch.toString();
+    final id =
+        _videoId(html) ?? DateTime.now().millisecondsSinceEpoch.toString();
     final qualities = <VideoQualityOption>[
       if (hdUrl != null)
         VideoQualityOption(
@@ -134,19 +134,21 @@ class FacebookExtractor extends BaseVideoExtractor {
       RegExp(r'"videoId":"(\d+)"').firstMatch(html)?.group(1);
 
   String _title(String html) {
-    final ogTitle =
-        RegExp(r'<meta[^>]+property="og:title"[^>]+content="([^"]*)"')
-            .firstMatch(html)
-            ?.group(1);
-    final rawTitle = ogTitle ??
-        RegExp(r'<title[^>]*>(.*?)</title>', caseSensitive: false, dotAll: true)
-            .firstMatch(html)
-            ?.group(1);
+    final ogTitle = RegExp(
+      r'<meta[^>]+property="og:title"[^>]+content="([^"]*)"',
+    ).firstMatch(html)?.group(1);
+    final rawTitle =
+        ogTitle ??
+        RegExp(
+          r'<title[^>]*>(.*?)</title>',
+          caseSensitive: false,
+          dotAll: true,
+        ).firstMatch(html)?.group(1);
     if (rawTitle == null || rawTitle.trim().isEmpty) return 'Facebook Video';
 
-    final title = decodeHtmlEntities(decodeJsonEscapes(rawTitle))
-        .replaceAll(RegExp(r'\s*\|\s*Facebook\s*$'), '')
-        .trim();
+    final title = decodeHtmlEntities(
+      decodeJsonEscapes(rawTitle),
+    ).replaceAll(RegExp(r'\s*\|\s*Facebook\s*$'), '').trim();
     return title.isEmpty ? 'Facebook Video' : title;
   }
 
@@ -158,30 +160,32 @@ class FacebookExtractor extends BaseVideoExtractor {
   String? _owner(String html) {
     final owner =
         RegExp(r'"owner":\{[^}]*"name":"([^"]+)"').firstMatch(html)?.group(1) ??
-            RegExp(r'"ownerName":"([^"]+)"').firstMatch(html)?.group(1);
+        RegExp(r'"ownerName":"([^"]+)"').firstMatch(html)?.group(1);
     return owner == null ? null : decodeJsonEscapes(owner);
   }
 
   String? _thumbnail(String html) {
-    final raw = RegExp(r'"preferred_thumbnail":\{"image":\{"uri":"([^"]+)"')
-            .firstMatch(html)
-            ?.group(1) ??
-        RegExp(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"')
-            .firstMatch(html)
-            ?.group(1);
+    final raw =
+        RegExp(
+          r'"preferred_thumbnail":\{"image":\{"uri":"([^"]+)"',
+        ).firstMatch(html)?.group(1) ??
+        RegExp(
+          r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"',
+        ).firstMatch(html)?.group(1);
     return raw == null ? null : decodeHtmlEntities(decodeJsonEscapes(raw));
   }
 
   Duration? _duration(String html) {
-    final ms = RegExp(r'"playable_duration_in_ms":(\d+)')
-        .firstMatch(html)
-        ?.group(1);
+    final ms = RegExp(
+      r'"playable_duration_in_ms":(\d+)',
+    ).firstMatch(html)?.group(1);
     if (ms != null) {
       final value = int.tryParse(ms);
       if (value != null && value > 0) return Duration(milliseconds: value);
     }
-    final seconds =
-        RegExp(r'"video_duration":(\d+)').firstMatch(html)?.group(1);
+    final seconds = RegExp(
+      r'"video_duration":(\d+)',
+    ).firstMatch(html)?.group(1);
     final value = int.tryParse(seconds ?? '');
     return value != null && value > 0 ? Duration(seconds: value) : null;
   }

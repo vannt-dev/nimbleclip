@@ -12,7 +12,11 @@ void main() {
         'https://m.youtube.com/watch?v=abc',
         'https://www.youtube-nocookie.com/embed/abc',
       ]) {
-        expect(UrlHelper.detectPlatform(url), VideoPlatform.youtube, reason: url);
+        expect(
+          UrlHelper.detectPlatform(url),
+          VideoPlatform.youtube,
+          reason: url,
+        );
       }
     });
 
@@ -22,23 +26,39 @@ void main() {
         'https://vm.tiktok.com/ZMxxxx/',
         'https://vt.tiktok.com/ZSabc/',
       ]) {
-        expect(UrlHelper.detectPlatform(url), VideoPlatform.tiktok, reason: url);
+        expect(
+          UrlHelper.detectPlatform(url),
+          VideoPlatform.tiktok,
+          reason: url,
+        );
       }
     });
 
     test('detects Facebook, X and Instagram', () {
-      expect(UrlHelper.detectPlatform('https://www.facebook.com/watch?v=123'),
-          VideoPlatform.facebook);
-      expect(UrlHelper.detectPlatform('https://fb.watch/abcdef/'),
-          VideoPlatform.facebook);
-      expect(UrlHelper.detectPlatform('https://x.com/u/status/1'),
-          VideoPlatform.twitter);
-      expect(UrlHelper.detectPlatform('https://twitter.com/u/status/1'),
-          VideoPlatform.twitter);
-      expect(UrlHelper.detectPlatform('https://t.co/abc123'),
-          VideoPlatform.twitter);
-      expect(UrlHelper.detectPlatform('https://www.instagram.com/reel/Cxyz/'),
-          VideoPlatform.instagram);
+      expect(
+        UrlHelper.detectPlatform('https://www.facebook.com/watch?v=123'),
+        VideoPlatform.facebook,
+      );
+      expect(
+        UrlHelper.detectPlatform('https://fb.watch/abcdef/'),
+        VideoPlatform.facebook,
+      );
+      expect(
+        UrlHelper.detectPlatform('https://x.com/u/status/1'),
+        VideoPlatform.twitter,
+      );
+      expect(
+        UrlHelper.detectPlatform('https://twitter.com/u/status/1'),
+        VideoPlatform.twitter,
+      );
+      expect(
+        UrlHelper.detectPlatform('https://t.co/abc123'),
+        VideoPlatform.twitter,
+      );
+      expect(
+        UrlHelper.detectPlatform('https://www.instagram.com/reel/Cxyz/'),
+        VideoPlatform.instagram,
+      );
     });
 
     test('matches on the host, not anywhere in the URL', () {

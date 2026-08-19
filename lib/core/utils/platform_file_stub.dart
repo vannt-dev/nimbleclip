@@ -33,7 +33,10 @@ class PlatformFileHelper {
     return true;
   }
 
-  static Future<bool> saveToGallery(String filePath, {bool isAudio = false}) async {
+  static Future<bool> saveToGallery(
+    String filePath, {
+    bool isAudio = false,
+  }) async {
     if (isAudio) return true;
     try {
       final hasAccess = await Gal.hasAccess();

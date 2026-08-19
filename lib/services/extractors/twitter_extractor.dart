@@ -50,8 +50,9 @@ class TwitterExtractor extends BaseVideoExtractor {
   ) async {
     final Map<String, dynamic> json;
     try {
-      final response =
-          await ExtractorHttp.get('https://api.fxtwitter.com/status/$tweetId');
+      final response = await ExtractorHttp.get(
+        'https://api.fxtwitter.com/status/$tweetId',
+      );
       if (response.statusCode != 200) return null;
       json = jsonDecode(response.body) as Map<String, dynamic>;
     } catch (_) {
@@ -60,8 +61,8 @@ class TwitterExtractor extends BaseVideoExtractor {
 
     if (json['code'] != 200 || json['tweet'] == null) return null;
     final tweet = json['tweet'] as Map<String, dynamic>;
-    final videos = (tweet['media'] as Map<String, dynamic>?)?['videos']
-        as List<dynamic>?;
+    final videos =
+        (tweet['media'] as Map<String, dynamic>?)?['videos'] as List<dynamic>?;
     if (videos == null || videos.isEmpty) return null;
 
     final video = videos.first as Map<String, dynamic>;
@@ -69,8 +70,10 @@ class TwitterExtractor extends BaseVideoExtractor {
         .cast<Map<String, dynamic>>()
         .where((v) => (v['content_type'] ?? '').toString().contains('mp4'))
         .toList();
-    variants.sort((a, b) => ((b['bitrate'] as num?) ?? 0)
-        .compareTo((a['bitrate'] as num?) ?? 0));
+    variants.sort(
+      (a, b) =>
+          ((b['bitrate'] as num?) ?? 0).compareTo((a['bitrate'] as num?) ?? 0),
+    );
 
     final qualities = <VideoQualityOption>[];
     for (var i = 0; i < variants.length; i++) {
@@ -122,7 +125,8 @@ class TwitterExtractor extends BaseVideoExtractor {
           ? text
           : l10n.xPostBy((author['screen_name'] ?? 'X').toString()),
       description: text,
-      author: author['name']?.toString() ??
+      author:
+          author['name']?.toString() ??
           author['screen_name']?.toString() ??
           'X User',
       authorAvatar: author['avatar_url']?.toString(),

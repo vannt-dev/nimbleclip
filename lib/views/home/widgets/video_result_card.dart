@@ -70,13 +70,17 @@ class _VideoResultCardState extends State<VideoResultCard> {
                     imageUrl: meta.coverUrl,
                     fit: BoxFit.cover,
                     placeholder: (context, url) => Container(
-                      color: isDark ? AppColors.darkCardElevated : Colors.grey[200],
+                      color: isDark
+                          ? AppColors.darkCardElevated
+                          : Colors.grey[200],
                       child: const Center(
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                     ),
                     errorWidget: (context, url, error) => Container(
-                      color: isDark ? AppColors.darkCardElevated : Colors.grey[200],
+                      color: isDark
+                          ? AppColors.darkCardElevated
+                          : Colors.grey[200],
                       child: Icon(
                         meta.platform.icon,
                         size: 48,
@@ -123,8 +127,10 @@ class _VideoResultCardState extends State<VideoResultCard> {
                   top: 12,
                   left: 12,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: meta.platform.brandColor,
                       borderRadius: BorderRadius.circular(12),
@@ -159,7 +165,9 @@ class _VideoResultCardState extends State<VideoResultCard> {
                     right: 12,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black.withAlpha(180),
                         borderRadius: BorderRadius.circular(8),
@@ -210,10 +218,8 @@ class _VideoResultCardState extends State<VideoResultCard> {
                           width: 22,
                           height: 22,
                           fit: BoxFit.cover,
-                          errorWidget: (context, url, error) => const Icon(
-                            Icons.person_rounded,
-                            size: 18,
-                          ),
+                          errorWidget: (context, url, error) =>
+                              const Icon(Icons.person_rounded, size: 18),
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -312,8 +318,8 @@ class _VideoResultCardState extends State<VideoResultCard> {
                                   color: _selectedTab == 0
                                       ? Colors.white
                                       : (isDark
-                                          ? AppColors.darkTextSecondary
-                                          : AppColors.lightTextSecondary),
+                                            ? AppColors.darkTextSecondary
+                                            : AppColors.lightTextSecondary),
                                 ),
                               ),
                             ),
@@ -345,8 +351,8 @@ class _VideoResultCardState extends State<VideoResultCard> {
                                   color: _selectedTab == 1
                                       ? Colors.white
                                       : (isDark
-                                          ? AppColors.darkTextSecondary
-                                          : AppColors.lightTextSecondary),
+                                            ? AppColors.darkTextSecondary
+                                            : AppColors.lightTextSecondary),
                                 ),
                               ),
                             ),
@@ -374,20 +380,22 @@ class _VideoResultCardState extends State<VideoResultCard> {
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: isSelected
                               ? AppColors.primary.withAlpha(isDark ? 40 : 25)
                               : (isDark
-                                  ? AppColors.darkCardElevated.withAlpha(120)
-                                  : AppColors.lightCardElevated),
+                                    ? AppColors.darkCardElevated.withAlpha(120)
+                                    : AppColors.lightCardElevated),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: isSelected
                                 ? AppColors.primary
                                 : (isDark
-                                    ? AppColors.darkBorder
-                                    : AppColors.lightBorder),
+                                      ? AppColors.darkBorder
+                                      : AppColors.lightBorder),
                             width: isSelected ? 1.5 : 1,
                           ),
                         ),
@@ -401,8 +409,8 @@ class _VideoResultCardState extends State<VideoResultCard> {
                               color: isSelected
                                   ? AppColors.primary
                                   : (isDark
-                                      ? AppColors.darkTextSecondary
-                                      : AppColors.lightTextSecondary),
+                                        ? AppColors.darkTextSecondary
+                                        : AppColors.lightTextSecondary),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
@@ -414,21 +422,23 @@ class _VideoResultCardState extends State<VideoResultCard> {
                                       ? FontWeight.w700
                                       : FontWeight.w500,
                                   color: isSelected
-                                      ? (isDark ? Colors.white : AppColors.primaryDark)
+                                      ? (isDark
+                                            ? Colors.white
+                                            : AppColors.primaryDark)
                                       : (isDark
-                                          ? AppColors.darkTextPrimary
-                                          : AppColors.lightTextPrimary),
+                                            ? AppColors.darkTextPrimary
+                                            : AppColors.lightTextPrimary),
                                 ),
                               ),
                             ),
                             if (opt.sizeBytes != null && opt.sizeBytes! > 0)
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: isDark
-                                      ? Colors.black26
-                                      : Colors.white,
+                                  color: isDark ? Colors.black26 : Colors.white,
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
@@ -456,11 +466,16 @@ class _VideoResultCardState extends State<VideoResultCard> {
                   children: [
                     OutlinedButton.icon(
                       onPressed: widget.onPreview,
-                      icon: const Icon(Icons.play_circle_outline_rounded, size: 18),
+                      icon: const Icon(
+                        Icons.play_circle_outline_rounded,
+                        size: 18,
+                      ),
                       label: Text(context.l10n.preview),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),

@@ -16,17 +16,16 @@ class ExtractorHttp {
   static const Duration defaultTimeout = Duration(seconds: 15);
 
   @visibleForTesting
-  static Future<http.Response> Function(
-    Uri uri,
-    Map<String, String> headers,
-  )? getOverride;
+  static Future<http.Response> Function(Uri uri, Map<String, String> headers)?
+  getOverride;
 
   @visibleForTesting
   static Future<http.Response> Function(
     Uri uri,
     Map<String, String> headers,
     Object? body,
-  )? postOverride;
+  )?
+  postOverride;
 
   @visibleForTesting
   static void resetOverrides() {
@@ -46,7 +45,8 @@ class ExtractorHttp {
 
     if (kIsWeb) {
       headers.removeWhere(
-        (key, _) => key.toLowerCase().startsWith('sec-') ||
+        (key, _) =>
+            key.toLowerCase().startsWith('sec-') ||
             key.toLowerCase() == 'user-agent',
       );
       headers[CorsHelper.userAgentHeader] = userAgent;
@@ -66,12 +66,7 @@ class ExtractorHttp {
     final requestHeaders = buildHeaders(userAgent: userAgent, extra: headers);
     final override = getOverride;
     if (override != null) return override(uri, requestHeaders);
-    return http
-        .get(
-          uri,
-          headers: requestHeaders,
-        )
-        .timeout(timeout);
+    return http.get(uri, headers: requestHeaders).timeout(timeout);
   }
 
   static Future<http.Response> post(
@@ -85,13 +80,7 @@ class ExtractorHttp {
     final requestHeaders = buildHeaders(userAgent: userAgent, extra: headers);
     final override = postOverride;
     if (override != null) return override(uri, requestHeaders, body);
-    return http
-        .post(
-          uri,
-          headers: requestHeaders,
-          body: body,
-        )
-        .timeout(timeout);
+    return http.post(uri, headers: requestHeaders, body: body).timeout(timeout);
   }
 
   /// Expands a short link to its final destination.
@@ -106,8 +95,9 @@ class ExtractorHttp {
   }) async {
     try {
       if (kIsWeb) {
-        final response =
-            await http.get(CorsHelper.resolveUri(url)).timeout(timeout);
+        final response = await http
+            .get(CorsHelper.resolveUri(url))
+            .timeout(timeout);
         if (response.statusCode != 200) return url;
         final json = jsonDecode(response.body) as Map<String, dynamic>;
         final resolved = json['url']?.toString();

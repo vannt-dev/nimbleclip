@@ -28,7 +28,8 @@ class CompletedDownloadCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isFailed = task.status == DownloadStatus.failed ||
+    final isFailed =
+        task.status == DownloadStatus.failed ||
         task.status == DownloadStatus.cancelled;
 
     final isCompleted = task.status == DownloadStatus.completed;
@@ -123,8 +124,11 @@ class CompletedDownloadCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(task.platform.icon,
-                            size: 13, color: task.platform.brandColor),
+                        Icon(
+                          task.platform.icon,
+                          size: 13,
+                          color: task.platform.brandColor,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           task.qualityLabel,
@@ -174,8 +178,11 @@ class CompletedDownloadCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline_rounded,
-                      size: 14, color: AppColors.error),
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    size: 14,
+                    color: AppColors.error,
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -222,13 +229,19 @@ class CompletedDownloadCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.download_done_rounded,
-                      size: 16, color: AppColors.info),
+                  const Icon(
+                    Icons.download_done_rounded,
+                    size: 16,
+                    color: AppColors.info,
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       context.l10n.browserDownloadStarted,
-                      style: const TextStyle(fontSize: 12, color: AppColors.info),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.info,
+                      ),
                     ),
                   ),
                 ],
@@ -261,8 +274,8 @@ class CompletedDownloadCard extends StatelessWidget {
                   color: task.isSavedToGallery
                       ? AppColors.success
                       : (isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary),
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary),
                   onTap: onSaveGallery,
                 ),
                 _ActionButton(

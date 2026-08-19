@@ -22,15 +22,15 @@ class VideoQualityOption {
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'label': label,
-        'quality': quality,
-        'format': format,
-        'downloadUrl': downloadUrl,
-        'sizeBytes': sizeBytes,
-        'isAudioOnly': isAudioOnly,
-        'headers': headers,
-      };
+    'id': id,
+    'label': label,
+    'quality': quality,
+    'format': format,
+    'downloadUrl': downloadUrl,
+    'sizeBytes': sizeBytes,
+    'isAudioOnly': isAudioOnly,
+    'headers': headers,
+  };
 
   factory VideoQualityOption.fromJson(Map<String, dynamic> json) =>
       VideoQualityOption(
@@ -98,45 +98,45 @@ class VideoMetadata {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'originalUrl': originalUrl,
-        'title': title,
-        'description': description,
-        'author': author,
-        'authorAvatar': authorAvatar,
-        'coverUrl': coverUrl,
-        'durationSeconds': duration?.inSeconds,
-        'platform': platform.name,
-        'qualities': qualities.map((q) => q.toJson()).toList(),
-        'viewCount': viewCount,
-        'likeCount': likeCount,
-        'commentCount': commentCount,
-        'shareCount': shareCount,
-      };
+    'id': id,
+    'originalUrl': originalUrl,
+    'title': title,
+    'description': description,
+    'author': author,
+    'authorAvatar': authorAvatar,
+    'coverUrl': coverUrl,
+    'durationSeconds': duration?.inSeconds,
+    'platform': platform.name,
+    'qualities': qualities.map((q) => q.toJson()).toList(),
+    'viewCount': viewCount,
+    'likeCount': likeCount,
+    'commentCount': commentCount,
+    'shareCount': shareCount,
+  };
 
   factory VideoMetadata.fromJson(Map<String, dynamic> json) => VideoMetadata(
-        id: json['id'] as String? ?? '',
-        originalUrl: json['originalUrl'] as String? ?? '',
-        title: json['title'] as String? ?? 'Untitled Video',
-        description: json['description'] as String?,
-        author: json['author'] as String? ?? 'Unknown',
-        authorAvatar: json['authorAvatar'] as String?,
-        coverUrl: json['coverUrl'] as String? ?? '',
-        duration: json['durationSeconds'] != null
-            ? Duration(seconds: json['durationSeconds'] as int)
-            : null,
-        platform: VideoPlatform.values.firstWhere(
-          (p) => p.name == json['platform'],
-          orElse: () => VideoPlatform.generic,
-        ),
-        qualities: (json['qualities'] as List<dynamic>?)
-                ?.map((q) =>
-                    VideoQualityOption.fromJson(q as Map<String, dynamic>))
-                .toList() ??
-            [],
-        viewCount: json['viewCount'] as int?,
-        likeCount: json['likeCount'] as int?,
-        commentCount: json['commentCount'] as int?,
-        shareCount: json['shareCount'] as int?,
-      );
+    id: json['id'] as String? ?? '',
+    originalUrl: json['originalUrl'] as String? ?? '',
+    title: json['title'] as String? ?? 'Untitled Video',
+    description: json['description'] as String?,
+    author: json['author'] as String? ?? 'Unknown',
+    authorAvatar: json['authorAvatar'] as String?,
+    coverUrl: json['coverUrl'] as String? ?? '',
+    duration: json['durationSeconds'] != null
+        ? Duration(seconds: json['durationSeconds'] as int)
+        : null,
+    platform: VideoPlatform.values.firstWhere(
+      (p) => p.name == json['platform'],
+      orElse: () => VideoPlatform.generic,
+    ),
+    qualities:
+        (json['qualities'] as List<dynamic>?)
+            ?.map((q) => VideoQualityOption.fromJson(q as Map<String, dynamic>))
+            .toList() ??
+        [],
+    viewCount: json['viewCount'] as int?,
+    likeCount: json['likeCount'] as int?,
+    commentCount: json['commentCount'] as int?,
+    shareCount: json['shareCount'] as int?,
+  );
 }

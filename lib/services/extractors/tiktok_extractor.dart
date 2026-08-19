@@ -31,7 +31,9 @@ class TikTokExtractor extends BaseVideoExtractor {
         body: {'url': url, 'count': '12', 'cursor': '0', 'web': '1', 'hd': '1'},
       );
       if (response.statusCode != 200) {
-        throw ExtractionException(l10n.tiktokServiceStatus(response.statusCode));
+        throw ExtractionException(
+          l10n.tiktokServiceStatus(response.statusCode),
+        );
       }
       json = jsonDecode(response.body) as Map<String, dynamic>;
     } on ExtractionException {
@@ -50,7 +52,8 @@ class TikTokExtractor extends BaseVideoExtractor {
     }
 
     final data = json['data'] as Map<String, dynamic>;
-    final id = data['id']?.toString() ??
+    final id =
+        data['id']?.toString() ??
         DateTime.now().millisecondsSinceEpoch.toString();
     final author = data['author'] as Map<String, dynamic>? ?? {};
     final qualities = <VideoQualityOption>[];
@@ -125,13 +128,13 @@ class TikTokExtractor extends BaseVideoExtractor {
       originalUrl: url,
       title: title != null && title.isNotEmpty ? title : 'TikTok Video ($id)',
       description: title,
-      author: author['nickname']?.toString() ??
+      author:
+          author['nickname']?.toString() ??
           author['unique_id']?.toString() ??
           'TikTok Creator',
       authorAvatar: author['avatar']?.toString(),
-      coverUrl: data['origin_cover']?.toString() ??
-          data['cover']?.toString() ??
-          '',
+      coverUrl:
+          data['origin_cover']?.toString() ?? data['cover']?.toString() ?? '',
       duration: durationSec != null && durationSec > 0
           ? Duration(seconds: durationSec)
           : null,

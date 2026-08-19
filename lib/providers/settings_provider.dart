@@ -35,8 +35,10 @@ class SettingsProvider extends ChangeNotifier {
     }
 
     _autoSaveGallery = prefs.getBool(AppConstants.keyAutoSaveGallery) ?? true;
-    _autoPasteClipboard = prefs.getBool(AppConstants.keyAutoPasteClipboard) ?? true;
-    _preferredQuality = prefs.getString(AppConstants.keyPreferredQuality) ?? 'Highest';
+    _autoPasteClipboard =
+        prefs.getBool(AppConstants.keyAutoPasteClipboard) ?? true;
+    _preferredQuality =
+        prefs.getString(AppConstants.keyPreferredQuality) ?? 'Highest';
     final languageCode = prefs.getString(AppConstants.keyLanguageCode);
     _locale = languageCode == null ? null : Locale(languageCode);
 
@@ -51,8 +53,8 @@ class SettingsProvider extends ChangeNotifier {
     final themeStr = mode == ThemeMode.dark
         ? 'dark'
         : mode == ThemeMode.light
-            ? 'light'
-            : 'system';
+        ? 'light'
+        : 'system';
     await prefs.setString(AppConstants.keyThemeMode, themeStr);
   }
 

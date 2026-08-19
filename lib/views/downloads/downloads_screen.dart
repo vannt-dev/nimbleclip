@@ -39,10 +39,8 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => VideoPlayerScreen(
-          title: task.title,
-          localFilePath: task.filePath,
-        ),
+        builder: (_) =>
+            VideoPlayerScreen(title: task.title, localFilePath: task.filePath),
       ),
     );
   }
@@ -136,8 +134,9 @@ class _DownloadsScreenState extends State<DownloadsScreen>
           IconButton(
             icon: const Icon(Icons.playlist_remove_rounded),
             tooltip: context.l10n.clearFinished,
-            onPressed:
-                hasFinished ? () => _confirmClearFinished(context) : null,
+            onPressed: hasFinished
+                ? () => _confirmClearFinished(context)
+                : null,
           ),
         ],
         bottom: TabBar(
@@ -148,7 +147,10 @@ class _DownloadsScreenState extends State<DownloadsScreen>
           unselectedLabelColor: isDark
               ? AppColors.darkTextSecondary
               : AppColors.lightTextSecondary,
-          labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
           tabs: [
             Tab(text: context.l10n.tabAll(all.length)),
             Tab(
@@ -160,7 +162,9 @@ class _DownloadsScreenState extends State<DownloadsScreen>
                     const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.primary,
                         borderRadius: BorderRadius.circular(10),
@@ -244,23 +248,25 @@ class _DownloadsScreenState extends State<DownloadsScreen>
             }
           },
           onShare: () => context.read<DownloadProvider>().shareFile(
-                task,
-                context.l10n.shareFromNimbleClip(task.title),
-              ),
-          onOpenExternal: () =>
-              context.read<DownloadProvider>().openFile(task),
+            task,
+            context.l10n.shareFromNimbleClip(task.title),
+          ),
+          onOpenExternal: () => context.read<DownloadProvider>().openFile(task),
           onDelete: () => _confirmDelete(context, task),
           onRetry: () => context.read<DownloadProvider>().retryTask(
-                task,
-                l10n: context.l10n,
-              ),
+            task,
+            l10n: context.l10n,
+          ),
         );
       },
     );
   }
 
-  Widget _buildTaskList(BuildContext context, List<DownloadTask> tasks,
-      {bool isAll = false}) {
+  Widget _buildTaskList(
+    BuildContext context,
+    List<DownloadTask> tasks, {
+    bool isAll = false,
+  }) {
     if (tasks.isEmpty) {
       return _buildEmptyState(
         icon: Icons.video_library_outlined,
@@ -298,16 +304,16 @@ class _DownloadsScreenState extends State<DownloadsScreen>
               }
             },
             onShare: () => context.read<DownloadProvider>().shareFile(
-                  task,
-                  context.l10n.shareFromNimbleClip(task.title),
-                ),
+              task,
+              context.l10n.shareFromNimbleClip(task.title),
+            ),
             onOpenExternal: () =>
                 context.read<DownloadProvider>().openFile(task),
             onDelete: () => _confirmDelete(context, task),
             onRetry: () => context.read<DownloadProvider>().retryTask(
-                  task,
-                  l10n: context.l10n,
-                ),
+              task,
+              l10n: context.l10n,
+            ),
           );
         }
       },
@@ -371,7 +377,10 @@ class _DownloadsScreenState extends State<DownloadsScreen>
               icon: const Icon(Icons.add_rounded, size: 18),
               label: Text(context.l10n.newDownload),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
               ),
             ),
           ],

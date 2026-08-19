@@ -19,12 +19,13 @@ class AppTheme {
         onSecondary: Colors.white,
         onSurface: AppColors.lightTextPrimary,
       ),
-      textTheme: GoogleFonts.plusJakartaSansTextTheme(
-        ThemeData.light().textTheme,
-      ).apply(
-        bodyColor: AppColors.lightTextPrimary,
-        displayColor: AppColors.lightTextPrimary,
-      ),
+      textTheme:
+          GoogleFonts.plusJakartaSansTextTheme(
+            ThemeData.light().textTheme,
+          ).apply(
+            bodyColor: AppColors.lightTextPrimary,
+            displayColor: AppColors.lightTextPrimary,
+          ),
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.lightBg,
         elevation: 0,
@@ -47,7 +48,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.lightCard,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: AppColors.lightBorder, width: 1),
@@ -95,12 +99,13 @@ class AppTheme {
         onSecondary: Colors.white,
         onSurface: AppColors.darkTextPrimary,
       ),
-      textTheme: GoogleFonts.plusJakartaSansTextTheme(
-        ThemeData.dark().textTheme,
-      ).apply(
-        bodyColor: AppColors.darkTextPrimary,
-        displayColor: AppColors.darkTextPrimary,
-      ),
+      textTheme:
+          GoogleFonts.plusJakartaSansTextTheme(
+            ThemeData.dark().textTheme,
+          ).apply(
+            bodyColor: AppColors.darkTextPrimary,
+            displayColor: AppColors.darkTextPrimary,
+          ),
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.darkBg,
         elevation: 0,
@@ -123,7 +128,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.darkCard,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: AppColors.darkBorder, width: 1),
@@ -134,7 +142,10 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.primaryLight, width: 1.5),
+          borderSide: const BorderSide(
+            color: AppColors.primaryLight,
+            width: 1.5,
+          ),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(

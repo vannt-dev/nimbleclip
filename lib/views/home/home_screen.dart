@@ -66,9 +66,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 children: [
                   const Icon(Icons.link_rounded, color: Colors.white, size: 18),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(context.l10n.clipboardVideoDetected),
-                  ),
+                  Expanded(child: Text(context.l10n.clipboardVideoDetected)),
                 ],
               ),
               action: SnackBarAction(
@@ -95,13 +93,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (text.isNotEmpty) {
       FocusScope.of(context).unfocus();
       final preferred = context.read<SettingsProvider>().preferredQuality;
-      context
-          .read<VideoExtractorProvider>()
-          .analyzeUrl(
-            text,
-            preferredQuality: preferred,
-            l10n: context.l10n,
-          );
+      context.read<VideoExtractorProvider>().analyzeUrl(
+        text,
+        preferredQuality: preferred,
+        l10n: context.l10n,
+      );
     }
   }
 
@@ -119,15 +115,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     if (meta != null && quality != null) {
       context.read<DownloadProvider>().startNewDownload(
-            metadata: meta,
-            quality: quality,
-            l10n: context.l10n,
-            autoSaveToGallery: settings.autoSaveGallery,
-          );
+        metadata: meta,
+        quality: quality,
+        l10n: context.l10n,
+        autoSaveToGallery: settings.autoSaveGallery,
+      );
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(context.l10n.downloadStarted(meta.title, quality.quality)),
+          content: Text(
+            context.l10n.downloadStarted(meta.title, quality.quality),
+          ),
           action: SnackBarAction(
             label: context.l10n.viewProgress,
             textColor: AppColors.tiktokAccent,
@@ -259,9 +257,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     decoration: BoxDecoration(
                       color: AppColors.error.withAlpha(25),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: AppColors.error.withAlpha(80),
-                      ),
+                      border: Border.all(color: AppColors.error.withAlpha(80)),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,

@@ -16,8 +16,8 @@ class DownloadProvider extends ChangeNotifier {
   DownloadProvider({
     DownloadService? downloadService,
     StorageService? storageService,
-  })  : _downloadService = downloadService ?? DownloadService(),
-        _storageService = storageService ?? StorageService() {
+  }) : _downloadService = downloadService ?? DownloadService(),
+       _storageService = storageService ?? StorageService() {
     _historyReady = _loadHistory();
   }
 
@@ -36,15 +36,17 @@ class DownloadProvider extends ChangeNotifier {
   bool _isDisposed = false;
 
   List<DownloadTask> get allTasks => List.unmodifiable(_tasks);
-  List<DownloadTask> get activeTasks => _tasks.where((t) => t.isActive).toList();
+  List<DownloadTask> get activeTasks =>
+      _tasks.where((t) => t.isActive).toList();
   List<DownloadTask> get pausedTasks =>
       _tasks.where((t) => t.status == DownloadStatus.paused).toList();
-  List<DownloadTask> get completedTasks =>
-      _tasks
-          .where((t) =>
-              t.status == DownloadStatus.completed ||
-              t.status == DownloadStatus.handedOff)
-          .toList();
+  List<DownloadTask> get completedTasks => _tasks
+      .where(
+        (t) =>
+            t.status == DownloadStatus.completed ||
+            t.status == DownloadStatus.handedOff,
+      )
+      .toList();
 
   @override
   void dispose() {
@@ -125,11 +127,9 @@ class DownloadProvider extends ChangeNotifier {
     notifyListeners();
     await _saveHistory();
 
-    unawaited(_executeDownload(
-      task,
-      l10n: l10n,
-      autoSaveToGallery: autoSaveToGallery,
-    ));
+    unawaited(
+      _executeDownload(task, l10n: l10n, autoSaveToGallery: autoSaveToGallery),
+    );
     return task;
   }
 
@@ -312,10 +312,7 @@ class DownloadProvider extends ChangeNotifier {
 
   Future<void> shareFile(DownloadTask task, String message) async {
     if (task.filePath == null) return;
-    await _downloadService.shareFile(
-      task.filePath!,
-      text: message,
-    );
+    await _downloadService.shareFile(task.filePath!, text: message);
   }
 
   DownloadTask? _findTask(String taskId) {

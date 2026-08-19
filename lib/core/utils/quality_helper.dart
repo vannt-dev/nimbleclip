@@ -26,7 +26,8 @@ class QualityHelper {
     final lower = text.toLowerCase();
 
     // Explicit resolutions win: "HD 1080p" is 1080, not 720.
-    final resolution = RegExp(r'(\d{3,4})\s*p').firstMatch(lower) ??
+    final resolution =
+        RegExp(r'(\d{3,4})\s*p').firstMatch(lower) ??
         RegExp(r'\d{3,4}\s*[x×]\s*(\d{3,4})').firstMatch(lower);
     if (resolution != null) {
       final value = int.tryParse(resolution.group(1)!);

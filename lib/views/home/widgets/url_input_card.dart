@@ -99,8 +99,10 @@ class UrlInputCard extends StatelessWidget {
               const Spacer(),
               if (hasText && detectedPlatform != VideoPlatform.generic)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: detectedPlatform.brandColor.withAlpha(25),
                     borderRadius: BorderRadius.circular(12),

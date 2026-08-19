@@ -29,7 +29,10 @@ class StorageService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonList = tasks.map((t) => t.toJson()).toList();
-      await prefs.setString(AppConstants.keyDownloadHistory, jsonEncode(jsonList));
+      await prefs.setString(
+        AppConstants.keyDownloadHistory,
+        jsonEncode(jsonList),
+      );
     } catch (_) {}
   }
 

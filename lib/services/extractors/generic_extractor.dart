@@ -127,7 +127,8 @@ class GenericExtractor extends BaseVideoExtractor {
     String id,
     AppLocalizations l10n,
   ) {
-    final videoUrl = _meta(html, ['og:video:secure_url', 'og:video:url', 'og:video']) ??
+    final videoUrl =
+        _meta(html, ['og:video:secure_url', 'og:video:url', 'og:video']) ??
         _meta(html, ['twitter:player:stream']);
     if (videoUrl == null) {
       throw ExtractionException(l10n.genericNoVideo);
@@ -145,8 +146,9 @@ class GenericExtractor extends BaseVideoExtractor {
       description: _meta(html, ['og:description']),
       author: _meta(html, ['og:site_name']) ?? uri.host,
       coverUrl: image == null ? '' : uri.resolve(image).toString(),
-      duration:
-          _durationFrom(_meta(html, ['og:video:duration', 'video:duration'])),
+      duration: _durationFrom(
+        _meta(html, ['og:video:duration', 'video:duration']),
+      ),
       platform: VideoPlatform.generic,
       qualities: QualityHelper.sortedByQuality([
         VideoQualityOption(
@@ -166,10 +168,11 @@ class GenericExtractor extends BaseVideoExtractor {
   String? _meta(String html, List<String> keys) {
     for (final key in keys) {
       final escaped = RegExp.escape(key);
-      final match = RegExp(
-                '<meta[^>]+(?:property|name)=["\']$escaped["\'][^>]*content=["\']([^"\']*)["\']',
-                caseSensitive: false,
-              ).firstMatch(html) ??
+      final match =
+          RegExp(
+            '<meta[^>]+(?:property|name)=["\']$escaped["\'][^>]*content=["\']([^"\']*)["\']',
+            caseSensitive: false,
+          ).firstMatch(html) ??
           RegExp(
             '<meta[^>]+content=["\']([^"\']*)["\'][^>]*(?:property|name)=["\']$escaped["\']',
             caseSensitive: false,
@@ -181,11 +184,11 @@ class GenericExtractor extends BaseVideoExtractor {
   }
 
   String? _title(String html) {
-    final raw = RegExp(r'<title[^>]*>(.*?)</title>',
-            caseSensitive: false, dotAll: true)
-        .firstMatch(html)
-        ?.group(1)
-        ?.trim();
+    final raw = RegExp(
+      r'<title[^>]*>(.*?)</title>',
+      caseSensitive: false,
+      dotAll: true,
+    ).firstMatch(html)?.group(1)?.trim();
     return raw == null || raw.isEmpty ? null : decodeHtmlEntities(raw);
   }
 

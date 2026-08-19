@@ -16,9 +16,7 @@ class SettingsScreen extends StatelessWidget {
     final l10n = context.l10n;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.settingsTitle),
-      ),
+      appBar: AppBar(title: Text(l10n.settingsTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -178,8 +176,10 @@ class SettingsScreen extends StatelessWidget {
             child: Column(
               children: [
                 SwitchListTile(
-                  secondary: const Icon(Icons.photo_library_outlined,
-                      color: AppColors.primary),
+                  secondary: const Icon(
+                    Icons.photo_library_outlined,
+                    color: AppColors.primary,
+                  ),
                   title: Text(l10n.autoSaveGallery),
                   subtitle: Text(
                     l10n.autoSaveGalleryDescription,
@@ -190,8 +190,10 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const Divider(height: 1),
                 SwitchListTile(
-                  secondary: const Icon(Icons.content_paste_rounded,
-                      color: AppColors.primary),
+                  secondary: const Icon(
+                    Icons.content_paste_rounded,
+                    color: AppColors.primary,
+                  ),
                   title: Text(l10n.autoDetectClipboard),
                   subtitle: Text(
                     l10n.autoDetectClipboardDescription,
@@ -202,13 +204,17 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.cleaning_services_rounded,
-                      color: AppColors.warning),
+                  leading: const Icon(
+                    Icons.cleaning_services_rounded,
+                    color: AppColors.warning,
+                  ),
                   title: Text(l10n.downloadedMediaSize),
                   subtitle: Text(
                     Formatters.formatBytes(settings.cacheSizeBytes),
                     style: const TextStyle(
-                        fontWeight: FontWeight.w700, color: AppColors.primary),
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
                   ),
                   trailing: TextButton(
                     onPressed: () async {
@@ -224,7 +230,8 @@ class SettingsScreen extends StatelessWidget {
                             ),
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.error),
+                                backgroundColor: AppColors.error,
+                              ),
                               onPressed: () => Navigator.pop(ctx, true),
                               child: Text(l10n.deleteAll),
                             ),
@@ -269,8 +276,10 @@ class SettingsScreen extends StatelessWidget {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.info_outline_rounded,
-                      color: AppColors.primary),
+                  leading: const Icon(
+                    Icons.info_outline_rounded,
+                    color: AppColors.primary,
+                  ),
                   title: Text(l10n.version),
                   trailing: Text(
                     AppConstants.appVersion,
@@ -279,7 +288,10 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.support_rounded, color: AppColors.accent),
+                  leading: const Icon(
+                    Icons.support_rounded,
+                    color: AppColors.accent,
+                  ),
                   title: Text(l10n.supportedPlatforms),
                   subtitle: Text(
                     l10n.supportedPlatformsDescription,
@@ -288,7 +300,10 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.code_rounded, color: AppColors.primary),
+                  leading: const Icon(
+                    Icons.code_rounded,
+                    color: AppColors.primary,
+                  ),
                   title: Text(l10n.githubSource),
                   subtitle: const Text(
                     'github.com/vannt-dev/nimbleclip',
@@ -430,10 +445,7 @@ class _QualityRadioTile extends StatelessWidget {
           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
         ),
       ),
-      subtitle: Text(
-        subtitle,
-        style: const TextStyle(fontSize: 12),
-      ),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
       trailing: isSelected
           ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
           : const Icon(Icons.circle_outlined, color: Colors.grey, size: 20),

@@ -50,14 +50,18 @@ class NimbleClipApp extends StatelessWidget {
               return AnnotatedRegion<SystemUiOverlayStyle>(
                 value: SystemUiOverlayStyle(
                   statusBarColor: Colors.transparent,
-                  statusBarIconBrightness:
-                      isDark ? Brightness.light : Brightness.dark,
-                  statusBarBrightness:
-                      isDark ? Brightness.dark : Brightness.light,
-                  systemNavigationBarColor:
-                      Theme.of(context).scaffoldBackgroundColor,
-                  systemNavigationBarIconBrightness:
-                      isDark ? Brightness.light : Brightness.dark,
+                  statusBarIconBrightness: isDark
+                      ? Brightness.light
+                      : Brightness.dark,
+                  statusBarBrightness: isDark
+                      ? Brightness.dark
+                      : Brightness.light,
+                  systemNavigationBarColor: Theme.of(
+                    context,
+                  ).scaffoldBackgroundColor,
+                  systemNavigationBarIconBrightness: isDark
+                      ? Brightness.light
+                      : Brightness.dark,
                 ),
                 child: child ?? const SizedBox.shrink(),
               );

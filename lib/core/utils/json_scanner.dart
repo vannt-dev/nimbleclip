@@ -19,9 +19,9 @@ String? extractBalancedJson(String source, int startIndex) {
     if (inString) {
       if (escaped) {
         escaped = false;
-      } else if (char == 0x5c /* \ */) {
+      } else if (char == 0x5c /* \ */ ) {
         escaped = true;
-      } else if (char == 0x22 /* " */) {
+      } else if (char == 0x22 /* " */ ) {
         inString = false;
       }
       continue;

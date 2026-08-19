@@ -62,8 +62,9 @@ void main() {
         DownloadStatus.failed,
         DownloadStatus.cancelled,
       ]) {
-        final restored =
-            DownloadTask.fromJson((task()..status = status).toJson());
+        final restored = DownloadTask.fromJson(
+          (task()..status = status).toJson(),
+        );
         expect(restored.status, status);
       }
     });
@@ -106,13 +107,21 @@ void main() {
     });
 
     test('keeps a readable base and appends a short id', () {
-      expect(service.buildFileName(task(title: 'My Clip')),
-          'My Clip_abcdef.mp4');
+      expect(
+        service.buildFileName(task(title: 'My Clip')),
+        'My Clip_abcdef.mp4',
+      );
     });
 
     test('falls back when the title sanitises to nothing', () {
-      expect(service.buildFileName(task(title: '///')), 'NimbleClip_abcdef.mp4');
-      expect(service.buildFileName(task(title: '   ')), 'NimbleClip_abcdef.mp4');
+      expect(
+        service.buildFileName(task(title: '///')),
+        'NimbleClip_abcdef.mp4',
+      );
+      expect(
+        service.buildFileName(task(title: '   ')),
+        'NimbleClip_abcdef.mp4',
+      );
     });
 
     test('truncates very long titles', () {

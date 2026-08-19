@@ -86,7 +86,12 @@ The exact Dart SDK constraint is defined in `pubspec.yaml`.
 git clone https://github.com/vannt-dev/nimbleclip.git
 cd nimbleclip
 flutter pub get
+git config core.hooksPath .githooks
 ```
+
+The repository hooks enforce Conventional Commits, run formatting and static
+analysis before commits, and run tests plus a release Web build before pushes.
+Run `tool/check.sh all` at any time to execute every local gate.
 
 ### Verify the project
 
@@ -236,18 +241,20 @@ streams that do not support the default policy.
 ## Continuous integration
 
 The GitHub Actions workflow runs on every pull request and every push to
-`main`. It performs Flutter dependency resolution, static analysis, unit/widget
-tests, a release Web build, JavaScript syntax validation, and Node server tests.
+`main`. It validates commit messages and formatting, performs Flutter static
+analysis and tests, checks an Android build and a release Web build, and runs
+the Node server checks. Pushing a matching `vX.Y.Z` tag starts the signed
+release workflow documented in [RELEASING.md](RELEASING.md).
 
 ## Contributing
 
 Issues and pull requests are welcome. Before submitting a change, run:
 
 ```bash
-flutter analyze
-flutter test
-node --test test/server_test.js
+tool/check.sh all
 ```
+
+Use a Conventional Commit subject such as `fix(web): reject unsafe redirects`.
 
 Keep extractor changes focused and include a sanitized fixture test whenever a
 third-party response format is involved. Never commit authentication tokens,

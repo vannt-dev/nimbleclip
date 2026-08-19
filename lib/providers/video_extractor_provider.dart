@@ -53,7 +53,7 @@ class VideoExtractorProvider extends ChangeNotifier {
       _metadata = metadata;
       _selectedQuality =
           QualityHelper.bestMatch(metadata.qualities, preferredQuality) ??
-              metadata.bestQuality;
+          metadata.bestQuality;
       _isAnalyzing = false;
       notifyListeners();
       return true;

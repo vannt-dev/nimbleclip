@@ -21,8 +21,9 @@ class InstagramExtractor extends BaseVideoExtractor {
   @override
   VideoPlatform get platform => VideoPlatform.instagram;
 
-  static final RegExp _shortcodePattern =
-      RegExp(r'/(?:reels?|p|tv)/([A-Za-z0-9_-]+)');
+  static final RegExp _shortcodePattern = RegExp(
+    r'/(?:reels?|p|tv)/([A-Za-z0-9_-]+)',
+  );
 
   String? _extractShortcode(String url) =>
       _shortcodePattern.firstMatch(url)?.group(1);
@@ -90,13 +91,16 @@ class InstagramExtractor extends BaseVideoExtractor {
         RegExp(r'"owner":\{[^}]*"username":"([^"]+)"'),
       ]),
       caption: _firstGroup(html, [
-        RegExp(r'"edge_media_to_caption":\{"edges":\[\{"node":\{"text":"([^"]*)"'),
+        RegExp(
+          r'"edge_media_to_caption":\{"edges":\[\{"node":\{"text":"([^"]*)"',
+        ),
         RegExp(r'"caption":"([^"]{1,400})"'),
       ]),
       durationSeconds: _duration(html),
-      viewCount: _intField(html, 'video_view_count') ??
-          _intField(html, 'play_count'),
-      likeCount: _intField(html, 'edge_media_preview_like') ??
+      viewCount:
+          _intField(html, 'video_view_count') ?? _intField(html, 'play_count'),
+      likeCount:
+          _intField(html, 'edge_media_preview_like') ??
           _intField(html, 'like_count'),
     );
   }
@@ -200,13 +204,16 @@ class InstagramExtractor extends BaseVideoExtractor {
   }
 
   int? _intField(String html, String key) {
-    final value = RegExp('"$key":\\{?"?count"?:?\\s*(\\d+)').firstMatch(html) ??
+    final value =
+        RegExp('"$key":\\{?"?count"?:?\\s*(\\d+)').firstMatch(html) ??
         RegExp('"$key":(\\d+)').firstMatch(html);
     return int.tryParse(value?.group(1) ?? '');
   }
 
   int? _duration(String html) {
-    final value = RegExp(r'"video_duration":([\d.]+)').firstMatch(html)?.group(1);
+    final value = RegExp(
+      r'"video_duration":([\d.]+)',
+    ).firstMatch(html)?.group(1);
     return double.tryParse(value ?? '')?.round();
   }
 }

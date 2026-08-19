@@ -60,9 +60,13 @@ void main() {
     // video does not silently invalidate the byte-count assertions.
     fixtureBytes = await _fetchFixture();
     fixtureSize = fixtureBytes.length;
-    expect(fixtureSize, greaterThan(100000),
-        reason: 'fixture server not reachable at $fixtureHost — '
-            'start it with `node tool/fixture_server.js`');
+    expect(
+      fixtureSize,
+      greaterThan(100000),
+      reason:
+          'fixture server not reachable at $fixtureHost — '
+          'start it with `node tool/fixture_server.js`',
+    );
   });
 
   group('scoped storage', () {
@@ -74,13 +78,16 @@ void main() {
       expect(Directory(downloadDir).existsSync(), isTrue);
     });
 
-    test('the directory is readable and writable without permissions', () async {
-      final probe = File('$downloadDir/.probe');
-      await probe.writeAsString('scoped-storage-ok');
-      expect(await probe.readAsString(), 'scoped-storage-ok');
-      await probe.delete();
-      expect(probe.existsSync(), isFalse);
-    });
+    test(
+      'the directory is readable and writable without permissions',
+      () async {
+        final probe = File('$downloadDir/.probe');
+        await probe.writeAsString('scoped-storage-ok');
+        expect(await probe.readAsString(), 'scoped-storage-ok');
+        await probe.delete();
+        expect(probe.existsSync(), isFalse);
+      },
+    );
   });
 
   group('download over cleartext to the dev host', () {
@@ -141,10 +148,16 @@ void main() {
       expect(sawResumeOffset, isTrue);
 
       final file = File(savePath);
-      expect(await file.length(), fixtureSize,
-          reason: 'resume appended the wrong number of bytes');
-      expect(await file.readAsBytes(), equals(fixtureBytes),
-          reason: 'resumed file does not match the original byte-for-byte');
+      expect(
+        await file.length(),
+        fixtureSize,
+        reason: 'resume appended the wrong number of bytes',
+      );
+      expect(
+        await file.readAsBytes(),
+        equals(fixtureBytes),
+        reason: 'resumed file does not match the original byte-for-byte',
+      );
 
       await file.delete();
     });
@@ -172,39 +185,47 @@ void main() {
 
       expect(task.status, DownloadStatus.completed);
       final file = File(savePath);
-      expect(await file.length(), fixtureSize,
-          reason: 'partial bytes were spliced onto a fresh response');
+      expect(
+        await file.length(),
+        fixtureSize,
+        reason: 'partial bytes were spliced onto a fresh response',
+      );
       expect(await file.readAsBytes(), equals(fixtureBytes));
 
       await file.delete();
     });
 
-    test('restarts if the real transfer returns 200 after a valid probe',
-        () async {
-      final task = fixtureTask(
-        id: 'aaaaaa05-flak',
-        title: 'Flaky range',
-        query: '?flakyrange=aaaaaa05',
-      );
-      final savePath = '$downloadDir/${service.buildFileName(task)}';
-      await File(savePath).writeAsBytes(List.filled(fixtureSize ~/ 4, 0x42));
-      task.filePath = savePath;
+    test(
+      'restarts if the real transfer returns 200 after a valid probe',
+      () async {
+        final task = fixtureTask(
+          id: 'aaaaaa05-flak',
+          title: 'Flaky range',
+          query: '?flakyrange=aaaaaa05',
+        );
+        final savePath = '$downloadDir/${service.buildFileName(task)}';
+        await File(savePath).writeAsBytes(List.filled(fixtureSize ~/ 4, 0x42));
+        task.filePath = savePath;
 
-      await service.startDownload(
-        task: task,
-        l10n: l10n,
-        autoSaveToGallery: false,
-        onProgress: (_, _, _, _, _) {},
-        onComplete: (_, _) {},
-        onError: (_, _) {},
-      );
+        await service.startDownload(
+          task: task,
+          l10n: l10n,
+          autoSaveToGallery: false,
+          onProgress: (_, _, _, _, _) {},
+          onComplete: (_, _) {},
+          onError: (_, _) {},
+        );
 
-      expect(task.status, DownloadStatus.completed);
-      expect(await File(savePath).readAsBytes(), equals(fixtureBytes),
-          reason: 'a full 200 response was appended after a successful probe');
+        expect(task.status, DownloadStatus.completed);
+        expect(
+          await File(savePath).readAsBytes(),
+          equals(fixtureBytes),
+          reason: 'a full 200 response was appended after a successful probe',
+        );
 
-      await File(savePath).delete();
-    });
+        await File(savePath).delete();
+      },
+    );
   });
 
   group('gallery publishing via MediaStore', () {
@@ -223,8 +244,11 @@ void main() {
 
       expect(failure, isNull, reason: 'download reported: $failure');
       expect(task.status, DownloadStatus.completed);
-      expect(task.isSavedToGallery, isTrue,
-          reason: 'MediaStore insert failed under scoped storage');
+      expect(
+        task.isSavedToGallery,
+        isTrue,
+        reason: 'MediaStore insert failed under scoped storage',
+      );
 
       await File(task.filePath!).delete();
     });

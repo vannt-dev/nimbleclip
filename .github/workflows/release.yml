@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing vX.Y.Z tag to release
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Validate tag, version, and release notes
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          if ! printf '%s' "$RELEASE_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Release tags must use vX.Y.Z."
+            exit 1
+          fi
+
+          version="${RELEASE_TAG#v}"
+          pubspec_version=$(sed -n 's/^version:[[:space:]]*\([^+[:space:]]*\).*/\1/p' pubspec.yaml)
+          if [ "$version" != "$pubspec_version" ]; then
+            echo "::error::Tag $RELEASE_TAG does not match pubspec.yaml version $pubspec_version."
+            exit 1
+          fi
+
+          awk -v header="## [$version]" '
+            index($0, header) == 1 { found = 1; next }
+            /^## \[/ { if (found) exit }
+            found
+          ' CHANGELOG.md > RELEASE_NOTES.md
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "::error::CHANGELOG.md has no [$version] release notes."
+            exit 1
+          fi
+
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v5
+      - uses: android-actions/setup-android@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Restore Android signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          for value in KEYSTORE_BASE64 STORE_PASSWORD KEY_PASSWORD KEY_ALIAS; do
+            if [ -z "${!value}" ]; then
+              echo "::error::Missing required Android signing secret: $value"
+              exit 1
+            fi
+          done
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          {
+            printf 'storePassword=%s\n' "$STORE_PASSWORD"
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD"
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'storeFile=upload-keystore.jks\n'
+          } > android/key.properties
+
+      - name: Run release checks
+        run: |
+          flutter pub get
+          dart format --output=none --set-exit-if-changed lib test integration_test
+          flutter analyze
+          flutter test
+          node --check server.js
+          node --check tool/fixture_server.js
+          node --test test/server_test.js
+
+      - name: Build Android and Web releases
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          flutter build apk --release --build-name="$VERSION" --build-number="${{ github.run_number }}"
+          flutter build web --release --build-name="$VERSION" --build-number="${{ github.run_number }}"
+
+      - name: Verify signing and package artifacts
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          apk=build/app/outputs/flutter-apk/app-release.apk
+          apksigner=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
+          cert=$($apksigner verify --print-certs "$apk" | grep -i 'certificate DN' || true)
+          if [ -z "$cert" ] || printf '%s' "$cert" | grep -qi 'CN=Android Debug'; then
+            echo "::error::The release APK is missing a valid non-debug signature."
+            exit 1
+          fi
+
+          mkdir -p dist
+          cp "$apk" "dist/nimbleclip-$TAG-android.apk"
+          (cd build/web && zip -qr "../../dist/nimbleclip-$TAG-web.zip" .)
+          (cd dist && sha256sum * > SHA256SUMS.txt)
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: NimbleClip ${{ steps.version.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/nimbleclip-${{ steps.version.outputs.tag }}-android.apk
+            dist/nimbleclip-${{ steps.version.outputs.tag }}-web.zip
+            dist/SHA256SUMS.txt

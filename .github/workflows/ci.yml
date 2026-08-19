@@ -5,31 +5,92 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
-  flutter:
+  commit-messages:
+    name: Conventional commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Validate new commit messages
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            range="$BASE_SHA..$HEAD_SHA"
+          elif [ -n "$BEFORE_SHA" ] && ! printf '%s' "$BEFORE_SHA" | grep -Eq '^0+$'; then
+            range="$BEFORE_SHA..$HEAD_SHA"
+          else
+            range="$HEAD_SHA^..$HEAD_SHA"
+          fi
+
+          failed=0
+          while IFS= read -r subject; do
+            if ! printf '%s\n' "$subject" | tool/validate_commit_message.sh -; then
+              printf 'Invalid commit subject: %s\n' "$subject" >&2
+              failed=1
+            fi
+          done < <(git log --format=%s "$range")
+          exit "$failed"
+
+  flutter-quality:
+    name: Flutter quality and Web build
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test integration_test
       - run: flutter analyze
       - run: flutter test
       - run: flutter build web --release
 
   node:
+    name: Node.js server checks
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: node --check server.js
+      - run: node --check tool/fixture_server.js
       - run: node --test test/server_test.js
+
+  android:
+    name: Android compile check
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v5
+      - uses: android-actions/setup-android@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Build a representative debug APK
+        run: flutter build apk --debug --target-platform android-arm64

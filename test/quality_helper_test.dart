@@ -54,8 +54,12 @@ void main() {
         option('720p'),
       ]);
 
-      expect(sorted.map((o) => o.quality).toList(),
-          ['1080p', '720p', '480p', 'Audio MP3']);
+      expect(sorted.map((o) => o.quality).toList(), [
+        '1080p',
+        '720p',
+        '480p',
+        'Audio MP3',
+      ]);
     });
 
     test('is stable for options of equal rank', () {
@@ -110,7 +114,10 @@ void main() {
 
     test('returns audio when that is all there is', () {
       final audioOnly = [option('Audio MP3', audio: true)];
-      expect(QualityHelper.bestMatch(audioOnly, 'Highest')!.isAudioOnly, isTrue);
+      expect(
+        QualityHelper.bestMatch(audioOnly, 'Highest')!.isAudioOnly,
+        isTrue,
+      );
     });
 
     test('returns null for an empty list', () {

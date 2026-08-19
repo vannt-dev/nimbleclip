@@ -9,13 +9,14 @@ import '../l10n/generated/app_localizations.dart';
 import '../models/download_task.dart';
 import 'storage_service.dart';
 
-typedef DownloadProgressCallback = void Function(
-  DownloadTask task,
-  double progress,
-  int receivedBytes,
-  int totalBytes,
-  double speedBytesPerSec,
-);
+typedef DownloadProgressCallback =
+    void Function(
+      DownloadTask task,
+      double progress,
+      int receivedBytes,
+      int totalBytes,
+      double speedBytesPerSec,
+    );
 
 class DownloadService {
   static final DownloadService _instance = DownloadService._internal();
@@ -26,10 +27,7 @@ class DownloadService {
     BaseOptions(
       connectTimeout: AppConstants.connectTimeout,
       receiveTimeout: AppConstants.receiveTimeout,
-      headers: {
-        'User-Agent': AppConstants.defaultUserAgent,
-        'Accept': '*/*',
-      },
+      headers: {'User-Agent': AppConstants.defaultUserAgent, 'Accept': '*/*'},
     ),
   );
 
@@ -59,9 +57,7 @@ class DownloadService {
     final ext = task.format.replaceAll('.', '').trim();
     final extension = ext.isEmpty ? 'mp4' : ext;
 
-    return suffix.isEmpty
-        ? '$base.$extension'
-        : '${base}_$suffix.$extension';
+    return suffix.isEmpty ? '$base.$extension' : '${base}_$suffix.$extension';
   }
 
   Future<void> startDownload({
@@ -80,8 +76,9 @@ class DownloadService {
 
     final storage = StorageService();
     final downloadDirPath = await storage.getDownloadDirectory();
-    final savePath =
-        downloadDirPath != null ? '$downloadDirPath/$fileName' : fileName;
+    final savePath = downloadDirPath != null
+        ? '$downloadDirPath/$fileName'
+        : fileName;
 
     task.filePath = savePath;
     task.status = DownloadStatus.downloading;
@@ -91,7 +88,8 @@ class DownloadService {
     // honours byte ranges — appending to a partial file when the server replies
     // with a fresh 200 would splice two copies together.
     var existingBytes = await PlatformFileHelper.fileSize(savePath);
-    if (existingBytes > 0 && !await _supportsRangeRequests(task, existingBytes)) {
+    if (existingBytes > 0 &&
+        !await _supportsRangeRequests(task, existingBytes)) {
       await PlatformFileHelper.deleteFile(savePath);
       existingBytes = 0;
     }
@@ -110,8 +108,9 @@ class DownloadService {
         savePath,
         cancelToken: cancelToken,
         deleteOnError: false,
-        fileAccessMode:
-            existingBytes > 0 ? FileAccessMode.append : FileAccessMode.write,
+        fileAccessMode: existingBytes > 0
+            ? FileAccessMode.append
+            : FileAccessMode.write,
         options: Options(
           headers: {
             ...?task.headers,
@@ -120,7 +119,8 @@ class DownloadService {
           followRedirects: true,
           // A resumed transfer must be a real partial response. Accepting a
           // fresh 200 here while appending would silently corrupt the file.
-          validateStatus: (status) => status != null &&
+          validateStatus: (status) =>
+              status != null &&
               (existingBytes > 0 ? status == 206 : status < 400),
         ),
         onReceiveProgress: (received, total) {
@@ -131,21 +131,26 @@ class DownloadService {
 
           task.receivedBytes = absoluteReceived;
           task.totalBytes = absoluteTotal;
-          task.progress =
-              absoluteTotal > 0 ? absoluteReceived / absoluteTotal : 0.0;
+          task.progress = absoluteTotal > 0
+              ? absoluteReceived / absoluteTotal
+              : 0.0;
 
           final now = DateTime.now();
           final msPassed = now.difference(lastTime).inMilliseconds;
           if (msPassed >= 500) {
-            currentSpeed =
-                (absoluteReceived - lastBytes) / (msPassed / 1000.0);
+            currentSpeed = (absoluteReceived - lastBytes) / (msPassed / 1000.0);
             lastBytes = absoluteReceived;
             lastTime = now;
           }
           task.downloadSpeed = currentSpeed;
 
-          onProgress(task, task.progress, absoluteReceived, absoluteTotal,
-              currentSpeed);
+          onProgress(
+            task,
+            task.progress,
+            absoluteReceived,
+            absoluteTotal,
+            currentSpeed,
+          );
         },
       );
 
@@ -289,7 +294,8 @@ class DownloadService {
           validateStatus: (status) => status != null && status < 500,
         ),
       );
-      final supported = response.statusCode == 206 &&
+      final supported =
+          response.statusCode == 206 &&
           _contentRangeStartsAt(
             response.headers.value('content-range'),
             offset,
@@ -307,8 +313,10 @@ class DownloadService {
 
   bool _contentRangeStartsAt(String? value, int offset) {
     if (value == null) return false;
-    final match = RegExp(r'^bytes\s+(\d+)-', caseSensitive: false)
-        .firstMatch(value.trim());
+    final match = RegExp(
+      r'^bytes\s+(\d+)-',
+      caseSensitive: false,
+    ).firstMatch(value.trim());
     return match != null && int.tryParse(match.group(1)!) == offset;
   }
 

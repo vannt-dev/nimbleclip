@@ -67,8 +67,7 @@ class DownloadTask {
       status == DownloadStatus.cancelled;
 
   bool get isActive =>
-      status == DownloadStatus.downloading ||
-      status == DownloadStatus.queued;
+      status == DownloadStatus.downloading || status == DownloadStatus.queued;
 
   /// Statuses that only make sense while a download is in flight.
   static const Set<DownloadStatus> transientStatuses = {
@@ -110,63 +109,63 @@ class DownloadTask {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'videoId': videoId,
-        'title': title,
-        'author': author,
-        'thumbnailUrl': thumbnailUrl,
-        'downloadUrl': downloadUrl,
-        'originalUrl': originalUrl,
-        'platform': platform.name,
-        'qualityLabel': qualityLabel,
-        'format': format,
-        'isAudioOnly': isAudioOnly,
-        'headers': headers,
-        'status': status.name,
-        'progress': progress,
-        'totalBytes': totalBytes,
-        'receivedBytes': receivedBytes,
-        'filePath': filePath,
-        'errorMessage': errorMessage,
-        'createdAt': createdAt.toIso8601String(),
-        'completedAt': completedAt?.toIso8601String(),
-        'isSavedToGallery': isSavedToGallery,
-      };
+    'id': id,
+    'videoId': videoId,
+    'title': title,
+    'author': author,
+    'thumbnailUrl': thumbnailUrl,
+    'downloadUrl': downloadUrl,
+    'originalUrl': originalUrl,
+    'platform': platform.name,
+    'qualityLabel': qualityLabel,
+    'format': format,
+    'isAudioOnly': isAudioOnly,
+    'headers': headers,
+    'status': status.name,
+    'progress': progress,
+    'totalBytes': totalBytes,
+    'receivedBytes': receivedBytes,
+    'filePath': filePath,
+    'errorMessage': errorMessage,
+    'createdAt': createdAt.toIso8601String(),
+    'completedAt': completedAt?.toIso8601String(),
+    'isSavedToGallery': isSavedToGallery,
+  };
 
   factory DownloadTask.fromJson(Map<String, dynamic> json) => DownloadTask(
-        id: json['id'] as String? ?? '',
-        videoId: json['videoId'] as String? ?? '',
-        title: json['title'] as String? ?? 'Untitled Video',
-        author: json['author'] as String? ?? 'Unknown',
-        thumbnailUrl: json['thumbnailUrl'] as String? ?? '',
-        downloadUrl: json['downloadUrl'] as String? ?? '',
-        originalUrl: json['originalUrl'] as String? ?? '',
-        platform: VideoPlatform.values.firstWhere(
-          (p) => p.name == json['platform'],
-          orElse: () => VideoPlatform.generic,
-        ),
-        qualityLabel: json['qualityLabel'] as String? ?? 'Default',
-        format: json['format'] as String? ?? 'mp4',
-        isAudioOnly: json['isAudioOnly'] as bool? ?? false,
-        headers: (json['headers'] as Map<String, dynamic>?)?.map(
-          (k, v) => MapEntry(k, v.toString()),
-        ),
-        // A task persisted as queued/downloading/paused belongs to a process
-        // that no longer exists — nothing resumes it, so restoring it as-is
-        // would leave it pinned to the "active" list forever. Mark it failed so
-        // the user can retry it deliberately.
-        status: _restoreStatus(json['status']?.toString()),
-        progress: (json['progress'] as num?)?.toDouble() ?? 1.0,
-        totalBytes: json['totalBytes'] as int? ?? 0,
-        receivedBytes: json['receivedBytes'] as int? ?? 0,
-        filePath: json['filePath'] as String?,
-        errorMessage: json['errorMessage'] as String?,
-        createdAt: json['createdAt'] != null
-            ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
-            : DateTime.now(),
-        completedAt: json['completedAt'] != null
-            ? DateTime.tryParse(json['completedAt'] as String)
-            : null,
-        isSavedToGallery: json['isSavedToGallery'] as bool? ?? false,
-      );
+    id: json['id'] as String? ?? '',
+    videoId: json['videoId'] as String? ?? '',
+    title: json['title'] as String? ?? 'Untitled Video',
+    author: json['author'] as String? ?? 'Unknown',
+    thumbnailUrl: json['thumbnailUrl'] as String? ?? '',
+    downloadUrl: json['downloadUrl'] as String? ?? '',
+    originalUrl: json['originalUrl'] as String? ?? '',
+    platform: VideoPlatform.values.firstWhere(
+      (p) => p.name == json['platform'],
+      orElse: () => VideoPlatform.generic,
+    ),
+    qualityLabel: json['qualityLabel'] as String? ?? 'Default',
+    format: json['format'] as String? ?? 'mp4',
+    isAudioOnly: json['isAudioOnly'] as bool? ?? false,
+    headers: (json['headers'] as Map<String, dynamic>?)?.map(
+      (k, v) => MapEntry(k, v.toString()),
+    ),
+    // A task persisted as queued/downloading/paused belongs to a process
+    // that no longer exists — nothing resumes it, so restoring it as-is
+    // would leave it pinned to the "active" list forever. Mark it failed so
+    // the user can retry it deliberately.
+    status: _restoreStatus(json['status']?.toString()),
+    progress: (json['progress'] as num?)?.toDouble() ?? 1.0,
+    totalBytes: json['totalBytes'] as int? ?? 0,
+    receivedBytes: json['receivedBytes'] as int? ?? 0,
+    filePath: json['filePath'] as String?,
+    errorMessage: json['errorMessage'] as String?,
+    createdAt: json['createdAt'] != null
+        ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
+        : DateTime.now(),
+    completedAt: json['completedAt'] != null
+        ? DateTime.tryParse(json['completedAt'] as String)
+        : null,
+    isSavedToGallery: json['isSavedToGallery'] as bool? ?? false,
+  );
 }
