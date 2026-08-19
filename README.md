@@ -15,8 +15,6 @@ management, local playback, and gallery export.
 > content you are authorized to download. You are responsible for complying
 > with the source platform's terms and applicable copyright laws.
 
-![NimbleClip application screenshot](screenshot.png)
-
 ## Features
 
 - Detects supported links pasted from the clipboard.
