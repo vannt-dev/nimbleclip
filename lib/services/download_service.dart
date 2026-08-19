@@ -165,7 +165,7 @@ class DownloadService {
           ..progress = 0
           ..receivedBytes = 0
           ..totalBytes = 0;
-        return startDownload(
+        return await startDownload(
           task: task,
           l10n: l10n,
           onProgress: onProgress,
