@@ -1,222 +1,232 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt_lib;
-import '../../core/utils/cors_helper.dart';
+
+import '../../core/utils/http_helper.dart';
+import '../../core/utils/json_scanner.dart';
+import '../../core/utils/quality_helper.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
 
-class YouTubeExtractor implements BaseVideoExtractor {
+class YouTubeExtractor extends BaseVideoExtractor {
+  const YouTubeExtractor();
+
   @override
   VideoPlatform get platform => VideoPlatform.youtube;
 
-  @override
-  bool canHandle(String url) {
-    final lower = url.toLowerCase();
-    return lower.contains('youtube.com') ||
-        lower.contains('youtu.be') ||
-        lower.contains('youtube.com/shorts');
-  }
+  static final RegExp _videoIdPattern = RegExp(
+    r'(?:youtu\.be/|youtube(?:-nocookie)?\.com/(?:embed/|v/|live/|shorts/|watch\?(?:.*&)?v=))([\w-]{11})',
+  );
 
-  String? _extractVideoId(String url) {
-    try {
-      final match = RegExp(
-              r'(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})')
-          .firstMatch(url);
-      return match?.group(1);
-    } catch (_) {
-      return null;
-    }
-  }
+  String? _extractVideoId(String url) =>
+      _videoIdPattern.firstMatch(url)?.group(1);
 
   @override
   Future<VideoMetadata> extract(String url) async {
-    // Strategy 1: If on native Mobile/Desktop, use YoutubeExplode directly
+    // Native platforms get the real deal: youtube_explode_dart deciphers
+    // signature-protected stream URLs, which plain HTML scraping cannot.
     if (!kIsWeb) {
-      final yt = yt_lib.YoutubeExplode();
-      try {
-        final video = await yt.videos.get(url);
-        final manifest = await yt.videos.streamsClient.getManifest(video.id);
-
-        final List<VideoQualityOption> qualities = [];
-
-        final muxedStreams = manifest.muxed.sortByVideoQuality();
-        for (final stream in muxedStreams) {
-          qualities.add(
-            VideoQualityOption(
-              id: 'yt_muxed_${stream.tag}',
-              label: '${stream.qualityLabel} (Video + Audio)',
-              quality: stream.qualityLabel,
-              format: stream.container.name,
-              downloadUrl: stream.url.toString(),
-              sizeBytes: stream.size.totalBytes,
-              isAudioOnly: false,
-            ),
-          );
-        }
-
-        final audioStreams = manifest.audioOnly.sortByBitrate();
-        if (audioStreams.isNotEmpty) {
-          final bestAudio = audioStreams.withHighestBitrate();
-          qualities.add(
-            VideoQualityOption(
-              id: 'yt_audio_${bestAudio.tag}',
-              label: 'Audio MP3/M4A (${bestAudio.bitrate.kiloBitsPerSecond.round()} kbps)',
-              quality: 'Audio (${bestAudio.bitrate.kiloBitsPerSecond.round()} kbps)',
-              format: 'm4a',
-              downloadUrl: bestAudio.url.toString(),
-              sizeBytes: bestAudio.size.totalBytes,
-              isAudioOnly: true,
-            ),
-          );
-        }
-
-        return VideoMetadata(
-          id: video.id.value,
-          originalUrl: url,
-          title: video.title,
-          description: video.description,
-          author: video.author,
-          coverUrl: video.thumbnails.highResUrl.isNotEmpty
-              ? video.thumbnails.highResUrl
-              : video.thumbnails.mediumResUrl,
-          duration: video.duration,
-          platform: VideoPlatform.youtube,
-          qualities: qualities,
-          viewCount: video.engagement.viewCount,
-          likeCount: video.engagement.likeCount,
-        );
-      } catch (_) {
-        // Fallback to web strategy below
-      } finally {
-        yt.close();
-      }
+      final native = await _extractNative(url);
+      if (native != null) return native;
     }
 
-    // Strategy 2: Web CORS Proxy Extractor
     final videoId = _extractVideoId(url);
     if (videoId == null) {
-      throw Exception('Không tìm thấy Video ID hợp lệ từ link YouTube.');
+      throw const ExtractionException(
+        'Không tìm thấy Video ID hợp lệ trong link YouTube.',
+      );
     }
+    return _extractFromWatchPage(url, videoId);
+  }
 
+  Future<VideoMetadata?> _extractNative(String url) async {
+    final yt = yt_lib.YoutubeExplode();
     try {
-      final watchUrl = 'https://www.youtube.com/watch?v=$videoId';
-      final proxyUrl = CorsHelper.wrap(watchUrl);
-      final response = await http.get(
-        Uri.parse(proxyUrl),
-        headers: {
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Accept-Language': 'en-US,en;q=0.9',
-        },
-      ).timeout(const Duration(seconds: 15));
+      final video = await yt.videos.get(url);
+      final manifest = await yt.videos.streamsClient.getManifest(video.id);
+      final qualities = <VideoQualityOption>[];
 
-      final html = response.body;
-
-      // Extract ytInitialPlayerResponse JSON
-      final pattern = RegExp(r'ytInitialPlayerResponse\s*=\s*({.+?});');
-      final match = pattern.firstMatch(html);
-
-      String title = 'YouTube Video';
-      String author = 'YouTube Creator';
-      String coverUrl = 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
-      int? durationSec;
-      final List<VideoQualityOption> qualities = [];
-
-      if (match != null && match.group(1) != null) {
-        try {
-          final jsonStr = match.group(1)!;
-          final json = jsonDecode(jsonStr) as Map<String, dynamic>;
-          final videoDetails = json['videoDetails'] as Map<String, dynamic>? ?? {};
-
-          title = videoDetails['title']?.toString() ?? title;
-          author = videoDetails['author']?.toString() ?? author;
-          durationSec = int.tryParse(videoDetails['lengthSeconds']?.toString() ?? '');
-
-          final streamingData = json['streamingData'] as Map<String, dynamic>?;
-          if (streamingData != null) {
-            // Muxed formats (with video + audio)
-            final formats = streamingData['formats'] as List<dynamic>? ?? [];
-            for (var i = 0; i < formats.length; i++) {
-              final f = formats[i] as Map<String, dynamic>;
-              final directUrl = f['url']?.toString();
-              if (directUrl != null && directUrl.isNotEmpty) {
-                final quality = f['qualityLabel']?.toString() ?? 'HD';
-                final mimeType = f['mimeType']?.toString() ?? 'video/mp4';
-                final format = mimeType.contains('webm') ? 'webm' : 'mp4';
-                final sizeBytes = int.tryParse(f['contentLength']?.toString() ?? '');
-
-                qualities.add(
-                  VideoQualityOption(
-                    id: 'yt_web_${videoId}_$i',
-                    label: '$quality (Video + Audio)',
-                    quality: quality,
-                    format: format,
-                    downloadUrl: directUrl,
-                    sizeBytes: sizeBytes,
-                    isAudioOnly: false,
-                  ),
-                );
-              }
-            }
-
-            // Adaptive formats (Audio only)
-            final adaptiveFormats = streamingData['adaptiveFormats'] as List<dynamic>? ?? [];
-            for (var i = 0; i < adaptiveFormats.length; i++) {
-              final f = adaptiveFormats[i] as Map<String, dynamic>;
-              final mimeType = f['mimeType']?.toString() ?? '';
-              final directUrl = f['url']?.toString();
-              if (mimeType.startsWith('audio/') && directUrl != null && directUrl.isNotEmpty) {
-                final bitrate = (f['bitrate'] as int?) ?? 128000;
-                final bitrateKbps = (bitrate / 1000).round();
-                final sizeBytes = int.tryParse(f['contentLength']?.toString() ?? '');
-
-                qualities.add(
-                  VideoQualityOption(
-                    id: 'yt_audio_${videoId}_$i',
-                    label: 'Audio MP3/M4A ($bitrateKbps kbps)',
-                    quality: 'Audio ($bitrateKbps kbps)',
-                    format: 'm4a',
-                    downloadUrl: directUrl,
-                    sizeBytes: sizeBytes,
-                    isAudioOnly: true,
-                  ),
-                );
-                break; // Take the highest quality audio
-              }
-            }
-          }
-        } catch (_) {}
-      }
-
-      // If no formats extracted directly, provide standard YouTube direct stream fallback
-      if (qualities.isEmpty) {
+      for (final stream in manifest.muxed.sortByVideoQuality()) {
         qualities.add(
           VideoQualityOption(
-            id: 'yt_fallback_$videoId',
-            label: '720p HD (MP4 Video)',
-            quality: '720p HD',
-            format: 'mp4',
-            downloadUrl: 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg',
-            isAudioOnly: false,
+            id: 'yt_muxed_${stream.tag}',
+            label: '${stream.qualityLabel} (Video + Âm thanh)',
+            quality: stream.qualityLabel,
+            format: stream.container.name,
+            downloadUrl: stream.url.toString(),
+            sizeBytes: stream.size.totalBytes,
           ),
         );
       }
 
+      final audioStreams = manifest.audioOnly.sortByBitrate();
+      if (audioStreams.isNotEmpty) {
+        final bestAudio = audioStreams.withHighestBitrate();
+        final kbps = bestAudio.bitrate.kiloBitsPerSecond.round();
+        qualities.add(
+          VideoQualityOption(
+            id: 'yt_audio_${bestAudio.tag}',
+            label: 'Âm thanh M4A ($kbps kbps)',
+            quality: 'Audio ($kbps kbps)',
+            format: 'm4a',
+            downloadUrl: bestAudio.url.toString(),
+            sizeBytes: bestAudio.size.totalBytes,
+            isAudioOnly: true,
+          ),
+        );
+      }
+
+      if (qualities.isEmpty) return null;
+
       return VideoMetadata(
-        id: videoId,
+        id: video.id.value,
         originalUrl: url,
-        title: title,
-        description: title,
-        author: author,
-        coverUrl: coverUrl,
-        duration: durationSec != null ? Duration(seconds: durationSec) : null,
+        title: video.title,
+        description: video.description,
+        author: video.author,
+        coverUrl: video.thumbnails.highResUrl.isNotEmpty
+            ? video.thumbnails.highResUrl
+            : video.thumbnails.mediumResUrl,
+        duration: video.duration,
         platform: VideoPlatform.youtube,
-        qualities: qualities,
+        qualities: QualityHelper.sortedByQuality(qualities),
+        viewCount: video.engagement.viewCount,
+        likeCount: video.engagement.likeCount,
+      );
+    } catch (_) {
+      // Fall through to the watch-page strategy.
+      return null;
+    } finally {
+      yt.close();
+    }
+  }
+
+  Future<VideoMetadata> _extractFromWatchPage(String url, String videoId) async {
+    final http.Response response;
+    try {
+      response = await ExtractorHttp.get(
+        'https://www.youtube.com/watch?v=$videoId',
       );
     } catch (e) {
-      throw Exception('Không thể phân tích video YouTube: $e');
+      throw ExtractionException('Không tải được trang YouTube: $e');
     }
+
+    // A balanced-brace scan, not a non-greedy regex: the player response
+    // contains nested objects and strings that truncate `({.+?});` early.
+    final blob =
+        extractJsonAfterMarker(response.body, 'ytInitialPlayerResponse');
+    if (blob == null) {
+      throw const ExtractionException(
+        'YouTube không trả về dữ liệu trình phát. Video có thể ở chế độ riêng tư '
+        'hoặc bị giới hạn độ tuổi.',
+      );
+    }
+
+    final Map<String, dynamic> json;
+    try {
+      json = jsonDecode(blob) as Map<String, dynamic>;
+    } catch (e) {
+      throw ExtractionException('Dữ liệu YouTube không hợp lệ: $e');
+    }
+
+    final playability = json['playabilityStatus'] as Map<String, dynamic>?;
+    final status = playability?['status']?.toString();
+    if (status != null && status != 'OK') {
+      final reason = playability?['reason']?.toString() ?? status;
+      throw ExtractionException('YouTube từ chối phát video này: $reason');
+    }
+
+    final details = json['videoDetails'] as Map<String, dynamic>? ?? {};
+    final streamingData = json['streamingData'] as Map<String, dynamic>?;
+    final qualities = <VideoQualityOption>[];
+    var hasCipheredStreams = false;
+
+    /// `signatureCipher` streams need YouTube's player JS to be deciphered,
+    /// which only the native path can do — note them so the error message can
+    /// say why nothing was found.
+    String? usableUrl(Map<String, dynamic> format) {
+      final directUrl = format['url']?.toString();
+      if (directUrl != null && directUrl.isNotEmpty) return directUrl;
+      if (format['signatureCipher'] != null) hasCipheredStreams = true;
+      return null;
+    }
+
+    final muxed = streamingData?['formats'] as List<dynamic>? ?? [];
+    for (var i = 0; i < muxed.length; i++) {
+      final format = muxed[i] as Map<String, dynamic>;
+      final directUrl = usableUrl(format);
+      if (directUrl == null) continue;
+
+      final mimeType = format['mimeType']?.toString() ?? 'video/mp4';
+      final quality =
+          format['qualityLabel']?.toString() ?? '${format['height'] ?? ''}p';
+      qualities.add(
+        VideoQualityOption(
+          id: 'yt_video_${videoId}_$i',
+          label: '$quality (Video + Âm thanh)',
+          quality: quality,
+          format: mimeType.contains('webm') ? 'webm' : 'mp4',
+          downloadUrl: directUrl,
+          sizeBytes: int.tryParse(format['contentLength']?.toString() ?? ''),
+        ),
+      );
+    }
+
+    // The adaptive list carries a dozen audio renditions; only the highest
+    // bitrate one is worth offering.
+    Map<String, dynamic>? bestAudio;
+    for (final entry in streamingData?['adaptiveFormats'] as List<dynamic>? ?? []) {
+      final format = entry as Map<String, dynamic>;
+      if (!(format['mimeType']?.toString() ?? '').startsWith('audio/')) continue;
+      if (usableUrl(format) == null) continue;
+      final bitrate = (format['bitrate'] as num?) ?? 0;
+      final bestBitrate = (bestAudio?['bitrate'] as num?) ?? -1;
+      if (bitrate > bestBitrate) bestAudio = format;
+    }
+
+    if (bestAudio != null) {
+      final kbps = (((bestAudio['bitrate'] as num?) ?? 128000) / 1000).round();
+      qualities.add(
+        VideoQualityOption(
+          id: 'yt_audio_$videoId',
+          label: 'Âm thanh M4A ($kbps kbps)',
+          quality: 'Audio ($kbps kbps)',
+          format: 'm4a',
+          downloadUrl: bestAudio['url'].toString(),
+          sizeBytes: int.tryParse(bestAudio['contentLength']?.toString() ?? ''),
+          isAudioOnly: true,
+        ),
+      );
+    }
+
+    if (qualities.isEmpty) {
+      throw ExtractionException(
+        hasCipheredStreams
+            ? 'Video này dùng luồng có chữ ký bảo vệ, bản web không giải mã được. '
+                'Hãy dùng ứng dụng Android / iOS / Desktop để tải.'
+            : 'Không tìm thấy luồng tải nào cho video YouTube này.',
+      );
+    }
+
+    return VideoMetadata(
+      id: videoId,
+      originalUrl: url,
+      title: details['title']?.toString() ?? 'YouTube Video',
+      description: details['shortDescription']?.toString(),
+      author: details['author']?.toString() ?? 'YouTube Creator',
+      coverUrl: 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg',
+      duration: _durationFrom(details['lengthSeconds']),
+      platform: VideoPlatform.youtube,
+      qualities: QualityHelper.sortedByQuality(qualities),
+      viewCount: int.tryParse(details['viewCount']?.toString() ?? ''),
+    );
+  }
+
+  Duration? _durationFrom(Object? lengthSeconds) {
+    final seconds = int.tryParse(lengthSeconds?.toString() ?? '');
+    return seconds != null && seconds > 0 ? Duration(seconds: seconds) : null;
   }
 }

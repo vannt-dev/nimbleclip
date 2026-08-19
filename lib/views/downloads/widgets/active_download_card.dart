@@ -7,17 +7,22 @@ import '../../../models/download_task.dart';
 class ActiveDownloadCard extends StatelessWidget {
   final DownloadTask task;
   final VoidCallback onCancel;
+  final VoidCallback? onPause;
+  final VoidCallback? onResume;
 
   const ActiveDownloadCard({
     super.key,
     required this.task,
     required this.onCancel,
+    this.onPause,
+    this.onResume,
   });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final percent = (task.progress * 100).toInt();
+    final isPaused = task.status == DownloadStatus.paused;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -103,7 +108,23 @@ class ActiveDownloadCard extends StatelessWidget {
                 ),
               ),
 
-              // Cancel button
+              // Pause / resume — only offered where a partial file can be kept.
+              if (isPaused && onResume != null)
+                IconButton(
+                  icon: const Icon(Icons.play_arrow_rounded, size: 22),
+                  color: AppColors.success,
+                  onPressed: onResume,
+                  tooltip: 'Tiếp tục tải',
+                )
+              else if (!isPaused && onPause != null)
+                IconButton(
+                  icon: const Icon(Icons.pause_rounded, size: 22),
+                  color: AppColors.warning,
+                  onPressed:
+                      task.status == DownloadStatus.downloading ? onPause : null,
+                  tooltip: 'Tạm dừng',
+                ),
+
               IconButton(
                 icon: const Icon(Icons.close_rounded, size: 20),
                 color: Colors.redAccent,
@@ -114,16 +135,18 @@ class ActiveDownloadCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
-          // Progress Bar
+          // Progress Bar — a paused bar holds its position instead of animating.
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
-              value: task.progress > 0 ? task.progress : null,
+              value: (task.progress > 0 || isPaused) ? task.progress : null,
               minHeight: 6,
               backgroundColor: isDark
                   ? AppColors.darkCardElevated
                   : AppColors.lightCardElevated,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                isPaused ? AppColors.warning : AppColors.primary,
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -143,11 +166,13 @@ class ActiveDownloadCard extends StatelessWidget {
                 ),
               ),
               Text(
-                Formatters.formatSpeed(task.downloadSpeed),
-                style: const TextStyle(
+                isPaused
+                    ? 'Đã tạm dừng'
+                    : Formatters.formatSpeed(task.downloadSpeed),
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
+                  color: isPaused ? AppColors.warning : AppColors.primary,
                 ),
               ),
             ],

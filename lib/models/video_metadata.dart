@@ -80,19 +80,21 @@ class VideoMetadata {
     this.shareCount,
   });
 
+  /// Highest video option, or the first audio option when the item has no
+  /// video. Extractors hand back their qualities already sorted best-first.
   VideoQualityOption? get bestQuality {
     if (qualities.isEmpty) return null;
-    final videoQualities = qualities.where((q) => !q.isAudioOnly).toList();
-    if (videoQualities.isNotEmpty) return videoQualities.first;
+    for (final quality in qualities) {
+      if (!quality.isAudioOnly) return quality;
+    }
     return qualities.first;
   }
 
   VideoQualityOption? get audioQuality {
-    try {
-      return qualities.firstWhere((q) => q.isAudioOnly);
-    } catch (_) {
-      return null;
+    for (final quality in qualities) {
+      if (quality.isAudioOnly) return quality;
     }
+    return null;
   }
 
   Map<String, dynamic> toJson() => {

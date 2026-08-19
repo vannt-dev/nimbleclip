@@ -1,10 +1,33 @@
 import 'package:http/http.dart' as http;
-import '../../core/utils/cors_helper.dart';
+
+import '../../core/utils/http_helper.dart';
+import '../../core/utils/quality_helper.dart';
+import '../../core/utils/text_unescape.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
 
-class GenericExtractor implements BaseVideoExtractor {
+/// Fallback for direct media links and pages that advertise a video through
+/// Open Graph tags. Registered last, so it only sees URLs no platform claimed.
+class GenericExtractor extends BaseVideoExtractor {
+  const GenericExtractor();
+
+  static const Map<String, String> _mediaExtensions = {
+    '.mp4': 'mp4',
+    '.m4v': 'mp4',
+    '.mkv': 'mkv',
+    '.webm': 'webm',
+    '.mov': 'mov',
+    '.avi': 'avi',
+    '.mp3': 'mp3',
+    '.m4a': 'm4a',
+    '.aac': 'aac',
+    '.wav': 'wav',
+    '.ogg': 'ogg',
+  };
+
+  static const Set<String> _audioFormats = {'mp3', 'm4a', 'aac', 'wav', 'ogg'};
+
   @override
   VideoPlatform get platform => VideoPlatform.generic;
 
@@ -14,134 +37,156 @@ class GenericExtractor implements BaseVideoExtractor {
   @override
   Future<VideoMetadata> extract(String url) async {
     final cleanUrl = url.trim();
+    final uri = Uri.parse(cleanUrl);
     final id = DateTime.now().millisecondsSinceEpoch.toString();
 
-    // Check if it's already a direct video file extension
-    final uri = Uri.parse(cleanUrl);
-    final path = uri.path.toLowerCase();
-    final isDirectVideo = path.endsWith('.mp4') ||
-        path.endsWith('.mkv') ||
-        path.endsWith('.webm') ||
-        path.endsWith('.mov') ||
-        path.endsWith('.mp3') ||
-        path.endsWith('.m4a');
+    final direct = _directMediaFormat(uri);
+    if (direct != null) return _directMedia(uri, cleanUrl, id, direct);
 
-    if (isDirectVideo) {
-      final fileName = uri.pathSegments.isNotEmpty
-          ? uri.pathSegments.last
-          : 'Direct_Video_$id';
-      final isAudio = path.endsWith('.mp3') || path.endsWith('.m4a');
+    final http.Response response;
+    try {
+      response = await ExtractorHttp.get(
+        cleanUrl,
+        timeout: const Duration(seconds: 12),
+      );
+    } catch (e) {
+      throw ExtractionException('Không truy cập được liên kết: $e');
+    }
 
+    // The URL had no media extension but the server says it is media anyway.
+    final contentType = (response.headers['content-type'] ?? '').toLowerCase();
+    if (contentType.startsWith('video/') || contentType.startsWith('audio/')) {
+      final isAudio = contentType.startsWith('audio/');
       return VideoMetadata(
         id: id,
         originalUrl: cleanUrl,
-        title: fileName,
-        description: 'Direct Media Link',
+        title: _fileNameOf(uri) ?? 'Media Stream ($id)',
+        description: 'Liên kết media trực tiếp',
         author: uri.host,
-        authorAvatar: null,
         coverUrl: '',
-        duration: null,
         platform: VideoPlatform.generic,
         qualities: [
           VideoQualityOption(
             id: 'gen_$id',
-            label: isAudio ? 'Audio File' : 'Direct Video File',
+            label: isAudio ? 'Âm thanh (Gốc)' : 'Video (Gốc)',
             quality: 'Original',
             format: isAudio ? 'mp3' : 'mp4',
             downloadUrl: cleanUrl,
+            sizeBytes: int.tryParse(response.headers['content-length'] ?? ''),
             isAudioOnly: isAudio,
           ),
         ],
-        viewCount: null,
-        likeCount: null,
-        commentCount: null,
-        shareCount: null,
       );
     }
 
-    try {
-      final response = await http.get(
-        Uri.parse(CorsHelper.wrap(cleanUrl)),
-        headers: {
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        },
-      ).timeout(const Duration(seconds: 10));
+    return _fromOpenGraph(response.body, uri, cleanUrl, id);
+  }
 
-      final contentType = response.headers['content-type'] ?? '';
-      if (contentType.startsWith('video/')) {
-        return VideoMetadata(
-          id: id,
-          originalUrl: cleanUrl,
-          title: 'Web Video ($id)',
-          description: null,
-          author: uri.host,
-          authorAvatar: null,
-          coverUrl: '',
-          duration: null,
-          platform: VideoPlatform.generic,
-          qualities: [
-            VideoQualityOption(
-              id: 'gen_$id',
-              label: 'Original Video Stream',
-              quality: 'Original',
-              format: 'mp4',
-              downloadUrl: cleanUrl,
-              sizeBytes: int.tryParse(response.headers['content-length'] ?? ''),
-              isAudioOnly: false,
-            ),
-          ],
-          viewCount: null,
-          likeCount: null,
-          commentCount: null,
-          shareCount: null,
-        );
-      }
-
-      // Check og:video in HTML
-      final html = response.body;
-      final ogVideo = RegExp(r'property="og:video(?::url)?"\s+content="([^"]+)"')
-          .firstMatch(html);
-      final ogTitle = RegExp(r'property="og:title"\s+content="([^"]+)"')
-          .firstMatch(html);
-      final ogImage = RegExp(r'property="og:image"\s+content="([^"]+)"')
-          .firstMatch(html);
-
-      if (ogVideo != null && ogVideo.group(1) != null) {
-        final videoUrl = ogVideo.group(1)!;
-        final title = ogTitle?.group(1) ?? 'Web Video';
-        final image = ogImage?.group(1) ?? '';
-
-        return VideoMetadata(
-          id: id,
-          originalUrl: cleanUrl,
-          title: title,
-          description: null,
-          author: uri.host,
-          authorAvatar: null,
-          coverUrl: image,
-          duration: null,
-          platform: VideoPlatform.generic,
-          qualities: [
-            VideoQualityOption(
-              id: 'gen_og_$id',
-              label: 'Web Video Stream',
-              quality: 'HD',
-              format: 'mp4',
-              downloadUrl: videoUrl,
-              isAudioOnly: false,
-            ),
-          ],
-          viewCount: null,
-          likeCount: null,
-          commentCount: null,
-          shareCount: null,
-        );
-      }
-
-      throw Exception('No playable video found at the provided URL.');
-    } catch (e) {
-      throw Exception('Generic extraction failed: $e');
+  String? _directMediaFormat(Uri uri) {
+    final path = uri.path.toLowerCase();
+    for (final entry in _mediaExtensions.entries) {
+      if (path.endsWith(entry.key)) return entry.value;
     }
+    return null;
+  }
+
+  VideoMetadata _directMedia(Uri uri, String url, String id, String format) {
+    final isAudio = _audioFormats.contains(format);
+    return VideoMetadata(
+      id: id,
+      originalUrl: url,
+      title: _fileNameOf(uri) ?? 'Direct_Media_$id',
+      description: 'Liên kết media trực tiếp',
+      author: uri.host,
+      coverUrl: '',
+      platform: VideoPlatform.generic,
+      qualities: [
+        VideoQualityOption(
+          id: 'gen_$id',
+          label: isAudio ? 'Âm thanh (Gốc)' : 'Video (Gốc)',
+          quality: 'Original',
+          format: format,
+          downloadUrl: url,
+          isAudioOnly: isAudio,
+        ),
+      ],
+    );
+  }
+
+  VideoMetadata _fromOpenGraph(String html, Uri uri, String url, String id) {
+    final videoUrl = _meta(html, ['og:video:secure_url', 'og:video:url', 'og:video']) ??
+        _meta(html, ['twitter:player:stream']);
+    if (videoUrl == null) {
+      throw const ExtractionException(
+        'Không tìm thấy video nào tại liên kết này. Hãy kiểm tra lại đường dẫn, '
+        'hoặc dán link trực tiếp tới file .mp4.',
+      );
+    }
+
+    // Open Graph URLs are often protocol-relative or site-relative.
+    final resolved = uri.resolve(videoUrl).toString();
+    final image = _meta(html, ['og:image']);
+    final height = _meta(html, ['og:video:height']);
+
+    return VideoMetadata(
+      id: id,
+      originalUrl: url,
+      title: _meta(html, ['og:title']) ?? _title(html) ?? 'Web Video',
+      description: _meta(html, ['og:description']),
+      author: _meta(html, ['og:site_name']) ?? uri.host,
+      coverUrl: image == null ? '' : uri.resolve(image).toString(),
+      duration:
+          _durationFrom(_meta(html, ['og:video:duration', 'video:duration'])),
+      platform: VideoPlatform.generic,
+      qualities: QualityHelper.sortedByQuality([
+        VideoQualityOption(
+          id: 'gen_og_$id',
+          label: 'Video nhúng (Web)',
+          quality: height != null ? '${height}p' : 'Original',
+          format: 'mp4',
+          downloadUrl: resolved,
+        ),
+      ]),
+    );
+  }
+
+  /// Reads a `<meta>` tag's content, tolerating either attribute order
+  /// (`property` before `content` or the reverse) and `name=` instead of
+  /// `property=`.
+  String? _meta(String html, List<String> keys) {
+    for (final key in keys) {
+      final escaped = RegExp.escape(key);
+      final match = RegExp(
+                '<meta[^>]+(?:property|name)=["\']$escaped["\'][^>]*content=["\']([^"\']*)["\']',
+                caseSensitive: false,
+              ).firstMatch(html) ??
+          RegExp(
+            '<meta[^>]+content=["\']([^"\']*)["\'][^>]*(?:property|name)=["\']$escaped["\']',
+            caseSensitive: false,
+          ).firstMatch(html);
+      final value = match?.group(1);
+      if (value != null && value.isNotEmpty) return decodeHtmlEntities(value);
+    }
+    return null;
+  }
+
+  String? _title(String html) {
+    final raw = RegExp(r'<title[^>]*>(.*?)</title>',
+            caseSensitive: false, dotAll: true)
+        .firstMatch(html)
+        ?.group(1)
+        ?.trim();
+    return raw == null || raw.isEmpty ? null : decodeHtmlEntities(raw);
+  }
+
+  String? _fileNameOf(Uri uri) {
+    if (uri.pathSegments.isEmpty) return null;
+    final last = uri.pathSegments.last;
+    return last.isEmpty ? null : Uri.decodeComponent(last);
+  }
+
+  Duration? _durationFrom(String? raw) {
+    final seconds = int.tryParse(raw ?? '');
+    return seconds != null && seconds > 0 ? Duration(seconds: seconds) : null;
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
@@ -77,18 +78,68 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     }
   }
 
+  /// Card used for anything still in flight, including paused tasks — they are
+  /// not finished, so they belong with the running downloads rather than in the
+  /// completed list.
+  Widget _activeCard(BuildContext context, DownloadTask task) {
+    final provider = context.read<DownloadProvider>();
+    return ActiveDownloadCard(
+      task: task,
+      onCancel: () => provider.cancelTask(task.id),
+      onPause: kIsWeb ? null : () => provider.pauseTask(task.id),
+      onResume: kIsWeb ? null : () => provider.resumeTask(task),
+    );
+  }
+
+  Future<void> _confirmClearFinished(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xóa mục đã xong'),
+        content: const Text(
+          'Xóa toàn bộ mục đã tải xong, thất bại và đã hủy khỏi danh sách? '
+          'File đã tải về máy vẫn được giữ lại.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      await context.read<DownloadProvider>().clearFinished();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final downloadProv = context.watch<DownloadProvider>();
 
     final all = downloadProv.allTasks;
-    final active = downloadProv.activeTasks;
+    final active = [...downloadProv.activeTasks, ...downloadProv.pausedTasks];
     final completed = downloadProv.completedTasks;
+    final hasFinished = all.any((t) => t.isDone);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Quản lý tải về'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.playlist_remove_rounded),
+            tooltip: 'Xóa mục đã xong',
+            onPressed:
+                hasFinished ? () => _confirmClearFinished(context) : null,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppColors.primary,
@@ -154,13 +205,7 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: tasks.length,
-      itemBuilder: (context, index) {
-        final task = tasks[index];
-        return ActiveDownloadCard(
-          task: task,
-          onCancel: () => context.read<DownloadProvider>().cancelTask(task.id),
-        );
-      },
+      itemBuilder: (context, index) => _activeCard(context, tasks[index]),
     );
   }
 
@@ -223,12 +268,8 @@ class _DownloadsScreenState extends State<DownloadsScreen>
       itemCount: tasks.length,
       itemBuilder: (context, index) {
         final task = tasks[index];
-        if (task.isActive) {
-          return ActiveDownloadCard(
-            task: task,
-            onCancel: () =>
-                context.read<DownloadProvider>().cancelTask(task.id),
-          );
+        if (task.isActive || task.status == DownloadStatus.paused) {
+          return _activeCard(context, task);
         } else {
           return CompletedDownloadCard(
             task: task,

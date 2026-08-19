@@ -4,11 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:snap_video/core/utils/formatters.dart';
-import 'package:snap_video/core/utils/url_helper.dart';
 import 'package:snap_video/models/video_platform.dart';
 import 'package:snap_video/providers/download_provider.dart';
 import 'package:snap_video/providers/settings_provider.dart';
 import 'package:snap_video/providers/video_extractor_provider.dart';
+import 'package:snap_video/services/extractors/registry.dart';
 import 'package:snap_video/views/home/home_screen.dart';
 
 void main() {
@@ -19,82 +19,82 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  group('UrlHelper Tests', () {
-    test('Detect YouTube URLs', () {
-      expect(
-        UrlHelper.detectPlatform('https://www.youtube.com/watch?v=dQw4w9WgXcQ'),
-        VideoPlatform.youtube,
-      );
-      expect(
-        UrlHelper.detectPlatform('https://youtu.be/dQw4w9WgXcQ'),
-        VideoPlatform.youtube,
-      );
-      expect(
-        UrlHelper.detectPlatform('https://youtube.com/shorts/abc123xyz'),
-        VideoPlatform.youtube,
-      );
+  group('ExtractorRegistry routing', () {
+    test('sends each link to the extractor that owns its platform', () {
+      const expected = {
+        'https://www.youtube.com/watch?v=dQw4w9WgXcQ': VideoPlatform.youtube,
+        'https://www.tiktok.com/@u/video/1': VideoPlatform.tiktok,
+        'https://x.com/u/status/1': VideoPlatform.twitter,
+        'https://www.facebook.com/watch?v=1': VideoPlatform.facebook,
+        'https://www.instagram.com/reel/Cxyz/': VideoPlatform.instagram,
+        'https://cdn.example.com/clip.mp4': VideoPlatform.generic,
+      };
+
+      expected.forEach((url, platform) {
+        expect(ExtractorRegistry.getExtractorFor(url).platform, platform,
+            reason: url);
+      });
     });
 
-    test('Detect TikTok URLs', () {
-      expect(
-        UrlHelper.detectPlatform('https://www.tiktok.com/@user/video/1234567890'),
-        VideoPlatform.tiktok,
-      );
-      expect(
-        UrlHelper.detectPlatform('https://vm.tiktok.com/ZMxxxx/'),
-        VideoPlatform.tiktok,
-      );
+    test('every platform except generic has an extractor registered', () {
+      final registered =
+          ExtractorRegistry.extractors.map((e) => e.platform).toSet();
+      expect(registered, containsAll(VideoPlatform.values));
     });
 
-    test('Detect Facebook URLs', () {
-      expect(
-        UrlHelper.detectPlatform('https://www.facebook.com/watch?v=123456'),
-        VideoPlatform.facebook,
-      );
-      expect(
-        UrlHelper.detectPlatform('https://fb.watch/abcdef/'),
-        VideoPlatform.facebook,
-      );
+    test('the catch-all extractor is last', () {
+      expect(ExtractorRegistry.extractors.last.platform, VideoPlatform.generic);
     });
 
-    test('Detect Twitter / X URLs', () {
-      expect(
-        UrlHelper.detectPlatform('https://x.com/user/status/1234567890'),
-        VideoPlatform.twitter,
-      );
-      expect(
-        UrlHelper.detectPlatform('https://twitter.com/user/status/1234567890'),
-        VideoPlatform.twitter,
-      );
-    });
-
-    test('Extract clean URL from shared text', () {
-      const raw = 'Check out this awesome video https://youtu.be/dQw4w9WgXcQ from YouTube!';
-      expect(
-        UrlHelper.extractCleanUrl(raw),
-        'https://youtu.be/dQw4w9WgXcQ',
+    test('rejects a non-http link before touching the network', () async {
+      await expectLater(
+        ExtractorRegistry.extract('not a url'),
+        throwsA(isA<Exception>()),
       );
     });
   });
 
-  group('Formatters Tests', () {
-    test('Format bytes correctly', () {
+  group('Formatters', () {
+    test('formats bytes', () {
       expect(Formatters.formatBytes(0), '0 B');
       expect(Formatters.formatBytes(1024), '1.0 KB');
       expect(Formatters.formatBytes(1048576), '1.0 MB');
       expect(Formatters.formatBytes(1073741824), '1.0 GB');
     });
 
-    test('Format duration correctly', () {
-      expect(Formatters.formatDuration(const Duration(minutes: 3, seconds: 45)), '03:45');
-      expect(Formatters.formatDuration(const Duration(hours: 1, minutes: 2, seconds: 3)), '01:02:03');
+    test('formats duration', () {
+      expect(
+        Formatters.formatDuration(const Duration(minutes: 3, seconds: 45)),
+        '03:45',
+      );
+      expect(
+        Formatters.formatDuration(const Duration(hours: 1, minutes: 2, seconds: 3)),
+        '01:02:03',
+      );
+    });
+  });
+
+  group('VideoExtractorProvider', () {
+    test('rejects an invalid URL without clearing into a loading state', () async {
+      final provider = VideoExtractorProvider();
+      final ok = await provider.analyzeUrl('definitely not a link');
+
+      expect(ok, isFalse);
+      expect(provider.isAnalyzing, isFalse);
+      expect(provider.errorMessage, isNotNull);
+      expect(provider.hasResult, isFalse);
+    });
+
+    test('clear() resets every field', () {
+      final provider = VideoExtractorProvider()..clear();
+      expect(provider.metadata, isNull);
+      expect(provider.selectedQuality, isNull);
+      expect(provider.errorMessage, isNull);
+      expect(provider.currentUrl, '');
     });
   });
 
   testWidgets('HomeScreen smoke test', (WidgetTester tester) async {
-    GoogleFonts.config.allowRuntimeFetching = false;
-    SharedPreferences.setMockInitialValues({});
-
     await tester.pumpWidget(
       MultiProvider(
         providers: [

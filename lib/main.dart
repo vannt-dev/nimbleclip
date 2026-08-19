@@ -8,18 +8,8 @@ import 'providers/settings_provider.dart';
 import 'providers/video_extractor_provider.dart';
 import 'views/main_navigation_screen.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Set system UI overlay style
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      statusBarBrightness: Brightness.light,
-    ),
-  );
-
   runApp(const SnapVideoApp());
 }
 
@@ -42,6 +32,26 @@ class SnapVideoApp extends StatelessWidget {
             themeMode: settings.themeMode,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
+            // Status bar icons follow the resolved theme. Setting them once at
+            // startup left dark icons on a dark background in dark mode, and
+            // never reacted to the system theme changing.
+            builder: (context, child) {
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              return AnnotatedRegion<SystemUiOverlayStyle>(
+                value: SystemUiOverlayStyle(
+                  statusBarColor: Colors.transparent,
+                  statusBarIconBrightness:
+                      isDark ? Brightness.light : Brightness.dark,
+                  statusBarBrightness:
+                      isDark ? Brightness.dark : Brightness.light,
+                  systemNavigationBarColor:
+                      Theme.of(context).scaffoldBackgroundColor,
+                  systemNavigationBarIconBrightness:
+                      isDark ? Brightness.light : Brightness.dark,
+                ),
+                child: child ?? const SizedBox.shrink(),
+              );
+            },
             home: const MainNavigationScreen(),
           );
         },

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/cors_helper.dart';
+import '../../core/utils/local_video_source.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final String title;
@@ -36,15 +37,19 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   Future<void> _initializePlayer() async {
     try {
-      if (widget.videoUrl != null && widget.videoUrl!.isNotEmpty) {
-        final streamUrl = CorsHelper.wrap(widget.videoUrl!);
+      final localPath = widget.localFilePath;
+      if (localPath != null && localPath.isNotEmpty) {
+        if (!localPlaybackSupported(localPath)) {
+          throw Exception(
+            'Không tìm thấy file đã tải trên máy. File có thể đã bị xóa.',
+          );
+        }
+        _videoPlayerController = createLocalVideoController(localPath);
+      } else if (widget.videoUrl != null && widget.videoUrl!.isNotEmpty) {
+        // Remote previews go through the CORS proxy on Web; the proxy forwards
+        // Range headers so seeking still works.
         _videoPlayerController = VideoPlayerController.networkUrl(
-          Uri.parse(streamUrl),
-        );
-      } else if (widget.localFilePath != null && widget.localFilePath!.isNotEmpty) {
-        final streamUrl = CorsHelper.wrap(widget.localFilePath!);
-        _videoPlayerController = VideoPlayerController.networkUrl(
-          Uri.parse(streamUrl),
+          Uri.parse(CorsHelper.wrap(widget.videoUrl!)),
         );
       } else {
         throw Exception('Không có nguồn video để phát');

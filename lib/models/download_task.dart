@@ -68,6 +68,45 @@ class DownloadTask {
       status == DownloadStatus.downloading ||
       status == DownloadStatus.queued;
 
+  /// Statuses that only make sense while a download is in flight.
+  static const Set<DownloadStatus> transientStatuses = {
+    DownloadStatus.queued,
+    DownloadStatus.downloading,
+    DownloadStatus.paused,
+  };
+
+  static DownloadStatus _restoreStatus(String? name) {
+    final status = DownloadStatus.values.firstWhere(
+      (s) => s.name == name,
+      orElse: () => DownloadStatus.completed,
+    );
+    return transientStatuses.contains(status) ? DownloadStatus.failed : status;
+  }
+
+  /// Copy carrying a fresh download URL and headers, used when a retry has to
+  /// re-extract because the persisted URL's signature has expired.
+  DownloadTask withRefreshedSource({
+    required String downloadUrl,
+    Map<String, String>? headers,
+  }) {
+    return DownloadTask(
+      id: id,
+      videoId: videoId,
+      title: title,
+      author: author,
+      thumbnailUrl: thumbnailUrl,
+      downloadUrl: downloadUrl,
+      originalUrl: originalUrl,
+      platform: platform,
+      qualityLabel: qualityLabel,
+      format: format,
+      isAudioOnly: isAudioOnly,
+      headers: headers ?? this.headers,
+      status: DownloadStatus.queued,
+      createdAt: createdAt,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'videoId': videoId,
@@ -110,10 +149,11 @@ class DownloadTask {
         headers: (json['headers'] as Map<String, dynamic>?)?.map(
           (k, v) => MapEntry(k, v.toString()),
         ),
-        status: DownloadStatus.values.firstWhere(
-          (s) => s.name == json['status'],
-          orElse: () => DownloadStatus.completed,
-        ),
+        // A task persisted as queued/downloading/paused belongs to a process
+        // that no longer exists — nothing resumes it, so restoring it as-is
+        // would leave it pinned to the "active" list forever. Mark it failed so
+        // the user can retry it deliberately.
+        status: _restoreStatus(json['status']?.toString()),
         progress: (json['progress'] as num?)?.toDouble() ?? 1.0,
         totalBytes: json['totalBytes'] as int? ?? 0,
         receivedBytes: json['receivedBytes'] as int? ?? 0,

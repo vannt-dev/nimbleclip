@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../core/utils/quality_helper.dart';
 import '../core/utils/url_helper.dart';
 import '../models/video_metadata.dart';
 import '../services/extractors/registry.dart';
@@ -10,6 +12,10 @@ class VideoExtractorProvider extends ChangeNotifier {
   String? _errorMessage;
   String _currentUrl = '';
 
+  /// Guards against a slow earlier analysis overwriting a newer one when the
+  /// user edits the URL and re-submits before the first request returns.
+  int _requestSequence = 0;
+
   VideoMetadata? get metadata => _metadata;
   VideoQualityOption? get selectedQuality => _selectedQuality;
   bool get isAnalyzing => _isAnalyzing;
@@ -17,50 +23,20 @@ class VideoExtractorProvider extends ChangeNotifier {
   String get currentUrl => _currentUrl;
   bool get hasResult => _metadata != null;
 
-  VideoQualityOption? _findBestMatchingQuality(
-      List<VideoQualityOption> options, String preferred) {
-    if (options.isEmpty) return null;
-
-    if (preferred == 'Audio') {
-      final audio = options.firstWhere(
-        (o) => o.isAudioOnly,
-        orElse: () => options.first,
-      );
-      return audio;
-    }
-
-    final videoOnly = options.where((o) => !o.isAudioOnly).toList();
-    if (videoOnly.isEmpty) return options.first;
-
-    if (preferred == '720p') {
-      return videoOnly.firstWhere(
-        (o) => o.quality.contains('720'),
-        orElse: () => videoOnly.first,
-      );
-    } else if (preferred == '480p') {
-      return videoOnly.firstWhere(
-        (o) => o.quality.contains('480'),
-        orElse: () => videoOnly.first,
-      );
-    } else if (preferred == '360p') {
-      return videoOnly.lastWhere(
-        (o) => o.quality.contains('360') || o.quality.contains('SD'),
-        orElse: () => videoOnly.last,
-      );
-    }
-
-    // Default 'Highest'
-    return videoOnly.first;
-  }
-
-  Future<bool> analyzeUrl(String url, {String preferredQuality = 'Highest'}) async {
+  Future<bool> analyzeUrl(
+    String url, {
+    String preferredQuality = 'Highest',
+  }) async {
     final cleanUrl = UrlHelper.extractCleanUrl(url);
-    if (cleanUrl.isEmpty || !UrlHelper.isValidVideoUrl(cleanUrl)) {
+    if (!UrlHelper.isValidVideoUrl(cleanUrl)) {
       _errorMessage = 'Vui lòng nhập đường dẫn video hợp lệ (http/https).';
+      _metadata = null;
+      _selectedQuality = null;
       notifyListeners();
       return false;
     }
 
+    final sequence = ++_requestSequence;
     _isAnalyzing = true;
     _errorMessage = null;
     _metadata = null;
@@ -69,23 +45,33 @@ class VideoExtractorProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final meta = await ExtractorRegistry.extract(cleanUrl);
-      _metadata = meta;
-      if (meta.qualities.isNotEmpty) {
-        _selectedQuality =
-            _findBestMatchingQuality(meta.qualities, preferredQuality) ??
-                meta.bestQuality ??
-                meta.qualities.first;
-      }
+      final metadata = await ExtractorRegistry.extract(cleanUrl);
+      if (sequence != _requestSequence) return false;
+
+      _metadata = metadata;
+      _selectedQuality =
+          QualityHelper.bestMatch(metadata.qualities, preferredQuality) ??
+              metadata.bestQuality;
       _isAnalyzing = false;
       notifyListeners();
       return true;
     } catch (e) {
+      if (sequence != _requestSequence) return false;
       _isAnalyzing = false;
-      _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+      _errorMessage = _readableError(e);
       notifyListeners();
       return false;
     }
+  }
+
+  /// Strips the `Exception:` prefixes Dart adds so the user sees the message the
+  /// extractor actually wrote.
+  String _readableError(Object error) {
+    var message = error.toString();
+    while (message.startsWith('Exception:')) {
+      message = message.substring('Exception:'.length).trim();
+    }
+    return message.isEmpty ? 'Không phân tích được liên kết này.' : message;
   }
 
   void selectQuality(VideoQualityOption quality) {
@@ -94,6 +80,7 @@ class VideoExtractorProvider extends ChangeNotifier {
   }
 
   void clear() {
+    _requestSequence++;
     _metadata = null;
     _selectedQuality = null;
     _isAnalyzing = false;

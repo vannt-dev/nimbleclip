@@ -8,4 +8,5 @@ class PlatformFileHelper {
   static Future<void> openFile(String filePath) async {}
   static Future<void> shareFile(String filePath, {String? text}) async {}
   static bool fileExists(String filePath) => true;
+  static Future<int> fileSize(String filePath) async => 0;
 }

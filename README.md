@@ -18,7 +18,11 @@
 - **Quản lý tải về thông minh (Download Manager)**:
   - Hiển thị phần trăm tiến trình thời gian thực.
   - Hiển thị tốc độ tải (MB/s, KB/s) và dung lượng đã nhận / tổng dung lượng.
-  - Hỗ trợ hủy tiến trình tải.
+  - **Tạm dừng & tiếp tục**: giữ lại phần đã tải và nối tiếp bằng HTTP Range
+    (tự động tải lại từ đầu nếu máy chủ không hỗ trợ Range).
+  - Hủy tiến trình tải và dọn sạch các mục đã xong.
+  - **Thử lại thông minh**: tự động phân tích lại link gốc để lấy URL mới, vì
+    link tải của YouTube / Facebook / Instagram có chữ ký hết hạn theo thời gian.
 - **Lưu trực tiếp vào Thư viện ảnh (Gallery/Album)**: Tự động hoặc thủ công lưu video đã tải vào ứng dụng Photos của thiết bị Android & iOS.
 - **Chia sẻ & Mở file**: Chia sẻ video nhanh chóng qua Zalo, Messenger, Telegram,... hoặc mở bằng trình phát mặc định của máy.
 - **Giao diện hiện đại & Tùy biến**:
@@ -38,8 +42,16 @@ lib/
 │   ├── theme/
 │   │   └── app_theme.dart           # Cấu hình Material 3 Light & Dark Theme
 │   └── utils/
+│       ├── cors_helper.dart         # Bọc URL qua proxy CORS khi chạy trên Web
 │       ├── formatters.dart          # Định dạng dung lượng bytes, thời lượng, số đếm
-│       └── url_helper.dart          # Lọc URL, nhận diện nền tảng video
+│       ├── http_helper.dart         # HTTP dùng chung cho extractor (header, timeout, proxy)
+│       ├── json_scanner.dart        # Cắt object JSON cân bằng ngoặc từ HTML
+│       ├── local_video_source.dart  # Tạo controller phát file cục bộ (native / web)
+│       ├── platform_file.dart       # Thao tác file & thư viện ảnh (native / web)
+│       ├── quality_helper.dart      # Xếp hạng & chọn chất lượng theo pixel height
+│       ├── text_unescape.dart       # Giải mã escape JSON (\uXXXX) và HTML entity
+│       ├── url_helper.dart          # Lọc URL, nhận diện nền tảng theo host
+│       └── web_download_helper.dart # Kích hoạt tải file trên trình duyệt
 ├── models/
 │   ├── download_task.dart           # Model quản lý trạng thái tải về
 │   ├── video_metadata.dart          # Model thông tin video & chất lượng
@@ -48,13 +60,14 @@ lib/
 │   ├── download_service.dart        # Tiến trình tải luồng bằng Dio
 │   ├── storage_service.dart         # Lưu trữ file cục bộ & Gal (Thư viện ảnh)
 │   └── extractors/
-│       ├── base_extractor.dart      # Interface cơ sở cho bộ bóc tách link
-│       ├── facebook_extractor.dart  # Bóc tách video Facebook & Reels
-│       ├── generic_extractor.dart   # Bóc tách link trực tiếp & Web Video
+│       ├── base_extractor.dart      # Interface cơ sở + ExtractionException
+│       ├── facebook_extractor.dart  # Facebook & Reels (watch page → embed → m.facebook)
+│       ├── generic_extractor.dart   # Link trực tiếp & video nhúng qua Open Graph
+│       ├── instagram_extractor.dart # Instagram Reels & video bài viết công khai
 │       ├── registry.dart            # Quản lý & điều phối bộ bóc tách
-│       ├── tiktok_extractor.dart    # Bóc tách TikTok Không Watermark (HD)
-│       ├── twitter_extractor.dart   # Bóc tách video X / Twitter
-│       └── youtube_extractor.dart   # Bóc tách video YouTube bằng YoutubeExplode
+│       ├── tiktok_extractor.dart    # TikTok không watermark (HD) + nhạc gốc MP3
+│       ├── twitter_extractor.dart   # X / Twitter (FxTwitter → VxTwitter)
+│       └── youtube_extractor.dart   # YouTube: YoutubeExplode (native) / watch page (web)
 ├── providers/
 │   ├── download_provider.dart       # Quản lý danh sách & trạng thái tải về
 │   ├── settings_provider.dart       # Quản lý cài đặt giao diện, cache, clipboard
@@ -66,6 +79,8 @@ lib/
 │   ├── settings/                    # Màn hình cài đặt & quản lý bộ nhớ
 │   └── main_navigation_screen.dart  # Thanh điều hướng chính (Bottom Navigation)
 └── main.dart                        # Điểm khởi chạy ứng dụng (MultiProvider)
+
+server.js                            # Web dev server: phục vụ build/web + CORS proxy
 ```
 
 ---
@@ -96,6 +111,13 @@ lib/
    flutter test
    ```
 
+   Kiểm thử trên thiết bị Android thật/emulator (storage, tải file, tạm dừng &
+   tiếp tục, lưu vào thư viện ảnh) — cần chạy fixture server trên máy host trước:
+   ```bash
+   node tool/fixture_server.js          # cửa sổ riêng
+   flutter test integration_test/android_storage_test.dart -d <device-id>
+   ```
+
 4. **Khởi chạy ứng dụng**:
    - Chạy trên thiết bị Android hoặc máy ảo:
      ```bash
@@ -112,12 +134,51 @@ lib/
 
 ---
 
+## 🌐 Chạy bản Web (kèm CORS proxy)
+
+Trình duyệt chặn request cross-origin tới YouTube/TikTok/Facebook, nên bản Web
+phải đi qua proxy cục bộ trong `server.js`.
+
+```bash
+flutter build web --release
+node server.js          # http://127.0.0.1:8080
+```
+
+Cấu hình qua biến môi trường: `PORT` (mặc định `8080`) và `HOST` (mặc định
+`127.0.0.1`).
+
+Proxy cung cấp 2 endpoint:
+
+| Endpoint | Công dụng |
+|---|---|
+| `GET/POST /cors-proxy?url=<url>` | Chuyển tiếp request, forward `Range` để tua video. Thêm `&filename=<tên>` để trả `Content-Disposition: attachment` — đây là cách duy nhất trình duyệt lưu được video cross-origin. |
+| `GET /resolve?url=<url>` | Theo redirect phía server và trả về URL cuối, dùng để mở rộng link rút gọn (`t.co`, `fb.watch`, `vm.tiktok.com`). |
+
+**Bảo mật:** proxy chỉ bind loopback, chỉ chấp nhận `http`/`https` trên cổng
+80/443, và từ chối mọi hostname phân giải ra địa chỉ loopback / private /
+link-local (chặn SSRF tới dịch vụ nội bộ và endpoint metadata của cloud). Mỗi
+bước redirect đều được kiểm tra lại. Phần phục vụ file tĩnh chỉ đọc trong
+`build/web`.
+
+> ⚠️ Bản Web chỉ tải được video có luồng công khai. Video YouTube dùng
+> `signatureCipher` cần giải mã bằng JS của YouTube — hãy dùng bản Android /
+> iOS / Desktop cho những video đó.
+
+---
+
 ## 📱 Cấu hình quyền (Permissions)
 
 ### Android (`android/app/src/main/AndroidManifest.xml`):
 - `INTERNET` & `ACCESS_NETWORK_STATE`
 - `READ_EXTERNAL_STORAGE` & `WRITE_EXTERNAL_STORAGE`
 - `READ_MEDIA_VIDEO`, `READ_MEDIA_IMAGES`, `READ_MEDIA_AUDIO` (Hỗ trợ Android 13+)
+- HTTP thường bị tắt mặc định qua `res/xml/network_security_config.xml`; chỉ vài
+  CDN video còn phục vụ cleartext mới được mở riêng, thay vì bật
+  `usesCleartextTraffic` cho toàn ứng dụng.
+- **Không dùng `requestLegacyExternalStorage`**: app ghi file vào thư mục external
+  riêng của chính nó (`Android/data/<package>/files/SnapVideos`) và đưa video vào
+  thư viện ảnh qua MediaStore (`gal`). Cả hai đều tuân thủ scoped storage, nên
+  không cần chế độ lưu trữ cũ (chế độ này cũng bị Android 11+ bỏ qua).
 
 ### iOS (`ios/Runner/Info.plist`):
 - `NSPhotoLibraryUsageDescription`

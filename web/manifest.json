@@ -1,11 +1,11 @@
 {
-    "name": "snap_video",
-    "short_name": "snap_video",
+    "name": "SnapVideo — Trình tải video HD",
+    "short_name": "SnapVideo",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0F172A",
+    "theme_color": "#6366F1",
+    "description": "Tải video & âm thanh HD từ YouTube, TikTok, Facebook, X và Instagram.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

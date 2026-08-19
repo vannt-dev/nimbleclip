@@ -1,177 +1,191 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
-import '../../core/utils/cors_helper.dart';
+
+import '../../core/utils/http_helper.dart';
+import '../../core/utils/quality_helper.dart';
+import '../../core/utils/url_helper.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
 
-class TwitterExtractor implements BaseVideoExtractor {
+class TwitterExtractor extends BaseVideoExtractor {
+  const TwitterExtractor();
+
   @override
   VideoPlatform get platform => VideoPlatform.twitter;
 
-  @override
-  bool canHandle(String url) {
-    final lower = url.toLowerCase();
-    return lower.contains('twitter.com') ||
-        lower.contains('x.com') ||
-        lower.contains('t.co');
-  }
+  static final RegExp _tweetIdPattern = RegExp(r'status(?:es)?/(\d+)');
 
-  String? _extractTweetId(String url) {
-    final regex = RegExp(r'status(?:es)?\/(\d+)');
-    final match = regex.firstMatch(url);
-    return match?.group(1);
-  }
+  String? _extractTweetId(String url) =>
+      _tweetIdPattern.firstMatch(url)?.group(1);
 
   @override
   Future<VideoMetadata> extract(String url) async {
-    final tweetId = _extractTweetId(url);
+    var cleanUrl = url.trim();
+    var tweetId = _extractTweetId(cleanUrl);
+
+    // A t.co link carries no tweet id — it has to be expanded first.
+    if (tweetId == null && UrlHelper.isShortLink(cleanUrl)) {
+      cleanUrl = await ExtractorHttp.resolveRedirects(cleanUrl);
+      tweetId = _extractTweetId(cleanUrl);
+    }
+
     if (tweetId == null) {
-      throw Exception('Could not extract Tweet / X ID from URL: $url');
+      throw const ExtractionException(
+        'Không tìm thấy ID bài đăng trong link X / Twitter. '
+        'Hãy dùng link dạng x.com/<tài khoản>/status/<id>.',
+      );
     }
 
+    final viaFx = await _fromFxTwitter(tweetId, cleanUrl);
+    if (viaFx != null) return viaFx;
+
+    final viaVx = await _fromVxTwitter(tweetId, cleanUrl);
+    if (viaVx != null) return viaVx;
+
+    throw const ExtractionException(
+      'Bài đăng này không có video tải được, hoặc tài khoản đang ở chế độ bảo vệ.',
+    );
+  }
+
+  Future<VideoMetadata?> _fromFxTwitter(String tweetId, String url) async {
+    final Map<String, dynamic> json;
     try {
-      // 1. Try FxTwitter API
-      final fxUrl = Uri.parse(CorsHelper.wrap('https://api.fxtwitter.com/status/$tweetId'));
-      final response = await http.get(
-        fxUrl,
-        headers: {'User-Agent': 'SnapVideo/1.0', 'Accept': 'application/json'},
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body) as Map<String, dynamic>;
-        if (json['code'] == 200 && json['tweet'] != null) {
-          final tweet = json['tweet'] as Map<String, dynamic>;
-          final media = tweet['media'] as Map<String, dynamic>?;
-          final videos = media?['videos'] as List<dynamic>?;
-
-          if (videos != null && videos.isNotEmpty) {
-            final firstVideo = videos.first as Map<String, dynamic>;
-            final variants = firstVideo['variants'] as List<dynamic>? ?? [];
-
-            final List<VideoQualityOption> qualities = [];
-
-            // Sort variants by bitrate descending
-            final mp4Variants = variants
-                .where((v) => (v['content_type'] ?? '').toString().contains('mp4'))
-                .toList();
-
-            mp4Variants.sort((a, b) {
-              final bBitrate = (b['bitrate'] as int?) ?? 0;
-              final aBitrate = (a['bitrate'] as int?) ?? 0;
-              return bBitrate.compareTo(aBitrate);
-            });
-
-            for (var i = 0; i < mp4Variants.length; i++) {
-              final v = mp4Variants[i];
-              final bitrate = (v['bitrate'] as int?) ?? 0;
-              final bitrateKbps = (bitrate / 1000).round();
-              final qualityName = bitrateKbps > 1500
-                  ? '1080p HD'
-                  : bitrateKbps > 800
-                      ? '720p HD'
-                      : bitrateKbps > 400
-                          ? '480p SD'
-                          : '360p SD';
-
-              qualities.add(
-                VideoQualityOption(
-                  id: 'x_${tweetId}_$i',
-                  label: '$qualityName ($bitrateKbps kbps)',
-                  quality: qualityName,
-                  format: 'mp4',
-                  downloadUrl: v['url'].toString(),
-                  isAudioOnly: false,
-                ),
-              );
-            }
-
-            // Fallback if no variants found but video url exists
-            if (qualities.isEmpty && firstVideo['url'] != null) {
-              qualities.add(
-                VideoQualityOption(
-                  id: 'x_${tweetId}_def',
-                  label: 'Standard Quality MP4',
-                  quality: 'HD',
-                  format: 'mp4',
-                  downloadUrl: firstVideo['url'].toString(),
-                  isAudioOnly: false,
-                ),
-              );
-            }
-
-            final author = tweet['author'] as Map<String, dynamic>? ?? {};
-            final authorName = author['name']?.toString() ??
-                author['screen_name']?.toString() ??
-                'X User';
-            final authorAvatar = author['avatar_url']?.toString();
-            final title = tweet['text']?.toString().trim().isNotEmpty == true
-                ? tweet['text'].toString()
-                : 'X Post by @${author['screen_name']}';
-            final coverUrl = firstVideo['thumbnail_url']?.toString() ?? '';
-            final durationSec = (firstVideo['duration'] as num?)?.toInt();
-
-            return VideoMetadata(
-              id: tweetId,
-              originalUrl: url,
-              title: title,
-              description: tweet['text']?.toString(),
-              author: authorName,
-              authorAvatar: authorAvatar,
-              coverUrl: coverUrl,
-              duration: durationSec != null ? Duration(seconds: durationSec) : null,
-              platform: VideoPlatform.twitter,
-              qualities: qualities,
-              viewCount: tweet['views'] as int?,
-              likeCount: tweet['likes'] as int?,
-              commentCount: tweet['replies'] as int?,
-              shareCount: tweet['retweets'] as int?,
-            );
-          }
-        }
-      }
-
-      // 2. Fallback: VxTwitter API
-      final vxUrl = Uri.parse(CorsHelper.wrap('https://api.vxtwitter.com/Twitter/status/$tweetId'));
-      final vxResponse = await http.get(vxUrl).timeout(const Duration(seconds: 10));
-      if (vxResponse.statusCode == 200) {
-        final vxJson = jsonDecode(vxResponse.body) as Map<String, dynamic>;
-        final mediaUrls = vxJson['mediaURLs'] as List<dynamic>? ?? [];
-        final videoUrls = mediaUrls.where((u) => u.toString().endsWith('.mp4')).toList();
-
-        if (videoUrls.isNotEmpty) {
-          final downloadUrl = videoUrls.first.toString();
-          return VideoMetadata(
-            id: tweetId,
-            originalUrl: url,
-            title: vxJson['text']?.toString() ?? 'X Video ($tweetId)',
-            description: vxJson['text']?.toString(),
-            author: vxJson['user_name']?.toString() ?? 'X User',
-            authorAvatar: null,
-            coverUrl: '',
-            duration: null,
-            platform: VideoPlatform.twitter,
-            qualities: [
-              VideoQualityOption(
-                id: 'vx_$tweetId',
-                label: 'High Quality MP4',
-                quality: 'HD',
-                format: 'mp4',
-                downloadUrl: downloadUrl,
-                isAudioOnly: false,
-              ),
-            ],
-            viewCount: null,
-            likeCount: vxJson['likes'] as int?,
-            commentCount: vxJson['replies'] as int?,
-            shareCount: vxJson['retweets'] as int?,
-          );
-        }
-      }
-
-      throw Exception('No downloadable video found for this tweet.');
-    } catch (e) {
-      throw Exception('Failed to extract Twitter / X video: $e');
+      final response =
+          await ExtractorHttp.get('https://api.fxtwitter.com/status/$tweetId');
+      if (response.statusCode != 200) return null;
+      json = jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
     }
+
+    if (json['code'] != 200 || json['tweet'] == null) return null;
+    final tweet = json['tweet'] as Map<String, dynamic>;
+    final videos = (tweet['media'] as Map<String, dynamic>?)?['videos']
+        as List<dynamic>?;
+    if (videos == null || videos.isEmpty) return null;
+
+    final video = videos.first as Map<String, dynamic>;
+    final variants = (video['variants'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .where((v) => (v['content_type'] ?? '').toString().contains('mp4'))
+        .toList();
+    variants.sort((a, b) => ((b['bitrate'] as num?) ?? 0)
+        .compareTo((a['bitrate'] as num?) ?? 0));
+
+    final qualities = <VideoQualityOption>[];
+    for (var i = 0; i < variants.length; i++) {
+      final variant = variants[i];
+      final variantUrl = variant['url']?.toString();
+      if (variantUrl == null || variantUrl.isEmpty) continue;
+
+      final kbps = (((variant['bitrate'] as num?) ?? 0) / 1000).round();
+      // Twitter does not label variant resolution, but it is encoded in the CDN
+      // path (`/vid/avc1/1280x720/`). Fall back to a bitrate estimate.
+      final fromPath = RegExp(r'/(\d{2,4})x(\d{2,4})/').firstMatch(variantUrl);
+      final quality = fromPath != null
+          ? '${fromPath.group(2)}p'
+          : _qualityFromBitrate(kbps);
+
+      qualities.add(
+        VideoQualityOption(
+          id: 'x_${tweetId}_$i',
+          label: '$quality ($kbps kbps)',
+          quality: quality,
+          format: 'mp4',
+          downloadUrl: variantUrl,
+        ),
+      );
+    }
+
+    final directUrl = video['url']?.toString();
+    if (qualities.isEmpty && directUrl != null && directUrl.isNotEmpty) {
+      qualities.add(
+        VideoQualityOption(
+          id: 'x_${tweetId}_default',
+          label: 'MP4 (Chất lượng gốc)',
+          quality: 'Original',
+          format: 'mp4',
+          downloadUrl: directUrl,
+        ),
+      );
+    }
+    if (qualities.isEmpty) return null;
+
+    final author = tweet['author'] as Map<String, dynamic>? ?? {};
+    final text = tweet['text']?.toString().trim();
+    final durationSec = (video['duration'] as num?)?.toInt();
+
+    return VideoMetadata(
+      id: tweetId,
+      originalUrl: url,
+      title: text != null && text.isNotEmpty
+          ? text
+          : 'Bài đăng của @${author['screen_name'] ?? 'X'}',
+      description: text,
+      author: author['name']?.toString() ??
+          author['screen_name']?.toString() ??
+          'X User',
+      authorAvatar: author['avatar_url']?.toString(),
+      coverUrl: video['thumbnail_url']?.toString() ?? '',
+      duration: durationSec != null && durationSec > 0
+          ? Duration(seconds: durationSec)
+          : null,
+      platform: VideoPlatform.twitter,
+      qualities: QualityHelper.sortedByQuality(qualities),
+      viewCount: (tweet['views'] as num?)?.toInt(),
+      likeCount: (tweet['likes'] as num?)?.toInt(),
+      commentCount: (tweet['replies'] as num?)?.toInt(),
+      shareCount: (tweet['retweets'] as num?)?.toInt(),
+    );
+  }
+
+  Future<VideoMetadata?> _fromVxTwitter(String tweetId, String url) async {
+    final Map<String, dynamic> json;
+    try {
+      final response = await ExtractorHttp.get(
+        'https://api.vxtwitter.com/Twitter/status/$tweetId',
+        timeout: const Duration(seconds: 10),
+      );
+      if (response.statusCode != 200) return null;
+      json = jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+
+    final videoUrls = (json['mediaURLs'] as List<dynamic>? ?? [])
+        .map((u) => u.toString())
+        .where((u) => u.contains('.mp4'))
+        .toList();
+    if (videoUrls.isEmpty) return null;
+
+    final text = json['text']?.toString().trim();
+    return VideoMetadata(
+      id: tweetId,
+      originalUrl: url,
+      title: text != null && text.isNotEmpty ? text : 'X Video ($tweetId)',
+      description: text,
+      author: json['user_name']?.toString() ?? 'X User',
+      coverUrl: '',
+      platform: VideoPlatform.twitter,
+      qualities: [
+        VideoQualityOption(
+          id: 'vx_$tweetId',
+          label: 'MP4 (Chất lượng gốc)',
+          quality: 'Original',
+          format: 'mp4',
+          downloadUrl: videoUrls.first,
+        ),
+      ],
+      likeCount: (json['likes'] as num?)?.toInt(),
+      commentCount: (json['replies'] as num?)?.toInt(),
+      shareCount: (json['retweets'] as num?)?.toInt(),
+    );
+  }
+
+  String _qualityFromBitrate(int kbps) {
+    if (kbps > 1500) return '1080p';
+    if (kbps > 800) return '720p';
+    if (kbps > 400) return '480p';
+    return '360p';
   }
 }

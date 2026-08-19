@@ -117,4 +117,14 @@ class PlatformFileHelper {
   static bool fileExists(String filePath) {
     return File(filePath).existsSync();
   }
+
+  /// Size of a partial download on disk, or 0 when there is nothing to resume.
+  static Future<int> fileSize(String filePath) async {
+    try {
+      final file = File(filePath);
+      return await file.exists() ? await file.length() : 0;
+    } catch (_) {
+      return 0;
+    }
+  }
 }
