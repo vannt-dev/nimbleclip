@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:snap_video/core/utils/quality_helper.dart';
-import 'package:snap_video/models/video_metadata.dart';
+import 'package:nimble_clip/core/utils/quality_helper.dart';
+import 'package:nimble_clip/models/video_metadata.dart';
 
 VideoQualityOption option(
   String quality, {

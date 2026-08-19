@@ -2,14 +2,14 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:snap_video/core/utils/http_helper.dart';
-import 'package:snap_video/models/video_platform.dart';
-import 'package:snap_video/services/extractors/facebook_extractor.dart';
-import 'package:snap_video/services/extractors/generic_extractor.dart';
-import 'package:snap_video/services/extractors/instagram_extractor.dart';
-import 'package:snap_video/services/extractors/tiktok_extractor.dart';
-import 'package:snap_video/services/extractors/twitter_extractor.dart';
-import 'package:snap_video/services/extractors/youtube_extractor.dart';
+import 'package:nimble_clip/core/utils/http_helper.dart';
+import 'package:nimble_clip/models/video_platform.dart';
+import 'package:nimble_clip/services/extractors/facebook_extractor.dart';
+import 'package:nimble_clip/services/extractors/generic_extractor.dart';
+import 'package:nimble_clip/services/extractors/instagram_extractor.dart';
+import 'package:nimble_clip/services/extractors/tiktok_extractor.dart';
+import 'package:nimble_clip/services/extractors/twitter_extractor.dart';
+import 'package:nimble_clip/services/extractors/youtube_extractor.dart';
 
 String fixture(String name) =>
     File('test/fixtures/extractors/$name').readAsStringSync();

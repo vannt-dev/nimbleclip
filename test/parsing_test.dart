@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:snap_video/core/utils/json_scanner.dart';
-import 'package:snap_video/core/utils/text_unescape.dart';
+import 'package:nimble_clip/core/utils/json_scanner.dart';
+import 'package:nimble_clip/core/utils/text_unescape.dart';
 
 void main() {
   group('decodeJsonEscapes', () {

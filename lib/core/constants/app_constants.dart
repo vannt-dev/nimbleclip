@@ -1,8 +1,8 @@
 class AppConstants {
-  static const String appName = 'SnapVideo';
+  static const String appName = 'NimbleClip';
   static const String appTagline = 'Fast HD Video & Audio Downloader';
   static const String appVersion = '1.0.0';
-  static const String appRepoUrl = 'https://github.com/vannt-dev/snap-video';
+  static const String appRepoUrl = 'https://github.com/vannt-dev/nimbleclip';
 
   // Storage keys
   static const String keyThemeMode = 'theme_mode';

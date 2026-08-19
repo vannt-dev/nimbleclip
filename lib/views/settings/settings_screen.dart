@@ -255,7 +255,7 @@ class SettingsScreen extends StatelessWidget {
                   leading: const Icon(Icons.code_rounded, color: AppColors.primary),
                   title: const Text('Mã nguồn GitHub'),
                   subtitle: const Text(
-                    'github.com/vannt-dev/snap-video',
+                    'github.com/vannt-dev/nimbleclip',
                     style: TextStyle(fontSize: 12),
                   ),
                   trailing: const Icon(Icons.open_in_new_rounded, size: 18),

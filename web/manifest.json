@@ -1,6 +1,6 @@
 {
-    "name": "SnapVideo — Trình tải video HD",
-    "short_name": "SnapVideo",
+    "name": "NimbleClip — Trình tải video HD",
+    "short_name": "NimbleClip",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0F172A",

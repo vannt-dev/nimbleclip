@@ -51,7 +51,7 @@ class DownloadService {
         .trim();
 
     // Leave room for the suffix and extension within the common 255-byte limit.
-    var base = sanitized.isEmpty ? 'SnapVideo' : sanitized;
+    var base = sanitized.isEmpty ? 'NimbleClip' : sanitized;
     if (base.length > 120) base = base.substring(0, 120).trim();
 
     final suffix = task.id.length >= 6 ? task.id.substring(0, 6) : task.id;

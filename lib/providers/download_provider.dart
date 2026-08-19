@@ -289,7 +289,7 @@ class DownloadProvider extends ChangeNotifier {
     if (task.filePath == null) return;
     await _downloadService.shareFile(
       task.filePath!,
-      text: 'Tải bằng SnapVideo: ${task.title}',
+      text: 'Tải bằng NimbleClip: ${task.title}',
     );
   }
 

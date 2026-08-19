@@ -10,11 +10,11 @@ import 'views/main_navigation_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const SnapVideoApp());
+  runApp(const NimbleClipApp());
 }
 
-class SnapVideoApp extends StatelessWidget {
-  const SnapVideoApp({super.key});
+class NimbleClipApp extends StatelessWidget {
+  const NimbleClipApp({super.key});
 
   @override
   Widget build(BuildContext context) {

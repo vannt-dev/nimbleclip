@@ -1,4 +1,4 @@
-# 🚀 SnapVideo - Multi-Platform Video & Audio Downloader
+# 🚀 NimbleClip - Multi-Platform Video & Audio Downloader
 
 Ứng dụng Flutter hiện đại, mượt mà hỗ trợ tải video chất lượng cao (HD 1080p, 720p, 480p) và trích xuất âm thanh MP3 từ các nền tảng phổ biến: **YouTube, TikTok (Không Watermark), Facebook, Twitter / X, Instagram** và nhiều liên kết trực tiếp khác.
 
@@ -96,8 +96,8 @@ server.js                            # Web dev server: phục vụ build/web + C
 
 1. **Clone repository**:
    ```bash
-   git clone https://github.com/vannt-dev/snap-video.git
-   cd snap-video
+   git clone https://github.com/vannt-dev/nimbleclip.git
+   cd nimbleclip
    ```
 
 2. **Cài đặt các gói phụ thuộc (Dependencies)**:
@@ -177,7 +177,7 @@ bước redirect đều được kiểm tra lại. Phần phục vụ file tĩnh
   CDN video còn phục vụ cleartext mới được mở riêng, thay vì bật
   `usesCleartextTraffic` cho toàn ứng dụng.
 - **Không dùng `requestLegacyExternalStorage`**: app ghi file vào thư mục external
-  riêng của chính nó (`Android/data/<package>/files/SnapVideos`) và đưa video vào
+  riêng của chính nó (`Android/data/<package>/files/NimbleClip`) và đưa video vào
   thư viện ảnh qua MediaStore (`gal`). Cả hai đều tuân thủ scoped storage, nên
   không cần chế độ lưu trữ cũ (chế độ này cũng bị Android 11+ bỏ qua).
 
@@ -191,4 +191,4 @@ bước redirect đều được kiểm tra lại. Phần phục vụ file tĩnh
 ## 📄 Bản quyền
 
 Dự án được xây dựng phục vụ mục đích học tập và chia sẻ mã nguồn mã nguồn mở.
-Repository: [https://github.com/vannt-dev/snap-video](https://github.com/vannt-dev/snap-video)
+Repository: [https://github.com/vannt-dev/nimbleclip](https://github.com/vannt-dev/nimbleclip)

@@ -1,4 +1,4 @@
-package com.snapvideo.snap_video
+package com.vannt.nimbleclip
 
 import io.flutter.embedding.android.FlutterActivity
 

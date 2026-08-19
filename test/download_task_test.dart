@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:snap_video/models/download_task.dart';
-import 'package:snap_video/models/video_platform.dart';
-import 'package:snap_video/services/download_service.dart';
+import 'package:nimble_clip/models/download_task.dart';
+import 'package:nimble_clip/models/video_platform.dart';
+import 'package:nimble_clip/services/download_service.dart';
 
 DownloadTask task({
   String id = 'abcdef01-2345-6789-abcd-ef0123456789',
@@ -111,8 +111,8 @@ void main() {
     });
 
     test('falls back when the title sanitises to nothing', () {
-      expect(service.buildFileName(task(title: '///')), 'SnapVideo_abcdef.mp4');
-      expect(service.buildFileName(task(title: '   ')), 'SnapVideo_abcdef.mp4');
+      expect(service.buildFileName(task(title: '///')), 'NimbleClip_abcdef.mp4');
+      expect(service.buildFileName(task(title: '   ')), 'NimbleClip_abcdef.mp4');
     });
 
     test('truncates very long titles', () {

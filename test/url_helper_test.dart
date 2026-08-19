@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:snap_video/core/utils/url_helper.dart';
-import 'package:snap_video/models/video_platform.dart';
+import 'package:nimble_clip/core/utils/url_helper.dart';
+import 'package:nimble_clip/models/video_platform.dart';
 
 void main() {
   group('UrlHelper.detectPlatform', () {

@@ -10,7 +10,7 @@ class PlatformFileHelper {
     if (Platform.isAndroid) {
       dir = await getExternalStorageDirectory();
       if (dir != null) {
-        final videosDir = Directory('${dir.path}/SnapVideos');
+        final videosDir = Directory('${dir.path}/NimbleClip');
         if (!await videosDir.exists()) {
           await videosDir.create(recursive: true);
         }
@@ -18,7 +18,7 @@ class PlatformFileHelper {
       }
     }
     dir = await getApplicationDocumentsDirectory();
-    final snapDir = Directory('${dir.path}/SnapVideos');
+    final snapDir = Directory('${dir.path}/NimbleClip');
     if (!await snapDir.exists()) {
       await snapDir.create(recursive: true);
     }

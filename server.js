@@ -470,7 +470,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, HOST, () => {
-    console.log(`SnapVideo web server running at http://${HOST}:${PORT}`);
+    console.log(`NimbleClip web server running at http://${HOST}:${PORT}`);
     if (!fs.existsSync(WEB_DIR)) {
       console.warn(`! ${WEB_DIR} does not exist — run \`flutter build web\` first.`);
     }

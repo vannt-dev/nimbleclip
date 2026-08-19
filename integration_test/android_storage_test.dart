@@ -2,10 +2,10 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:snap_video/core/utils/platform_file.dart';
-import 'package:snap_video/models/download_task.dart';
-import 'package:snap_video/models/video_platform.dart';
-import 'package:snap_video/services/download_service.dart';
+import 'package:nimble_clip/core/utils/platform_file.dart';
+import 'package:nimble_clip/models/download_task.dart';
+import 'package:nimble_clip/models/video_platform.dart';
+import 'package:nimble_clip/services/download_service.dart';
 
 /// On-device checks for the Android storage and download paths.
 ///
@@ -67,7 +67,7 @@ void main() {
       // Under scoped storage this is the only external location the app may
       // write to without holding any permission at all.
       expect(downloadDir, contains('/Android/data/'));
-      expect(downloadDir, endsWith('/SnapVideos'));
+      expect(downloadDir, endsWith('/NimbleClip'));
       expect(Directory(downloadDir).existsSync(), isTrue);
     });
 

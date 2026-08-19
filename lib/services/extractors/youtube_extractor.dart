@@ -182,11 +182,17 @@ class YouTubeExtractor extends BaseVideoExtractor {
     Map<String, dynamic>? bestAudio;
     for (final entry in streamingData?['adaptiveFormats'] as List<dynamic>? ?? []) {
       final format = entry as Map<String, dynamic>;
-      if (!(format['mimeType']?.toString() ?? '').startsWith('audio/')) continue;
-      if (usableUrl(format) == null) continue;
+      if (!(format['mimeType']?.toString() ?? '').startsWith('audio/')) {
+        continue;
+      }
+      if (usableUrl(format) == null) {
+        continue;
+      }
       final bitrate = (format['bitrate'] as num?) ?? 0;
       final bestBitrate = (bestAudio?['bitrate'] as num?) ?? -1;
-      if (bitrate > bestBitrate) bestAudio = format;
+      if (bitrate > bestBitrate) {
+        bestAudio = format;
+      }
     }
 
     if (bestAudio != null) {

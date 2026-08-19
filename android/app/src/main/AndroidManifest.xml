@@ -2,14 +2,14 @@
     xmlns:tools="http://schemas.android.com/tools">
     <!--
         No requestLegacyExternalStorage: the app writes downloads to its own
-        external files dir (Android/data/<pkg>/files/SnapVideos) and publishes to
+        external files dir (Android/data/<pkg>/files/NimbleClip) and publishes to
         the gallery through MediaStore via `gal`. Neither needs the pre-scoped
         storage model, and the flag is ignored from Android 11 onwards anyway.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
-    <!-- open_filex declares broad read permissions, but SnapVideo only opens
+    <!-- open_filex declares broad read permissions, but NimbleClip only opens
          files in its own app-specific directory and does not browse the user's
          media library. Remove those permissions from the merged manifest. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove"/>
@@ -19,7 +19,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
 
     <application
-        android:label="SnapVideo"
+        android:label="NimbleClip"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:networkSecurityConfig="@xml/network_security_config">
