@@ -63,9 +63,9 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v5
-      - uses: android-actions/setup-android@v4
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.47.0'
           channel: stable
           cache: true
       - uses: actions/setup-node@v4
@@ -108,7 +108,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           flutter build apk --release --build-name="$VERSION" --build-number="${{ github.run_number }}"
-          flutter build web --release --build-name="$VERSION" --build-number="${{ github.run_number }}"
+          flutter build web --release --no-wasm-dry-run --build-name="$VERSION" --build-number="${{ github.run_number }}"
 
       - name: Verify signing and package artifacts
         env:

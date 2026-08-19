@@ -37,7 +37,7 @@ if [ "$mode" = "push" ] || [ "$mode" = "all" ]; then
   node --test test/server_test.js
 
   echo "Building the release Web bundle..."
-  flutter build web --release
+  flutter build web --release --no-wasm-dry-run
 fi
 
 echo "All $mode checks passed."
