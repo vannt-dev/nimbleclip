@@ -6,7 +6,7 @@ const fsp = require('fs/promises');
 const path = require('path');
 const dns = require('dns/promises');
 const net = require('net');
-const { Readable } = require('stream');
+const { Readable, Transform } = require('stream');
 const { pipeline } = require('stream/promises');
 
 const PORT = Number(process.env.PORT || 8080);
@@ -16,7 +16,13 @@ const HOST = process.env.HOST || '127.0.0.1';
 const WEB_DIR = path.resolve(__dirname, 'build', 'web');
 
 const MAX_REDIRECTS = 5;
-const PROXY_TIMEOUT_MS = 30000;
+// Abort stalled connections, but never impose a total duration on large video
+// downloads. The timer is refreshed whenever another body chunk arrives.
+const PROXY_IDLE_TIMEOUT_MS = 30000;
+const MAX_REQUEST_BODY_BYTES = Number(process.env.MAX_REQUEST_BODY_BYTES || 1024 * 1024);
+const RATE_LIMIT_WINDOW_MS = 60000;
+const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX || 120);
+const rateBuckets = new Map();
 const DEFAULT_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
@@ -163,14 +169,44 @@ const PASS_THROUGH_HEADERS = [
   'content-type',
   'content-length',
   'content-range',
+  'accept-ranges',
   'last-modified',
   'etag',
 ];
 
 async function readRequestBody(req) {
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let total = 0;
+  for await (const chunk of req) {
+    total += chunk.length;
+    if (total > MAX_REQUEST_BODY_BYTES) {
+      const error = new Error('Request body too large');
+      error.statusCode = 413;
+      throw error;
+    }
+    chunks.push(chunk);
+  }
   return chunks.length > 0 ? Buffer.concat(chunks) : undefined;
+}
+
+function consumeProxyQuota(req) {
+  const now = Date.now();
+  const key = req.socket.remoteAddress || 'unknown';
+  if (rateBuckets.size > 1024) {
+    for (const [address, bucket] of rateBuckets) {
+      if (now - bucket.startedAt >= RATE_LIMIT_WINDOW_MS) {
+        rateBuckets.delete(address);
+      }
+    }
+  }
+  const current = rateBuckets.get(key);
+  if (!current || now - current.startedAt >= RATE_LIMIT_WINDOW_MS) {
+    rateBuckets.set(key, { startedAt: now, count: 1 });
+    return true;
+  }
+  if (current.count >= RATE_LIMIT_MAX) return false;
+  current.count += 1;
+  return true;
 }
 
 async function handleProxy(req, res, requestUrl) {
@@ -199,7 +235,12 @@ async function handleProxy(req, res, requestUrl) {
   }
 
   const abort = new AbortController();
-  const timer = setTimeout(() => abort.abort(), PROXY_TIMEOUT_MS);
+  let timer;
+  const armIdleTimeout = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => abort.abort(), PROXY_IDLE_TIMEOUT_MS);
+  };
+  armIdleTimeout();
 
   try {
     const upstream = await safeFetch(targetUrl, {
@@ -213,7 +254,6 @@ async function handleProxy(req, res, requestUrl) {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Expose-Headers':
         'Content-Range, Content-Length, Accept-Ranges, Content-Type, Content-Disposition',
-      'Accept-Ranges': 'bytes',
     };
 
     upstream.headers.forEach((value, key) => {
@@ -235,8 +275,17 @@ async function handleProxy(req, res, requestUrl) {
 
     if (upstream.body && req.method !== 'HEAD') {
       // pipeline() honours backpressure, so a 2 GB video does not get buffered
-      // into memory the way a manual read/write loop would.
-      await pipeline(Readable.fromWeb(upstream.body), res);
+      // into memory the way a manual read/write loop would. Refreshing the
+      // timer on data makes it an inactivity timeout rather than a 30-second
+      // cap on the entire download.
+      const activityMonitor = new Transform({
+        transform(chunk, encoding, callback) {
+          armIdleTimeout();
+          callback(null, chunk);
+        },
+      });
+      armIdleTimeout();
+      await pipeline(Readable.fromWeb(upstream.body), activityMonitor, res);
     } else {
       res.end();
     }
@@ -390,6 +439,17 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
+    const isProxy = requestUrl.pathname === '/cors-proxy' ||
+      requestUrl.pathname === '/proxy' || requestUrl.pathname === '/resolve';
+    if (isProxy && !consumeProxyQuota(req)) {
+      res.writeHead(429, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Retry-After': '60',
+      });
+      res.end(JSON.stringify({ error: 'Too many proxy requests' }));
+      return;
+    }
+
     if (requestUrl.pathname === '/cors-proxy' || requestUrl.pathname === '/proxy') {
       await handleProxy(req, res, requestUrl);
     } else if (requestUrl.pathname === '/resolve') {
@@ -399,8 +459,9 @@ const server = http.createServer(async (req, res) => {
     }
   } catch (err) {
     if (!res.headersSent) {
-      res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end('500 Internal Server Error');
+      const status = Number.isInteger(err && err.statusCode) ? err.statusCode : 500;
+      res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end(status === 413 ? '413 Payload Too Large' : '500 Internal Server Error');
     } else {
       res.destroy();
     }
@@ -416,4 +477,11 @@ if (require.main === module) {
   });
 }
 
-module.exports = { server, assertSafeTarget, resolveStaticPath, isBlockedAddress };
+module.exports = {
+  server,
+  assertSafeTarget,
+  resolveStaticPath,
+  isBlockedAddress,
+  consumeProxyQuota,
+  readRequestBody,
+};

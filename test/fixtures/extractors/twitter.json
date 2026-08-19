@@ -1,0 +1,17 @@
+{
+  "code": 200,
+  "tweet": {
+    "text": "X fixture",
+    "author": {"name": "Fixture User", "screen_name": "fixture"},
+    "media": {
+      "videos": [{
+        "thumbnail_url": "https://cdn.example/x.jpg",
+        "duration": 8,
+        "variants": [
+          {"content_type": "video/mp4", "bitrate": 832000, "url": "https://cdn.example/vid/1280x720/x.mp4"},
+          {"content_type": "video/mp4", "bitrate": 256000, "url": "https://cdn.example/vid/640x360/x.mp4"}
+        ]
+      }]
+    }
+  }
+}

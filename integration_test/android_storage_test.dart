@@ -172,6 +172,32 @@ void main() {
 
       await file.delete();
     });
+
+    test('restarts if the real transfer returns 200 after a valid probe',
+        () async {
+      final task = fixtureTask(
+        id: 'aaaaaa05-flak',
+        title: 'Flaky range',
+        query: '?flakyrange=aaaaaa05',
+      );
+      final savePath = '$downloadDir/${service.buildFileName(task)}';
+      await File(savePath).writeAsBytes(List.filled(fixtureSize ~/ 4, 0x42));
+      task.filePath = savePath;
+
+      await service.startDownload(
+        task: task,
+        autoSaveToGallery: false,
+        onProgress: (_, _, _, _, _) {},
+        onComplete: (_, _) {},
+        onError: (_, _) {},
+      );
+
+      expect(task.status, DownloadStatus.completed);
+      expect(await File(savePath).readAsBytes(), equals(fixtureBytes),
+          reason: 'a full 200 response was appended after a successful probe');
+
+      await File(savePath).delete();
+    });
   });
 
   group('gallery publishing via MediaStore', () {

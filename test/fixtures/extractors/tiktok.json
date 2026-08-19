@@ -1,0 +1,12 @@
+{
+  "code": 0,
+  "data": {
+    "id": "tt-fixture",
+    "title": "TikTok fixture",
+    "duration": 12,
+    "hdplay": "/video/hd.mp4",
+    "hd_size": 2048,
+    "music": "/audio/music.mp3",
+    "author": {"nickname": "Fixture Creator"}
+  }
+}

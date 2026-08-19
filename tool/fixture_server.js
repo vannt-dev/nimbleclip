@@ -43,14 +43,25 @@ async function ensureFixture() {
 
 function serve() {
   const size = fs.statSync(FIXTURE_FILE).size;
+  const rangeRequestCounts = new Map();
 
   http
     .createServer((req, res) => {
       // `?norange` simulates a server that ignores Range, so the test can check
       // the client restarts cleanly instead of appending onto a partial file.
       const ignoreRange = req.url.includes('norange');
+      const flakyRange = req.url.includes('flakyrange');
       const acceptRanges = ignoreRange ? 'none' : 'bytes';
-      const range = ignoreRange ? null : req.headers.range;
+      let range = ignoreRange ? null : req.headers.range;
+
+      if (flakyRange && range) {
+        const count = (rangeRequestCounts.get(req.url) || 0) + 1;
+        rangeRequestCounts.set(req.url, count);
+        // Let the one-byte capability probe succeed, then deliberately ignore
+        // Range on the actual download. The client must discard its partial
+        // file and restart rather than append this 200 response.
+        if (count > 1) range = null;
+      }
 
       if (req.method === 'HEAD') {
         res.writeHead(200, {

@@ -103,7 +103,7 @@ class DownloadService {
     var currentSpeed = 0.0;
 
     try {
-      await _dio.download(
+      final response = await _dio.download(
         task.downloadUrl,
         savePath,
         cancelToken: cancelToken,
@@ -116,7 +116,10 @@ class DownloadService {
             if (existingBytes > 0) 'Range': 'bytes=$existingBytes-',
           },
           followRedirects: true,
-          validateStatus: (status) => status != null && status < 400,
+          // A resumed transfer must be a real partial response. Accepting a
+          // fresh 200 here while appending would silently corrupt the file.
+          validateStatus: (status) => status != null &&
+              (existingBytes > 0 ? status == 206 : status < 400),
         ),
         onReceiveProgress: (received, total) {
           // With a Range request these counters describe the remaining slice,
@@ -143,6 +146,26 @@ class DownloadService {
               currentSpeed);
         },
       );
+
+      if (existingBytes > 0 &&
+          !_contentRangeStartsAt(
+            response.headers.value('content-range'),
+            existingBytes,
+          )) {
+        _cancelTokens.remove(task.id);
+        await PlatformFileHelper.deleteFile(savePath);
+        task
+          ..progress = 0
+          ..receivedBytes = 0
+          ..totalBytes = 0;
+        return startDownload(
+          task: task,
+          onProgress: onProgress,
+          onComplete: onComplete,
+          onError: onError,
+          autoSaveToGallery: autoSaveToGallery,
+        );
+      }
 
       _cancelTokens.remove(task.id);
       task.status = DownloadStatus.completed;
@@ -172,6 +195,26 @@ class DownloadService {
           await PlatformFileHelper.deleteFile(savePath);
         }
         return;
+      }
+
+      // The range probe succeeded but the real transfer changed its mind and
+      // returned a full response. Discard the partial bytes and retry once from
+      // zero; the recursive call cannot loop because the file is now absent.
+      if (existingBytes > 0 &&
+          e.type == DioExceptionType.badResponse &&
+          e.response?.statusCode == 200) {
+        await PlatformFileHelper.deleteFile(savePath);
+        task
+          ..progress = 0
+          ..receivedBytes = 0
+          ..totalBytes = 0;
+        return startDownload(
+          task: task,
+          onProgress: onProgress,
+          onComplete: onComplete,
+          onError: onError,
+          autoSaveToGallery: autoSaveToGallery,
+        );
       }
 
       task.status = DownloadStatus.failed;
@@ -212,12 +255,15 @@ class DownloadService {
         fileName,
       );
 
-      task.status = DownloadStatus.completed;
-      task.progress = 1.0;
+      // Browsers do not expose completion or cancellation of a download that
+      // was handed to their download manager. Record that hand-off honestly
+      // instead of claiming a local file exists.
+      task.status = DownloadStatus.handedOff;
+      task.progress = 0.0;
       task.downloadSpeed = 0.0;
-      task.filePath = fileName;
+      task.filePath = null;
       task.completedAt = DateTime.now();
-      onComplete(task, fileName);
+      onComplete(task, '');
     } catch (e) {
       task.status = DownloadStatus.failed;
       task.errorMessage = e.toString();
@@ -228,20 +274,38 @@ class DownloadService {
   /// Probes whether the source will serve a byte range starting at [offset].
   Future<bool> _supportsRangeRequests(DownloadTask task, int offset) async {
     try {
-      final response = await _dio.head<void>(
+      // A HEAD response advertising Accept-Ranges is only a hint. Probe one
+      // actual byte and require both 206 and a matching Content-Range.
+      final response = await _dio.get<ResponseBody>(
         task.downloadUrl,
         options: Options(
-          headers: {...?task.headers, 'Range': 'bytes=$offset-'},
+          headers: {...?task.headers, 'Range': 'bytes=$offset-$offset'},
           followRedirects: true,
+          responseType: ResponseType.stream,
           validateStatus: (status) => status != null && status < 500,
         ),
       );
-      if (response.statusCode == 206) return true;
-      final acceptRanges = response.headers.value('accept-ranges');
-      return acceptRanges != null && acceptRanges.toLowerCase().contains('bytes');
+      final supported = response.statusCode == 206 &&
+          _contentRangeStartsAt(
+            response.headers.value('content-range'),
+            offset,
+          );
+      final stream = response.data?.stream;
+      if (stream != null) {
+        final subscription = stream.listen((_) {});
+        await subscription.cancel();
+      }
+      return supported;
     } catch (_) {
       return false;
     }
+  }
+
+  bool _contentRangeStartsAt(String? value, int offset) {
+    if (value == null) return false;
+    final match = RegExp(r'^bytes\s+(\d+)-', caseSensitive: false)
+        .firstMatch(value.trim());
+    return match != null && int.tryParse(match.group(1)!) == offset;
   }
 
   /// Stops a download and discards its partial file.

@@ -12,7 +12,9 @@ import '../../models/video_platform.dart';
 import 'base_extractor.dart';
 
 class YouTubeExtractor extends BaseVideoExtractor {
-  const YouTubeExtractor();
+  const YouTubeExtractor({this.useNativeClient = true});
+
+  final bool useNativeClient;
 
   @override
   VideoPlatform get platform => VideoPlatform.youtube;
@@ -28,7 +30,7 @@ class YouTubeExtractor extends BaseVideoExtractor {
   Future<VideoMetadata> extract(String url) async {
     // Native platforms get the real deal: youtube_explode_dart deciphers
     // signature-protected stream URLs, which plain HTML scraping cannot.
-    if (!kIsWeb) {
+    if (!kIsWeb && useNativeClient) {
       final native = await _extractNative(url);
       if (native != null) return native;
     }

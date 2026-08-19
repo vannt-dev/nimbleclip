@@ -15,6 +15,25 @@ import 'cors_helper.dart';
 class ExtractorHttp {
   static const Duration defaultTimeout = Duration(seconds: 15);
 
+  @visibleForTesting
+  static Future<http.Response> Function(
+    Uri uri,
+    Map<String, String> headers,
+  )? getOverride;
+
+  @visibleForTesting
+  static Future<http.Response> Function(
+    Uri uri,
+    Map<String, String> headers,
+    Object? body,
+  )? postOverride;
+
+  @visibleForTesting
+  static void resetOverrides() {
+    getOverride = null;
+    postOverride = null;
+  }
+
   static Map<String, String> buildHeaders({
     String userAgent = AppConstants.defaultUserAgent,
     Map<String, String>? extra,
@@ -43,10 +62,14 @@ class ExtractorHttp {
     Map<String, String>? headers,
     Duration timeout = defaultTimeout,
   }) {
+    final uri = Uri.parse(CorsHelper.wrap(url));
+    final requestHeaders = buildHeaders(userAgent: userAgent, extra: headers);
+    final override = getOverride;
+    if (override != null) return override(uri, requestHeaders);
     return http
         .get(
-          Uri.parse(CorsHelper.wrap(url)),
-          headers: buildHeaders(userAgent: userAgent, extra: headers),
+          uri,
+          headers: requestHeaders,
         )
         .timeout(timeout);
   }
@@ -58,10 +81,14 @@ class ExtractorHttp {
     Map<String, String>? headers,
     Duration timeout = defaultTimeout,
   }) {
+    final uri = Uri.parse(CorsHelper.wrap(url));
+    final requestHeaders = buildHeaders(userAgent: userAgent, extra: headers);
+    final override = postOverride;
+    if (override != null) return override(uri, requestHeaders, body);
     return http
         .post(
-          Uri.parse(CorsHelper.wrap(url)),
-          headers: buildHeaders(userAgent: userAgent, extra: headers),
+          uri,
+          headers: requestHeaders,
           body: body,
         )
         .timeout(timeout);

@@ -170,8 +170,9 @@ bước redirect đều được kiểm tra lại. Phần phục vụ file tĩnh
 
 ### Android (`android/app/src/main/AndroidManifest.xml`):
 - `INTERNET` & `ACCESS_NETWORK_STATE`
-- `READ_EXTERNAL_STORAGE` & `WRITE_EXTERNAL_STORAGE`
-- `READ_MEDIA_VIDEO`, `READ_MEDIA_IMAGES`, `READ_MEDIA_AUDIO` (Hỗ trợ Android 13+)
+- `WRITE_EXTERNAL_STORAGE` chỉ tới Android 10 (API 29), theo yêu cầu của `gal`
+  khi xuất file vào thư viện trên thiết bị cũ. Android 11+ dùng MediaStore và
+  không yêu cầu quyền đọc ảnh/video của người dùng.
 - HTTP thường bị tắt mặc định qua `res/xml/network_security_config.xml`; chỉ vài
   CDN video còn phục vụ cleartext mới được mở riêng, thay vì bật
   `usesCleartextTraffic` cho toàn ứng dụng.

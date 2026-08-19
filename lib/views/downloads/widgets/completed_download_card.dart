@@ -31,6 +31,7 @@ class CompletedDownloadCard extends StatelessWidget {
         task.status == DownloadStatus.cancelled;
 
     final isCompleted = task.status == DownloadStatus.completed;
+    final isHandedOff = task.status == DownloadStatus.handedOff;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -203,6 +204,30 @@ class CompletedDownloadCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                ],
+              ),
+            ),
+          ],
+
+          if (isHandedOff) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.info.withAlpha(20),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.download_done_rounded,
+                      size: 16, color: AppColors.info),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Đã chuyển sang trình tải xuống của trình duyệt.',
+                      style: TextStyle(fontSize: 12, color: AppColors.info),
+                    ),
+                  ),
                 ],
               ),
             ),

@@ -5,6 +5,7 @@ enum DownloadStatus {
   downloading,
   paused,
   completed,
+  handedOff,
   failed,
   cancelled,
 }
@@ -61,6 +62,7 @@ class DownloadTask {
 
   bool get isDone =>
       status == DownloadStatus.completed ||
+      status == DownloadStatus.handedOff ||
       status == DownloadStatus.failed ||
       status == DownloadStatus.cancelled;
 

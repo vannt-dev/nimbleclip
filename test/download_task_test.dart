@@ -58,6 +58,7 @@ void main() {
     test('keeps terminal statuses as they were', () {
       for (final status in const [
         DownloadStatus.completed,
+        DownloadStatus.handedOff,
         DownloadStatus.failed,
         DownloadStatus.cancelled,
       ]) {

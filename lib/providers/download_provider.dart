@@ -17,13 +17,14 @@ class DownloadProvider extends ChangeNotifier {
     StorageService? storageService,
   })  : _downloadService = downloadService ?? DownloadService(),
         _storageService = storageService ?? StorageService() {
-    _loadHistory();
+    _historyReady = _loadHistory();
   }
 
   final List<DownloadTask> _tasks = [];
   final DownloadService _downloadService;
   final StorageService _storageService;
   final Uuid _uuid = const Uuid();
+  late final Future<void> _historyReady;
 
   /// Progress callbacks arrive far faster than the screen refreshes; coalescing
   /// them into one notification per frame budget keeps the list from rebuilding
@@ -38,7 +39,11 @@ class DownloadProvider extends ChangeNotifier {
   List<DownloadTask> get pausedTasks =>
       _tasks.where((t) => t.status == DownloadStatus.paused).toList();
   List<DownloadTask> get completedTasks =>
-      _tasks.where((t) => t.status == DownloadStatus.completed).toList();
+      _tasks
+          .where((t) =>
+              t.status == DownloadStatus.completed ||
+              t.status == DownloadStatus.handedOff)
+          .toList();
 
   @override
   void dispose() {
@@ -94,6 +99,10 @@ class DownloadProvider extends ChangeNotifier {
     required VideoQualityOption quality,
     bool autoSaveToGallery = true,
   }) async {
+    // Do not let the asynchronous history restore clear a task that the user
+    // starts immediately after launch.
+    await _historyReady;
+
     final task = DownloadTask(
       id: _uuid.v4(),
       videoId: metadata.id,

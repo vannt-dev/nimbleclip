@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:gal/gal.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 
 class PlatformFileHelper {
@@ -27,14 +26,9 @@ class PlatformFileHelper {
   }
 
   static Future<bool> requestStoragePermissions() async {
-    if (Platform.isAndroid) {
-      final mediaStatus = await Permission.videos.request();
-      if (mediaStatus.isGranted || mediaStatus.isLimited) return true;
-      final storageStatus = await Permission.storage.request();
-      return storageStatus.isGranted || storageStatus.isLimited;
-    } else if (Platform.isIOS) {
-      final photos = await Permission.photos.request();
-      return photos.isGranted || photos.isLimited;
+    if (Platform.isAndroid || Platform.isIOS) {
+      final hasAccess = await Gal.hasAccess();
+      return hasAccess || await Gal.requestAccess();
     }
     return true;
   }
