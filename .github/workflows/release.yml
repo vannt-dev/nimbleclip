@@ -1,6 +1,16 @@
 name: Release
 
 on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Semantic vX.Y.Z tag to create and release
+        required: true
+        type: string
+      ref:
+        description: Commit SHA to release
+        required: true
+        type: string
   push:
     tags:
       - 'v*.*.*'
@@ -26,12 +36,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Validate tag, version, and release notes
         id: version
         env:
-          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          RELEASE_TAG: ${{ (github.event_name == 'workflow_call' || github.event_name == 'workflow_dispatch') && inputs.tag || github.ref_name }}
         run: |
           if ! printf '%s' "$RELEASE_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "::error::Release tags must use vX.Y.Z."
@@ -126,6 +137,25 @@ jobs:
           cp "$apk" "dist/nimbleclip-$TAG-android.apk"
           (cd build/web && zip -qr "../../dist/nimbleclip-$TAG-web.zip" .)
           (cd dist && sha256sum * > SHA256SUMS.txt)
+
+      - name: Create release tag when needed
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            tagged_commit=$(git rev-list -n 1 "$TAG")
+            if [ "$tagged_commit" != "$(git rev-parse HEAD)" ]; then
+              echo "::error::$TAG already points to a different commit."
+              exit 1
+            fi
+            echo "$TAG already points to this release commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "NimbleClip ${{ steps.version.outputs.version }}"
+          git push origin "refs/tags/$TAG"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3

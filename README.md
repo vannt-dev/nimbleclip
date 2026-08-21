@@ -271,8 +271,9 @@ streams that do not support the default policy.
 The GitHub Actions workflow runs on every pull request and every push to
 `main`. It validates commit messages and formatting, performs Flutter static
 analysis and tests, checks an Android build and a release Web build, and runs
-the Node server checks. Pushing a matching `vX.Y.Z` tag starts the signed
-release workflow documented in [RELEASING.md](RELEASING.md).
+the Node server checks. A version-bump commit on `main` automatically starts
+the signed release workflow after every CI job succeeds, as documented in
+[RELEASING.md](RELEASING.md).
 
 ## Contributing
 

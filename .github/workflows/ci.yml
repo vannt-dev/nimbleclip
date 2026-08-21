@@ -75,3 +75,106 @@ jobs:
       - run: node --check server.js
       - run: node --check tool/fixture_server.js
       - run: node --test test/server_test.js
+
+  android:
+    name: Android arm64 debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build apk --debug --target-platform android-arm64
+
+  release-candidate:
+    name: Detect version release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [commit-messages, flutter-quality, node, android]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should_release: ${{ steps.version.outputs.should_release }}
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Detect a releasable version bump
+        id: version
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          echo "should_release=false" >> "$GITHUB_OUTPUT"
+
+          if [ -z "$BEFORE_SHA" ] || printf '%s' "$BEFORE_SHA" | grep -Eq '^0+$'; then
+            echo "No previous main commit is available; skipping automatic release."
+            exit 0
+          fi
+
+          read_version() {
+            sed -n 's/^version:[[:space:]]*\([^[:space:]]*\).*/\1/p'
+          }
+
+          current_full=$(read_version < pubspec.yaml)
+          previous_full=$(git show "$BEFORE_SHA:pubspec.yaml" | read_version)
+          current_version=${current_full%%+*}
+          previous_version=${previous_full%%+*}
+
+          if [ "$current_version" = "$previous_version" ]; then
+            echo "pubspec.yaml release version is unchanged ($current_version)."
+            exit 0
+          fi
+
+          if ! printf '%s' "$current_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::pubspec.yaml must use a semantic X.Y.Z release version."
+            exit 1
+          fi
+
+          oldest=$(printf '%s\n%s\n' "$previous_version" "$current_version" | sort -V | head -1)
+          if [ "$oldest" != "$previous_version" ]; then
+            echo "::error::Version must increase ($previous_version -> $current_version)."
+            exit 1
+          fi
+
+          if ! awk -v header="## [$current_version]" '
+            index($0, header) == 1 { found = 1; next }
+            /^## \[/ { if (found) exit }
+            found && /^-[[:space:]]/ { notes = 1 }
+            END { exit !(found && notes) }
+          ' CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no [$current_version] release notes."
+            exit 1
+          fi
+
+          tag="v$current_version"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "$tag already exists; skipping automatic release."
+            exit 0
+          fi
+
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$current_version" >> "$GITHUB_OUTPUT"
+          echo "Release candidate detected: $tag"
+
+  publish-release:
+    name: Publish release
+    needs: release-candidate
+    if: needs.release-candidate.outputs.should_release == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.release-candidate.outputs.tag }}
+      ref: ${{ github.sha }}
+    secrets: inherit

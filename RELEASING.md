@@ -1,8 +1,9 @@
 # Releasing NimbleClip
 
-Releases are created by GitHub Actions when a semantic version tag is pushed.
-The workflow validates the source, builds a signed Android APK and a Web
-archive, generates SHA-256 checksums, and attaches them to a GitHub Release.
+Releases are created automatically after a version-bump commit reaches `main`
+and every CI job succeeds. The release workflow builds a signed Android APK and
+a Web archive, verifies the artifacts, creates the matching semantic version
+tag, generates SHA-256 checksums, and attaches everything to a GitHub Release.
 
 ## One-time repository setup
 
@@ -34,13 +35,13 @@ source of truth; rerunning the script reuses them instead of rotating the key.
 2. Move the release notes from `Unreleased` into a new `## [X.Y.Z]` section in
    `CHANGELOG.md`.
 3. Commit and push the changes after all local checks pass.
-4. Create and push the matching tag:
 
-   ```bash
-   git tag -a v1.1.0 -m "NimbleClip 1.1.0"
-   git push origin v1.1.0
-   ```
+No manual tag is required. CI compares the release version with the previous
+`main` revision. If the semantic version increased, the changelog contains a
+non-empty matching section, and the tag does not already exist, publishing
+starts only after all normal CI jobs pass.
 
-The `Release` workflow rejects malformed tags, version mismatches, missing
-release notes, missing signing secrets, failed checks, and debug-signed APKs.
-An existing tag can also be rerun from the workflow's manual dispatch form.
+The `Release` workflow rejects malformed or decreasing versions, version/tag
+mismatches, missing release notes or signing secrets, failed checks, and
+debug-signed APKs. A matching tag can still trigger the workflow directly, and
+an existing tag can be rerun from the workflow's manual dispatch form.
