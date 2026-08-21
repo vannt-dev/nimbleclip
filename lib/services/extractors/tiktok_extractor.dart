@@ -69,7 +69,7 @@ class TikTokExtractor extends BaseVideoExtractor {
           quality: l10n.imageLabel(index + 1),
           format: _imageFormat(imageUrl),
           downloadUrl: _absolute(imageUrl),
-          isImage: true,
+          kind: MediaKind.image,
         ),
       );
     }
@@ -130,7 +130,7 @@ class TikTokExtractor extends BaseVideoExtractor {
           quality: 'Audio MP3',
           format: 'mp3',
           downloadUrl: _absolute(music),
-          isAudioOnly: true,
+          kind: MediaKind.audio,
         ),
       );
     }

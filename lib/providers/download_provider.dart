@@ -26,13 +26,12 @@ class DownloadProvider extends ChangeNotifier {
   final StorageService _storageService;
   final Uuid _uuid = const Uuid();
   late final Future<void> _historyReady;
+  final List<_QueuedDownload> _queue = [];
+  int _runningDownloads = 0;
+  Future<void> _persistenceTail = Future.value();
 
-  /// Progress callbacks arrive far faster than the screen refreshes; coalescing
-  /// them into one notification per frame budget keeps the list from rebuilding
-  /// hundreds of times a second during a download.
-  static const Duration _progressNotifyInterval = Duration(milliseconds: 100);
-  DateTime _lastProgressNotify = DateTime.fromMillisecondsSinceEpoch(0);
-  Timer? _pendingProgressNotify;
+  static const int maxConcurrentDownloads = 3;
+
   bool _isDisposed = false;
 
   List<DownloadTask> get allTasks => List.unmodifiable(_tasks);
@@ -51,7 +50,9 @@ class DownloadProvider extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
-    _pendingProgressNotify?.cancel();
+    for (final task in _tasks) {
+      task.dispose();
+    }
     super.dispose();
   }
 
@@ -59,25 +60,6 @@ class DownloadProvider extends ChangeNotifier {
   void notifyListeners() {
     if (_isDisposed) return;
     super.notifyListeners();
-  }
-
-  void _notifyProgress() {
-    final now = DateTime.now();
-    final elapsed = now.difference(_lastProgressNotify);
-    if (elapsed >= _progressNotifyInterval) {
-      _lastProgressNotify = now;
-      _pendingProgressNotify?.cancel();
-      _pendingProgressNotify = null;
-      notifyListeners();
-      return;
-    }
-
-    // Make sure the final position of a burst is not dropped.
-    _pendingProgressNotify ??= Timer(_progressNotifyInterval - elapsed, () {
-      _pendingProgressNotify = null;
-      _lastProgressNotify = DateTime.now();
-      notifyListeners();
-    });
   }
 
   Future<void> _loadHistory() async {
@@ -95,7 +77,15 @@ class DownloadProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _saveHistory() => _storageService.saveHistory(_tasks);
+  Future<void> _saveHistory() {
+    final snapshot = _tasks
+        .map((task) => DownloadTask.fromJson(task.toJson()))
+        .toList(growable: false);
+    _persistenceTail = _persistenceTail.then(
+      (_) => _storageService.saveHistory(snapshot),
+    );
+    return _persistenceTail;
+  }
 
   Future<DownloadTask> startNewDownload({
     required VideoMetadata metadata,
@@ -133,15 +123,15 @@ class DownloadProvider extends ChangeNotifier {
                 : metadata.title,
             author: metadata.author,
             thumbnailUrl: quality.isImage
-                ? quality.downloadUrl
+                ? quality.thumbnailUrl ?? quality.downloadUrl
                 : metadata.coverUrl,
             downloadUrl: quality.downloadUrl,
             originalUrl: metadata.originalUrl,
             platform: metadata.platform,
+            sourceOptionId: quality.id,
             qualityLabel: quality.label,
             format: quality.format,
-            isAudioOnly: quality.isAudioOnly,
-            isImage: quality.isImage,
+            kind: quality.kind,
             headers: quality.headers,
             totalBytes: quality.sizeBytes ?? 0,
           ),
@@ -152,35 +142,38 @@ class DownloadProvider extends ChangeNotifier {
     notifyListeners();
     await _saveHistory();
 
-    unawaited(
-      _executeDownloadBatch(
-        tasks,
-        l10n: l10n,
-        autoSaveToGallery: autoSaveToGallery,
-      ),
-    );
+    for (final task in tasks) {
+      _queue.add(
+        _QueuedDownload(
+          task: task,
+          l10n: l10n,
+          autoSaveToGallery: autoSaveToGallery,
+        ),
+      );
+    }
+    _drainQueue();
     return tasks;
   }
 
-  Future<void> _executeDownloadBatch(
-    List<DownloadTask> tasks, {
-    required AppLocalizations l10n,
-    required bool autoSaveToGallery,
-  }) async {
-    var nextIndex = 0;
-    Future<void> worker() async {
-      while (nextIndex < tasks.length) {
-        final task = tasks[nextIndex++];
-        await _executeDownload(
-          task,
-          l10n: l10n,
-          autoSaveToGallery: autoSaveToGallery,
-        );
+  void _drainQueue() {
+    while (_runningDownloads < maxConcurrentDownloads && _queue.isNotEmpty) {
+      final queued = _queue.removeAt(0);
+      if (queued.task.status != DownloadStatus.queued ||
+          !_tasks.contains(queued.task)) {
+        continue;
       }
+      _runningDownloads++;
+      unawaited(
+        _executeDownload(
+          queued.task,
+          l10n: queued.l10n,
+          autoSaveToGallery: queued.autoSaveToGallery,
+        ).whenComplete(() {
+          _runningDownloads--;
+          _drainQueue();
+        }),
+      );
     }
-
-    final workerCount = tasks.length.clamp(1, 3);
-    await Future.wait(List.generate(workerCount, (_) => worker()));
   }
 
   Future<void> _executeDownload(
@@ -192,14 +185,15 @@ class DownloadProvider extends ChangeNotifier {
       task: task,
       l10n: l10n,
       autoSaveToGallery: autoSaveToGallery,
-      onProgress: (_, _, _, _, _) => _notifyProgress(),
+      onProgress: (changedTask, _, _, _, _) =>
+          changedTask.notifyProgressChanged(),
       onComplete: (_, _) {
         notifyListeners();
-        _saveHistory();
+        unawaited(_saveHistory());
       },
       onError: (_, _) {
         notifyListeners();
-        _saveHistory();
+        unawaited(_saveHistory());
       },
     );
     // Covers the pause / cancel paths, which finish without a callback.
@@ -208,13 +202,14 @@ class DownloadProvider extends ChangeNotifier {
   }
 
   void cancelTask(String taskId) {
+    _queue.removeWhere((queued) => queued.task.id == taskId);
     _downloadService.cancelDownload(taskId);
     final task = _findTask(taskId);
     if (task == null) return;
     task.status = DownloadStatus.cancelled;
     task.downloadSpeed = 0.0;
     notifyListeners();
-    _saveHistory();
+    unawaited(_saveHistory());
   }
 
   /// Suspends a running download, keeping the bytes already written.
@@ -238,11 +233,15 @@ class DownloadProvider extends ChangeNotifier {
     task.status = DownloadStatus.queued;
     task.errorMessage = null;
     notifyListeners();
-    await _executeDownload(
-      task,
-      l10n: l10n,
-      autoSaveToGallery: autoSaveToGallery,
+    _queue.add(
+      _QueuedDownload(
+        task: task,
+        l10n: l10n,
+        autoSaveToGallery: autoSaveToGallery,
+      ),
     );
+    _drainQueue();
+    await _saveHistory();
   }
 
   /// Retries a failed or cancelled task.
@@ -274,21 +273,32 @@ class DownloadProvider extends ChangeNotifier {
         downloadUrl: refreshedUrl.downloadUrl,
         headers: refreshedUrl.headers,
       );
-      if (index != -1) _tasks[index] = refreshed;
+      if (index != -1) {
+        _tasks[index] = refreshed;
+        task.dispose();
+      }
       notifyListeners();
-      await _executeDownload(
-        refreshed,
-        l10n: l10n,
-        autoSaveToGallery: autoSaveToGallery,
+      _queue.add(
+        _QueuedDownload(
+          task: refreshed,
+          l10n: l10n,
+          autoSaveToGallery: autoSaveToGallery,
+        ),
       );
+      _drainQueue();
+      await _saveHistory();
       return;
     }
 
-    await _executeDownload(
-      task,
-      l10n: l10n,
-      autoSaveToGallery: autoSaveToGallery,
+    _queue.add(
+      _QueuedDownload(
+        task: task,
+        l10n: l10n,
+        autoSaveToGallery: autoSaveToGallery,
+      ),
     );
+    _drainQueue();
+    await _saveHistory();
   }
 
   /// Re-extracts [task]'s source link and returns the option matching the
@@ -300,6 +310,11 @@ class DownloadProvider extends ChangeNotifier {
     if (task.originalUrl.isEmpty) return null;
     try {
       final metadata = await ExtractorRegistry.extract(task.originalUrl, l10n);
+      if (task.sourceOptionId.isNotEmpty) {
+        for (final option in metadata.qualities) {
+          if (option.id == task.sourceOptionId) return option;
+        }
+      }
       for (final option in metadata.qualities) {
         if (option.label == task.qualityLabel) return option;
       }
@@ -317,6 +332,7 @@ class DownloadProvider extends ChangeNotifier {
     if (index == -1) return;
 
     final task = _tasks[index];
+    _queue.removeWhere((queued) => queued.task.id == taskId);
     if (task.isActive || task.status == DownloadStatus.paused) {
       _downloadService.cancelDownload(taskId);
     }
@@ -324,6 +340,7 @@ class DownloadProvider extends ChangeNotifier {
       await PlatformFileHelper.deleteFile(task.filePath!);
     }
     _tasks.removeAt(index);
+    task.dispose();
     notifyListeners();
     await _saveHistory();
   }
@@ -337,8 +354,32 @@ class DownloadProvider extends ChangeNotifier {
       }
     }
     _tasks.removeWhere((t) => t.isDone);
+    for (final task in finished) {
+      task.dispose();
+    }
     notifyListeners();
     await _saveHistory();
+  }
+
+  /// Clears downloaded files and their finished history entries. Active and
+  /// paused transfers are deliberately left alone; callers should disable the
+  /// action while any transfer is in flight.
+  Future<bool> clearDownloadedFiles() async {
+    await _historyReady;
+    if (_tasks.any(
+      (task) => task.isActive || task.status == DownloadStatus.paused,
+    )) {
+      return false;
+    }
+    await _storageService.clearDownloads();
+    final finished = _tasks.where((task) => task.isDone).toList();
+    _tasks.removeWhere((task) => task.isDone);
+    for (final task in finished) {
+      task.dispose();
+    }
+    notifyListeners();
+    await _saveHistory();
+    return true;
   }
 
   Future<bool> saveToGalleryManually(DownloadTask task) async {
@@ -372,4 +413,16 @@ class DownloadProvider extends ChangeNotifier {
     }
     return null;
   }
+}
+
+class _QueuedDownload {
+  const _QueuedDownload({
+    required this.task,
+    required this.l10n,
+    required this.autoSaveToGallery,
+  });
+
+  final DownloadTask task;
+  final AppLocalizations l10n;
+  final bool autoSaveToGallery;
 }

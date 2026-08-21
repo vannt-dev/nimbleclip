@@ -1,14 +1,16 @@
 import 'video_platform.dart';
 
+enum MediaKind { video, audio, image }
+
 class VideoQualityOption {
   final String id;
   final String label;
   final String quality; // e.g. "1080p", "720p", "480p", "Audio"
   final String format; // "mp4", "mp3", "m4a"
   final String downloadUrl;
+  final String? thumbnailUrl;
   final int? sizeBytes;
-  final bool isAudioOnly;
-  final bool isImage;
+  final MediaKind kind;
   final Map<String, String>? headers;
 
   const VideoQualityOption({
@@ -17,11 +19,14 @@ class VideoQualityOption {
     required this.quality,
     required this.format,
     required this.downloadUrl,
+    this.thumbnailUrl,
     this.sizeBytes,
-    this.isAudioOnly = false,
-    this.isImage = false,
+    this.kind = MediaKind.video,
     this.headers,
   });
+
+  bool get isAudioOnly => kind == MediaKind.audio;
+  bool get isImage => kind == MediaKind.image;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -29,9 +34,9 @@ class VideoQualityOption {
     'quality': quality,
     'format': format,
     'downloadUrl': downloadUrl,
+    'thumbnailUrl': thumbnailUrl,
     'sizeBytes': sizeBytes,
-    'isAudioOnly': isAudioOnly,
-    'isImage': isImage,
+    'kind': kind.name,
     'headers': headers,
   };
 
@@ -42,9 +47,16 @@ class VideoQualityOption {
         quality: json['quality'] as String? ?? '',
         format: json['format'] as String? ?? 'mp4',
         downloadUrl: json['downloadUrl'] as String? ?? '',
+        thumbnailUrl: json['thumbnailUrl'] as String?,
         sizeBytes: json['sizeBytes'] as int?,
-        isAudioOnly: json['isAudioOnly'] as bool? ?? false,
-        isImage: json['isImage'] as bool? ?? false,
+        kind: MediaKind.values.firstWhere(
+          (kind) => kind.name == json['kind'],
+          orElse: () => json['isImage'] == true
+              ? MediaKind.image
+              : json['isAudioOnly'] == true
+              ? MediaKind.audio
+              : MediaKind.video,
+        ),
         headers: (json['headers'] as Map<String, dynamic>?)?.map(
           (k, v) => MapEntry(k, v.toString()),
         ),

@@ -21,6 +21,13 @@ class ActiveDownloadCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: task,
+      builder: (context, _) => _buildCard(context),
+    );
+  }
+
+  Widget _buildCard(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final percent = (task.progress * 100).toInt();
     final isPaused = task.status == DownloadStatus.paused;

@@ -44,6 +44,22 @@ class GenericExtractor extends BaseVideoExtractor {
     final direct = _directMediaFormat(uri);
     if (direct != null) return _directMedia(uri, cleanUrl, id, direct, l10n);
 
+    // An extensionless media URL may point at a multi-gigabyte file. Probe its
+    // headers first so extraction never buffers the payload just to inspect
+    // Content-Type. Fixture tests intentionally bypass this network probe.
+    if (!ExtractorHttp.isUsingOverrides) {
+      try {
+        final head = await ExtractorHttp.head(
+          cleanUrl,
+          timeout: const Duration(seconds: 8),
+        );
+        final media = _fromMediaHeaders(head, uri, cleanUrl, id, l10n);
+        if (media != null) return media;
+      } catch (_) {
+        // Many sites reject HEAD. Fall through to the HTML GET path.
+      }
+    }
+
     final http.Response response;
     try {
       response = await ExtractorHttp.get(
@@ -55,32 +71,45 @@ class GenericExtractor extends BaseVideoExtractor {
     }
 
     // The URL had no media extension but the server says it is media anyway.
-    final contentType = (response.headers['content-type'] ?? '').toLowerCase();
-    if (contentType.startsWith('video/') || contentType.startsWith('audio/')) {
-      final isAudio = contentType.startsWith('audio/');
-      return VideoMetadata(
-        id: id,
-        originalUrl: cleanUrl,
-        title: _fileNameOf(uri) ?? 'Media Stream ($id)',
-        description: l10n.directMediaLink,
-        author: uri.host,
-        coverUrl: '',
-        platform: VideoPlatform.generic,
-        qualities: [
-          VideoQualityOption(
-            id: 'gen_$id',
-            label: isAudio ? l10n.originalAudio : l10n.originalVideo,
-            quality: 'Original',
-            format: isAudio ? 'mp3' : 'mp4',
-            downloadUrl: cleanUrl,
-            sizeBytes: int.tryParse(response.headers['content-length'] ?? ''),
-            isAudioOnly: isAudio,
-          ),
-        ],
-      );
-    }
+    final media = _fromMediaHeaders(response, uri, cleanUrl, id, l10n);
+    if (media != null) return media;
 
     return _fromOpenGraph(response.body, uri, cleanUrl, id, l10n);
+  }
+
+  VideoMetadata? _fromMediaHeaders(
+    http.Response response,
+    Uri uri,
+    String cleanUrl,
+    String id,
+    AppLocalizations l10n,
+  ) {
+    final contentType = (response.headers['content-type'] ?? '').toLowerCase();
+    if (!contentType.startsWith('video/') &&
+        !contentType.startsWith('audio/')) {
+      return null;
+    }
+    final isAudio = contentType.startsWith('audio/');
+    return VideoMetadata(
+      id: id,
+      originalUrl: cleanUrl,
+      title: _fileNameOf(uri) ?? 'Media Stream ($id)',
+      description: l10n.directMediaLink,
+      author: uri.host,
+      coverUrl: '',
+      platform: VideoPlatform.generic,
+      qualities: [
+        VideoQualityOption(
+          id: 'gen_$id',
+          label: isAudio ? l10n.originalAudio : l10n.originalVideo,
+          quality: 'Original',
+          format: isAudio ? 'mp3' : 'mp4',
+          downloadUrl: cleanUrl,
+          sizeBytes: int.tryParse(response.headers['content-length'] ?? ''),
+          kind: isAudio ? MediaKind.audio : MediaKind.video,
+        ),
+      ],
+    );
   }
 
   String? _directMediaFormat(Uri uri) {
@@ -114,7 +143,7 @@ class GenericExtractor extends BaseVideoExtractor {
           quality: 'Original',
           format: format,
           downloadUrl: url,
-          isAudioOnly: isAudio,
+          kind: isAudio ? MediaKind.audio : MediaKind.video,
         ),
       ],
     );

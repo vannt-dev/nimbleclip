@@ -16,23 +16,23 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+  late final List<Widget> _screens;
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final activeDownloadsCount = context
-        .watch<DownloadProvider>()
-        .activeTasks
-        .length;
-
-    final screens = [
+  void initState() {
+    super.initState();
+    _screens = [
       HomeScreen(onNavigateDownloads: () => setState(() => _currentIndex = 1)),
       DownloadsScreen(onNavigateHome: () => setState(() => _currentIndex = 0)),
       const SettingsScreen(),
     ];
+  }
 
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: screens),
+      body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkCard : AppColors.lightCard,
@@ -61,21 +61,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               label: context.l10n.navHome,
             ),
             NavigationDestination(
-              icon: Badge(
-                isLabelVisible: activeDownloadsCount > 0,
-                label: Text('$activeDownloadsCount'),
-                backgroundColor: AppColors.primary,
-                child: const Icon(Icons.download_outlined),
-              ),
-              selectedIcon: Badge(
-                isLabelVisible: activeDownloadsCount > 0,
-                label: Text('$activeDownloadsCount'),
-                backgroundColor: AppColors.primary,
-                child: const Icon(
-                  Icons.download_rounded,
-                  color: AppColors.primary,
-                ),
-              ),
+              icon: const _DownloadBadge(selected: false),
+              selectedIcon: const _DownloadBadge(selected: true),
               label: context.l10n.navDownloads,
             ),
             NavigationDestination(
@@ -87,6 +74,28 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               label: context.l10n.navSettings,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DownloadBadge extends StatelessWidget {
+  const _DownloadBadge({required this.selected});
+
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Selector<DownloadProvider, int>(
+      selector: (_, provider) => provider.activeTasks.length,
+      builder: (_, count, _) => Badge(
+        isLabelVisible: count > 0,
+        label: Text('$count'),
+        backgroundColor: AppColors.primary,
+        child: Icon(
+          selected ? Icons.download_rounded : Icons.download_outlined,
+          color: selected ? AppColors.primary : null,
         ),
       ),
     );

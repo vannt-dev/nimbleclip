@@ -78,7 +78,7 @@ class YouTubeExtractor extends BaseVideoExtractor {
             format: 'm4a',
             downloadUrl: bestAudio.url.toString(),
             sizeBytes: bestAudio.size.totalBytes,
-            isAudioOnly: true,
+            kind: MediaKind.audio,
           ),
         );
       }
@@ -211,7 +211,7 @@ class YouTubeExtractor extends BaseVideoExtractor {
           format: 'm4a',
           downloadUrl: bestAudio['url'].toString(),
           sizeBytes: int.tryParse(bestAudio['contentLength']?.toString() ?? ''),
-          isAudioOnly: true,
+          kind: MediaKind.audio,
         ),
       );
     }

@@ -20,6 +20,9 @@ import 'base_extractor.dart';
 class InstagramExtractor extends BaseVideoExtractor {
   const InstagramExtractor();
 
+  static String? _snapInstaExpiry;
+  static String? _snapInstaToken;
+
   @override
   VideoPlatform get platform => VideoPlatform.instagram;
 
@@ -82,18 +85,31 @@ class InstagramExtractor extends BaseVideoExtractor {
     VideoMetadata? fallback,
   }) async {
     try {
-      final landing = await ExtractorHttp.get(
-        'https://snap-insta.to/vi',
-        userAgent: AppConstants.defaultUserAgent,
-      );
-      if (landing.statusCode != 200) return null;
-
-      final expiry = RegExp(
-        r'\bk_exp\s*=\s*"([^"]+)"',
-      ).firstMatch(landing.body)?.group(1);
-      final token = RegExp(
-        r'\bk_token\s*=\s*"([^"]+)"',
-      ).firstMatch(landing.body)?.group(1);
+      var expiry = _snapInstaExpiry;
+      var token = _snapInstaToken;
+      final expirySeconds = int.tryParse(expiry ?? '');
+      final cacheValid =
+          !ExtractorHttp.isUsingOverrides &&
+          expirySeconds != null &&
+          expirySeconds > DateTime.now().millisecondsSinceEpoch ~/ 1000 + 30 &&
+          token != null;
+      if (!cacheValid) {
+        final landing = await ExtractorHttp.get(
+          'https://snap-insta.to/vi',
+          userAgent: AppConstants.defaultUserAgent,
+        );
+        if (landing.statusCode != 200) return null;
+        expiry = RegExp(
+          r'\bk_exp\s*=\s*"([^"]+)"',
+        ).firstMatch(landing.body)?.group(1);
+        token = RegExp(
+          r'\bk_token\s*=\s*"([^"]+)"',
+        ).firstMatch(landing.body)?.group(1);
+        if (!ExtractorHttp.isUsingOverrides) {
+          _snapInstaExpiry = expiry;
+          _snapInstaToken = token;
+        }
+      }
       if (expiry == null || token == null) return null;
 
       final response = await ExtractorHttp.post(
@@ -171,7 +187,8 @@ class InstagramExtractor extends BaseVideoExtractor {
               quality: l10n.imageLabel(index + 1),
               format: 'jpg',
               downloadUrl: downloadUrls[index],
-              isImage: true,
+              thumbnailUrl: previewUrls[index],
+              kind: MediaKind.image,
             ),
         ],
         viewCount: fallback?.viewCount,
@@ -396,7 +413,7 @@ class InstagramExtractor extends BaseVideoExtractor {
             quality: l10n.imageLabel(index + 1),
             format: _imageFormat(decodedUrls[index]),
             downloadUrl: decodedUrls[index],
-            isImage: true,
+            kind: MediaKind.image,
           ),
       ],
     );

@@ -3,9 +3,9 @@
     "short_name": "NimbleClip",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0F172A",
-    "theme_color": "#6366F1",
-    "description": "Download public video and audio streams with NimbleClip.",
+    "background_color": "#3212C8",
+    "theme_color": "#4257F4",
+    "description": "Download public video, audio, and image posts with NimbleClip.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

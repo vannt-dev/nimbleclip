@@ -15,7 +15,7 @@ VideoQualityOption option(
     format: audio ? 'mp3' : 'mp4',
     downloadUrl: 'https://cdn.example.com/${quality.replaceAll(' ', '_')}.mp4',
     sizeBytes: sizeBytes,
-    isAudioOnly: audio,
+    kind: audio ? MediaKind.audio : MediaKind.video,
   );
 }
 

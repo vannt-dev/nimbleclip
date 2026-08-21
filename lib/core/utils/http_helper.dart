@@ -14,6 +14,7 @@ import 'cors_helper.dart';
 /// than sent verbatim.
 class ExtractorHttp {
   static const Duration defaultTimeout = Duration(seconds: 15);
+  static final http.Client _client = http.Client();
 
   @visibleForTesting
   static Future<http.Response> Function(Uri uri, Map<String, String> headers)?
@@ -28,9 +29,17 @@ class ExtractorHttp {
   postOverride;
 
   @visibleForTesting
+  static Future<http.Response> Function(Uri uri, Map<String, String> headers)?
+  headOverride;
+
+  static bool get isUsingOverrides =>
+      getOverride != null || postOverride != null || headOverride != null;
+
+  @visibleForTesting
   static void resetOverrides() {
     getOverride = null;
     postOverride = null;
+    headOverride = null;
   }
 
   static Map<String, String> buildHeaders({
@@ -66,7 +75,20 @@ class ExtractorHttp {
     final requestHeaders = buildHeaders(userAgent: userAgent, extra: headers);
     final override = getOverride;
     if (override != null) return override(uri, requestHeaders);
-    return http.get(uri, headers: requestHeaders).timeout(timeout);
+    return _client.get(uri, headers: requestHeaders).timeout(timeout);
+  }
+
+  static Future<http.Response> head(
+    String url, {
+    String userAgent = AppConstants.defaultUserAgent,
+    Map<String, String>? headers,
+    Duration timeout = defaultTimeout,
+  }) {
+    final uri = Uri.parse(CorsHelper.wrap(url));
+    final requestHeaders = buildHeaders(userAgent: userAgent, extra: headers);
+    final override = headOverride;
+    if (override != null) return override(uri, requestHeaders);
+    return _client.head(uri, headers: requestHeaders).timeout(timeout);
   }
 
   static Future<http.Response> post(
@@ -80,7 +102,9 @@ class ExtractorHttp {
     final requestHeaders = buildHeaders(userAgent: userAgent, extra: headers);
     final override = postOverride;
     if (override != null) return override(uri, requestHeaders, body);
-    return http.post(uri, headers: requestHeaders, body: body).timeout(timeout);
+    return _client
+        .post(uri, headers: requestHeaders, body: body)
+        .timeout(timeout);
   }
 
   /// Expands a short link to its final destination.
@@ -95,7 +119,7 @@ class ExtractorHttp {
   }) async {
     try {
       if (kIsWeb) {
-        final response = await http
+        final response = await _client
             .get(CorsHelper.resolveUri(url))
             .timeout(timeout);
         if (response.statusCode != 200) return url;
@@ -104,7 +128,7 @@ class ExtractorHttp {
         return (resolved != null && resolved.isNotEmpty) ? resolved : url;
       }
 
-      final response = await http
+      final response = await _client
           .get(Uri.parse(url), headers: buildHeaders())
           .timeout(timeout);
       return response.request?.url.toString() ?? url;

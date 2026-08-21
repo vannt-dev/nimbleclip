@@ -4,6 +4,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/video_metadata.dart';
+import '../image_picker_screen.dart';
 
 class VideoResultCard extends StatefulWidget {
   final VideoMetadata metadata;
@@ -53,150 +54,25 @@ class _VideoResultCardState extends State<VideoResultCard> {
       ..addAll(_imageOptions.map((option) => option.id));
   }
 
-  void _toggleImage(VideoQualityOption option) {
-    setState(() {
-      if (!_selectedImageIds.add(option.id)) {
-        _selectedImageIds.remove(option.id);
-      }
-    });
-    widget.onQualitySelected(option);
-  }
-
-  Widget _buildImageGrid(
-    BuildContext context,
-    List<VideoQualityOption> options,
-    bool isDark,
-  ) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const spacing = 8.0;
-        final tileWidth = (constraints.maxWidth - spacing * 2) / 3;
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: options.map((option) {
-            final isSelected = _selectedImageIds.contains(option.id);
-            return SizedBox(
-              width: tileWidth,
-              height: tileWidth / 0.78,
-              child: Semantics(
-                label: option.label,
-                selected: isSelected,
-                button: true,
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => _toggleImage(option),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Ink(
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? AppColors.darkCardElevated
-                            : AppColors.lightCardElevated,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected
-                              ? AppColors.primary
-                              : (isDark
-                                    ? AppColors.darkBorder
-                                    : AppColors.lightBorder),
-                          width: isSelected ? 2 : 1,
-                        ),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            CachedNetworkImage(
-                              imageUrl: option.downloadUrl,
-                              httpHeaders: option.headers,
-                              fit: BoxFit.cover,
-                              placeholder: (_, _) => const Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                              errorWidget: (_, _, _) =>
-                                  const Icon(Icons.broken_image_outlined),
-                            ),
-                            Positioned.fill(
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      Colors.black.withAlpha(15),
-                                      Colors.transparent,
-                                      Colors.black.withAlpha(170),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              top: 4,
-                              right: 4,
-                              child: Icon(
-                                isSelected
-                                    ? Icons.check_circle_rounded
-                                    : Icons.circle_outlined,
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : Colors.white,
-                                size: 24,
-                                shadows: const [Shadow(blurRadius: 4)],
-                              ),
-                            ),
-                            Positioned(
-                              top: 2,
-                              left: 2,
-                              child: IconButton(
-                                tooltip: context.l10n.preview,
-                                visualDensity: VisualDensity.compact,
-                                style: IconButton.styleFrom(
-                                  backgroundColor: Colors.black54,
-                                  foregroundColor: Colors.white,
-                                ),
-                                onPressed: () {
-                                  widget.onQualitySelected(option);
-                                  widget.onPreview();
-                                },
-                                icon: const Icon(
-                                  Icons.zoom_in_rounded,
-                                  size: 18,
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              left: 6,
-                              right: 6,
-                              bottom: 6,
-                              child: Text(
-                                option.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  shadows: [Shadow(blurRadius: 4)],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        );
-      },
+  Future<void> _openImagePicker(List<VideoQualityOption> options) async {
+    final selected = await Navigator.of(context).push<Set<String>>(
+      MaterialPageRoute(
+        builder: (_) => ImagePickerScreen(
+          options: options,
+          initiallySelectedIds: _selectedImageIds,
+        ),
+      ),
     );
+    if (!mounted || selected == null) return;
+    setState(() {
+      _selectedImageIds
+        ..clear()
+        ..addAll(selected);
+    });
+    final first = options
+        .where((option) => selected.contains(option.id))
+        .firstOrNull;
+    if (first != null) widget.onQualitySelected(first);
   }
 
   @override
@@ -591,19 +467,21 @@ class _VideoResultCardState extends State<VideoResultCard> {
                 ),
                 const SizedBox(height: 8),
                 if (hasOnlyImages && _selectedTab == 0)
-                  _buildImageGrid(context, videoOptions, isDark)
+                  OutlinedButton.icon(
+                    onPressed: () => _openImagePicker(videoOptions),
+                    icon: const Icon(Icons.photo_library_outlined),
+                    label: Text(
+                      '${context.l10n.selectImages} '
+                      '(${_selectedImageIds.length}/${videoOptions.length})',
+                    ),
+                  )
                 else
                   ...currentOptions.map((opt) {
-                    final isImageChoice = hasOnlyImages && _selectedTab == 0;
-                    final isSelected = isImageChoice
-                        ? _selectedImageIds.contains(opt.id)
-                        : widget.selectedQuality?.id == opt.id;
+                    final isSelected = widget.selectedQuality?.id == opt.id;
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: InkWell(
-                        onTap: () => isImageChoice
-                            ? _toggleImage(opt)
-                            : widget.onQualitySelected(opt),
+                        onTap: () => widget.onQualitySelected(opt),
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -631,14 +509,9 @@ class _VideoResultCardState extends State<VideoResultCard> {
                           child: Row(
                             children: [
                               Icon(
-                                isImageChoice
-                                    ? (isSelected
-                                          ? Icons.check_box_rounded
-                                          : Icons
-                                                .check_box_outline_blank_rounded)
-                                    : (isSelected
-                                          ? Icons.radio_button_checked_rounded
-                                          : Icons.radio_button_off_rounded),
+                                isSelected
+                                    ? Icons.radio_button_checked_rounded
+                                    : Icons.radio_button_off_rounded,
                                 size: 18,
                                 color: isSelected
                                     ? AppColors.primary

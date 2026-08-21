@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
@@ -41,7 +43,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     super.didChangeDependencies();
     if (!_hasInitialized) {
       _hasInitialized = true;
-      _initializePlayer();
+      unawaited(_initializePlayer());
     }
   }
 
@@ -116,7 +118,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   void dispose() {
-    _videoPlayerController?.dispose();
+    unawaited(_videoPlayerController?.dispose());
     _chewieController?.dispose();
     super.dispose();
   }
@@ -178,7 +180,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             _isLoading = true;
                             _errorMessage = null;
                           });
-                          _initializePlayer();
+                          unawaited(_initializePlayer());
                         },
                         child: Text(context.l10n.retry),
                       ),

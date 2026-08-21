@@ -94,10 +94,4 @@ class SettingsProvider extends ChangeNotifier {
     _cacheSizeBytes = await StorageService().calculateCacheSize();
     notifyListeners();
   }
-
-  Future<void> clearCache() async {
-    await StorageService().clearDownloads();
-    await refreshCacheSize();
-    notifyListeners();
-  }
 }

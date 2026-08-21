@@ -6,10 +6,18 @@ const test = require('node:test');
 
 const {
   consumeProxyQuota,
+  allowedMethods,
   isBlockedAddress,
   readRequestBody,
   resolveStaticPath,
 } = require('../server');
+
+test('routes expose only the methods they implement', () => {
+  assert.equal(allowedMethods('/proxy').has('POST'), true);
+  assert.equal(allowedMethods('/proxy').has('DELETE'), false);
+  assert.equal(allowedMethods('/resolve').has('POST'), false);
+  assert.equal(allowedMethods('/assets/app.js').has('POST'), false);
+});
 
 test('SSRF guard blocks private and link-local addresses', () => {
   assert.equal(isBlockedAddress('127.0.0.1'), true);

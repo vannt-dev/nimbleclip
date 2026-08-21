@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nimble_clip/models/download_task.dart';
+import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/services/download_service.dart';
 
@@ -20,7 +21,7 @@ DownloadTask task({
     platform: VideoPlatform.generic,
     qualityLabel: '720p',
     format: format,
-    isImage: isImage,
+    kind: isImage ? MediaKind.image : MediaKind.video,
   );
 }
 
@@ -85,6 +86,28 @@ void main() {
       expect(restored.format, 'jpg');
       expect(restored.isImage, isTrue);
     });
+
+    test('preserves the stable source option id', () {
+      final original = DownloadTask(
+        id: 'task',
+        videoId: 'post',
+        title: 'Image',
+        author: 'Author',
+        thumbnailUrl: '',
+        downloadUrl: 'https://cdn.example/image.jpg',
+        originalUrl: 'https://example/post',
+        platform: VideoPlatform.instagram,
+        sourceOptionId: 'image-3',
+        qualityLabel: 'Image 3',
+        format: 'jpg',
+        kind: MediaKind.image,
+      );
+
+      expect(
+        DownloadTask.fromJson(original.toJson()).sourceOptionId,
+        'image-3',
+      );
+    });
   });
 
   group('DownloadTask.withRefreshedSource', () {
@@ -105,6 +128,21 @@ void main() {
       expect(refreshed.status, DownloadStatus.queued);
       expect(refreshed.errorMessage, isNull);
     });
+  });
+
+  test('progress notifications are coalesced per task', () async {
+    final download = task();
+    var notifications = 0;
+    download.addListener(() => notifications++);
+
+    download.notifyProgressChanged();
+    download.notifyProgressChanged();
+    download.notifyProgressChanged();
+    expect(notifications, 1);
+
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    expect(notifications, 2);
+    download.dispose();
   });
 
   group('DownloadService.buildFileName', () {

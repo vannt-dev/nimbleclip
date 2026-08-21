@@ -34,13 +34,10 @@ class StorageService {
 
   /// Persists task list to SharedPreferences
   Future<void> saveHistory(List<DownloadTask> tasks) async {
+    final encoded = jsonEncode(tasks.map((task) => task.toJson()).toList());
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonList = tasks.map((t) => t.toJson()).toList();
-      await prefs.setString(
-        AppConstants.keyDownloadHistory,
-        jsonEncode(jsonList),
-      );
+      await prefs.setString(AppConstants.keyDownloadHistory, encoded);
     } catch (_) {}
   }
 

@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/utils/formatters.dart';
 import '../../l10n/l10n.dart';
+import '../../providers/download_provider.dart';
 import '../../providers/settings_provider.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
+  static final Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final settings = context.watch<SettingsProvider>();
+    final hasActiveDownloads = context.select<DownloadProvider, bool>(
+      (provider) =>
+          provider.activeTasks.isNotEmpty || provider.pausedTasks.isNotEmpty,
+    );
     final l10n = context.l10n;
 
     return Scaffold(
@@ -217,39 +224,44 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ),
                   trailing: TextButton(
-                    onPressed: () async {
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: Text(l10n.clearCacheTitle),
-                          content: Text(l10n.clearCacheMessage),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, false),
-                              child: Text(l10n.cancel),
-                            ),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.error,
+                    onPressed: hasActiveDownloads
+                        ? null
+                        : () async {
+                            final downloadProvider = context
+                                .read<DownloadProvider>();
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: Text(l10n.clearCacheTitle),
+                                content: Text(l10n.clearCacheMessage),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: Text(l10n.cancel),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.error,
+                                    ),
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    child: Text(l10n.deleteAll),
+                                  ),
+                                ],
                               ),
-                              onPressed: () => Navigator.pop(ctx, true),
-                              child: Text(l10n.deleteAll),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (confirmed == true) {
-                        await settings.clearCache();
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(l10n.cacheCleared),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      }
-                    },
+                            );
+                            if (confirmed == true) {
+                              await downloadProvider.clearDownloadedFiles();
+                              await settings.refreshCacheSize();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(l10n.cacheCleared),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            }
+                          },
                     child: Text(
                       l10n.cleanUp,
                       style: const TextStyle(color: AppColors.error),
@@ -281,9 +293,12 @@ class SettingsScreen extends StatelessWidget {
                     color: AppColors.primary,
                   ),
                   title: Text(l10n.version),
-                  trailing: Text(
-                    AppConstants.appVersion,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  trailing: FutureBuilder<PackageInfo>(
+                    future: _packageInfo,
+                    builder: (_, snapshot) => Text(
+                      snapshot.data?.version ?? '—',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ),
                 const Divider(height: 1),

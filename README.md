@@ -7,7 +7,7 @@
 **Save clips. Keep moments.**
 
 NimbleClip is a Flutter application for discovering and downloading publicly
-available video and audio streams from popular social platforms. It provides a
+available video, audio, and image posts from popular social platforms. It provides a
 single, polished interface for link detection, quality selection, download
 management, local playback, and gallery export.
 
@@ -19,6 +19,8 @@ management, local playback, and gallery export.
 
 - Detects supported links pasted from the clipboard.
 - Extracts available video and audio qualities before downloading.
+- Shows Instagram and TikTok carousel thumbnails in a lazy full-screen picker,
+  with preview, select-all, and multi-image download.
 - Tracks progress, transfer speed, and downloaded file size in real time.
 - Pauses and resumes native downloads when the source server supports HTTP
   range requests.
@@ -37,10 +39,10 @@ management, local playback, and gallery export.
 | Source | Supported content |
 | --- | --- |
 | YouTube | Public videos and available M4A audio streams |
-| TikTok | Public videos, including watermark-free variants when exposed by the source, and audio |
+| TikTok | Public videos, slideshows/image posts, including watermark-free variants when exposed by the source, and audio |
 | Facebook | Public videos, Watch links, and Reels |
 | X / Twitter | Public posts containing video |
-| Instagram | Public video posts and Reels |
+| Instagram | Public image/carousel posts, video posts, and Reels |
 | Direct URLs | Public video/audio files and pages exposing standard Open Graph media metadata |
 
 Extraction depends on public endpoints and page formats controlled by third
@@ -119,6 +121,27 @@ Examples:
 ```bash
 flutter run -d windows
 flutter run -d chrome
+```
+
+On Windows, the repository provides a one-command Android emulator launcher.
+It reuses or starts the configured emulator, closes an old NimbleClip instance,
+and runs the app without repeating dependency checks:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tool\run_android_emulator.ps1
+```
+
+AI coding agents should follow the shorter workflow documented in
+[`AGENTS.md`](AGENTS.md) instead of probing devices before every launch.
+
+### Regenerate branded app icons
+
+The master artwork lives at `assets/branding/nimbleclip_icon_master.png`.
+After replacing it, regenerate the Android, iOS, Web, macOS, Windows, adaptive,
+round, themed, and splash assets with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tool\generate_app_icons.ps1
 ```
 
 ## Android integration test

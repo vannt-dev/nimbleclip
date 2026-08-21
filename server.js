@@ -192,21 +192,28 @@ async function readRequestBody(req) {
 function consumeProxyQuota(req) {
   const now = Date.now();
   const key = req.socket.remoteAddress || 'unknown';
-  if (rateBuckets.size > 1024) {
-    for (const [address, bucket] of rateBuckets) {
-      if (now - bucket.startedAt >= RATE_LIMIT_WINDOW_MS) {
-        rateBuckets.delete(address);
-      }
+  for (const [address, bucket] of rateBuckets) {
+    if (now - bucket.startedAt >= RATE_LIMIT_WINDOW_MS) {
+      rateBuckets.delete(address);
     }
   }
   const current = rateBuckets.get(key);
   if (!current || now - current.startedAt >= RATE_LIMIT_WINDOW_MS) {
+    if (rateBuckets.size >= 1024) return false;
     rateBuckets.set(key, { startedAt: now, count: 1 });
     return true;
   }
   if (current.count >= RATE_LIMIT_MAX) return false;
   current.count += 1;
   return true;
+}
+
+function allowedMethods(pathname) {
+  if (pathname === '/cors-proxy' || pathname === '/proxy') {
+    return new Set(['GET', 'POST', 'HEAD', 'OPTIONS']);
+  }
+  if (pathname === '/resolve') return new Set(['GET', 'OPTIONS']);
+  return new Set(['GET', 'HEAD', 'OPTIONS']);
 }
 
 async function handleProxy(req, res, requestUrl) {
@@ -243,6 +250,16 @@ async function handleProxy(req, res, requestUrl) {
   armIdleTimeout();
 
   try {
+    const methods = allowedMethods(requestUrl.pathname);
+    if (!methods.has(req.method)) {
+      res.writeHead(405, {
+        'Content-Type': 'text/plain; charset=utf-8',
+        Allow: [...methods].join(', '),
+      });
+      res.end('405 Method Not Allowed');
+      return;
+    }
+
     const upstream = await safeFetch(targetUrl, {
       method: req.method,
       headers: outboundHeaders,
@@ -484,4 +501,5 @@ module.exports = {
   isBlockedAddress,
   consumeProxyQuota,
   readRequestBody,
+  allowedMethods,
 };

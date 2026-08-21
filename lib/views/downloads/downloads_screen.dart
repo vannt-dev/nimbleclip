@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -37,14 +39,18 @@ class _DownloadsScreenState extends State<DownloadsScreen>
   void _openMedia(BuildContext context, DownloadTask task) {
     if (task.filePath == null) return;
     if (task.isImage) {
-      context.read<DownloadProvider>().openFile(task);
+      unawaited(context.read<DownloadProvider>().openFile(task));
       return;
     }
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            VideoPlayerScreen(title: task.title, localFilePath: task.filePath),
+    unawaited(
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VideoPlayerScreen(
+            title: task.title,
+            localFilePath: task.filePath,
+          ),
+        ),
       ),
     );
   }
@@ -70,7 +76,8 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     );
 
     if (confirmed == true && context.mounted) {
-      context.read<DownloadProvider>().deleteTask(task.id);
+      await context.read<DownloadProvider>().deleteTask(task.id);
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(context.l10n.videoDeleted),

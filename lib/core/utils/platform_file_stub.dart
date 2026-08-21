@@ -62,7 +62,7 @@ class PlatformFileHelper {
       final dir = Directory(dirPath);
       int totalSize = 0;
       if (await dir.exists()) {
-        for (final entity in dir.listSync(recursive: true)) {
+        await for (final entity in dir.list(recursive: true)) {
           if (entity is File) {
             totalSize += await entity.length();
           }
@@ -79,7 +79,7 @@ class PlatformFileHelper {
     try {
       final dir = Directory(dirPath);
       if (await dir.exists()) {
-        for (final entity in dir.listSync()) {
+        await for (final entity in dir.list()) {
           if (entity is File) {
             await entity.delete();
           }

@@ -5,12 +5,11 @@ import '../../../core/utils/url_helper.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/video_platform.dart';
 
-class UrlInputCard extends StatelessWidget {
+class UrlInputCard extends StatefulWidget {
   final TextEditingController controller;
   final bool isAnalyzing;
   final VoidCallback onAnalyze;
   final VoidCallback onClear;
-  final Function(String url) onChanged;
 
   const UrlInputCard({
     super.key,
@@ -18,16 +17,41 @@ class UrlInputCard extends StatelessWidget {
     required this.isAnalyzing,
     required this.onAnalyze,
     required this.onClear,
-    required this.onChanged,
   });
+
+  @override
+  State<UrlInputCard> createState() => _UrlInputCardState();
+}
+
+class _UrlInputCardState extends State<UrlInputCard> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_handleTextChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant UrlInputCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller == widget.controller) return;
+    oldWidget.controller.removeListener(_handleTextChanged);
+    widget.controller.addListener(_handleTextChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_handleTextChanged);
+    super.dispose();
+  }
+
+  void _handleTextChanged() => setState(() {});
 
   Future<void> _pasteFromClipboard(BuildContext context) async {
     try {
       final data = await Clipboard.getData('text/plain');
       if (data?.text != null && data!.text!.isNotEmpty) {
         final clean = UrlHelper.extractCleanUrl(data.text!);
-        controller.text = clean;
-        onChanged(clean);
+        widget.controller.text = clean;
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -46,8 +70,8 @@ class UrlInputCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final detectedPlatform = UrlHelper.detectPlatform(controller.text);
-    final hasText = controller.text.trim().isNotEmpty;
+    final detectedPlatform = UrlHelper.detectPlatform(widget.controller.text);
+    final hasText = widget.controller.text.trim().isNotEmpty;
 
     return Container(
       decoration: BoxDecoration(
@@ -131,10 +155,9 @@ class UrlInputCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           TextField(
-            controller: controller,
-            onChanged: onChanged,
+            controller: widget.controller,
             textInputAction: TextInputAction.go,
-            onSubmitted: (_) => onAnalyze(),
+            onSubmitted: (_) => widget.onAnalyze(),
             style: const TextStyle(fontSize: 14),
             decoration: InputDecoration(
               hintText: 'https://youtube.com/..., tiktok.com/..., fb.watch/...',
@@ -151,7 +174,7 @@ class UrlInputCard extends StatelessWidget {
                   if (hasText)
                     IconButton(
                       icon: const Icon(Icons.close_rounded, size: 18),
-                      onPressed: onClear,
+                      onPressed: widget.onClear,
                       tooltip: context.l10n.clear,
                     ),
                   IconButton(
@@ -165,7 +188,7 @@ class UrlInputCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           ElevatedButton(
-            onPressed: isAnalyzing ? null : onAnalyze,
+            onPressed: widget.isAnalyzing ? null : widget.onAnalyze,
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
@@ -173,7 +196,7 @@ class UrlInputCard extends StatelessWidget {
               ),
               elevation: 0,
             ),
-            child: isAnalyzing
+            child: widget.isAnalyzing
                 ? const SizedBox(
                     height: 22,
                     width: 22,
