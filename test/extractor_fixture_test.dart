@@ -35,6 +35,22 @@ void main() {
     expect(result.qualities.first.downloadUrl, endsWith('/video/hd.mp4'));
   });
 
+  test('TikTok exposes every slideshow image as a download option', () async {
+    ExtractorHttp.postOverride = (_, _, _) async =>
+        http.Response(fixture('tiktok_images.json'), 200);
+
+    final result = await const TikTokExtractor().extract(
+      'https://www.tiktok.com/@u/photo/1',
+      l10n,
+    );
+
+    final images = result.qualities.where((option) => option.isImage).toList();
+    expect(images, hasLength(2));
+    expect(images.first.format, 'jpg');
+    expect(images.last.downloadUrl, endsWith('/images/image-2.webp'));
+    expect(images.last.format, 'webp');
+  });
+
   test('X parses and sorts the FxTwitter fixture', () async {
     ExtractorHttp.getOverride = (_, _) async =>
         http.Response(fixture('twitter.json'), 200);
@@ -78,6 +94,55 @@ void main() {
     expect(result.author, 'fixture_user');
     expect(result.qualities.single.downloadUrl, 'https://cdn.example/ig.mp4');
   });
+
+  test('Instagram exposes every carousel image as a download option', () async {
+    ExtractorHttp.getOverride = (_, _) async =>
+        http.Response(fixture('instagram_images.html'), 200);
+
+    final result = await const InstagramExtractor().extract(
+      'https://www.instagram.com/p/imageFixture/',
+      l10n,
+    );
+
+    expect(result.author, 'fixture_photographer');
+    expect(result.qualities, hasLength(2));
+    expect(result.qualities.every((option) => option.isImage), isTrue);
+    expect(result.qualities.last.downloadUrl, 'https://cdn.example/ig-2.webp');
+  });
+
+  test(
+    'Instagram enriches an og:image with SnapInsta carousel slides',
+    () async {
+      ExtractorHttp.getOverride = (uri, _) async {
+        if (uri.host == 'snap-insta.to') {
+          return http.Response(fixture('snapinsta_page.html'), 200);
+        }
+        return http.Response(fixture('instagram_single_image.html'), 200);
+      };
+      ExtractorHttp.postOverride = (uri, _, body) async {
+        expect(uri.host, 'snap-insta.to');
+        expect(body, containsPair('k_token', 'fixture-token'));
+        expect(
+          body,
+          containsPair('q', 'https://www.instagram.com/p/carousel/'),
+        );
+        return http.Response(fixture('snapinsta_carousel.json'), 200);
+      };
+
+      final result = await const InstagramExtractor().extract(
+        'https://www.instagram.com/p/carousel/',
+        l10n,
+      );
+
+      expect(result.qualities, hasLength(2));
+      expect(result.qualities.every((option) => option.isImage), isTrue);
+      expect(
+        result.qualities.first.downloadUrl,
+        'https://dl.snapcdn.app/get?token=download-one',
+      );
+      expect(result.coverUrl, 'https://i.snapcdn.app/photo?token=preview-one');
+    },
+  );
 
   test('YouTube parses a watch-page player fixture', () async {
     ExtractorHttp.getOverride = (_, _) async =>

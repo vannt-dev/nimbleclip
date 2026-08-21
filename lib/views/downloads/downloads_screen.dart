@@ -34,8 +34,12 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     super.dispose();
   }
 
-  void _playVideo(BuildContext context, DownloadTask task) {
+  void _openMedia(BuildContext context, DownloadTask task) {
     if (task.filePath == null) return;
+    if (task.isImage) {
+      context.read<DownloadProvider>().openFile(task);
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -229,7 +233,7 @@ class _DownloadsScreenState extends State<DownloadsScreen>
         final task = tasks[index];
         return CompletedDownloadCard(
           task: task,
-          onPlay: () => _playVideo(context, task),
+          onPlay: () => _openMedia(context, task),
           onSaveGallery: () async {
             final saved = await context
                 .read<DownloadProvider>()
@@ -285,7 +289,7 @@ class _DownloadsScreenState extends State<DownloadsScreen>
         } else {
           return CompletedDownloadCard(
             task: task,
-            onPlay: () => _playVideo(context, task),
+            onPlay: () => _openMedia(context, task),
             onSaveGallery: () async {
               final saved = await context
                   .read<DownloadProvider>()

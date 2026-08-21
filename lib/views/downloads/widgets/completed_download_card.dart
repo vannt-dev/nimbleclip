@@ -93,8 +93,10 @@ class CompletedDownloadCard extends StatelessWidget {
                           color: Colors.black.withAlpha(150),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(
-                          Icons.play_arrow_rounded,
+                        child: Icon(
+                          task.isImage
+                              ? Icons.visibility_outlined
+                              : Icons.play_arrow_rounded,
                           color: Colors.white,
                           size: 20,
                         ),
@@ -125,9 +127,13 @@ class CompletedDownloadCard extends StatelessWidget {
                     Row(
                       children: [
                         Icon(
-                          task.platform.icon,
+                          task.isImage
+                              ? Icons.image_outlined
+                              : task.platform.icon,
                           size: 13,
-                          color: task.platform.brandColor,
+                          color: task.isImage
+                              ? AppColors.primary
+                              : task.platform.brandColor,
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -254,12 +260,17 @@ class CompletedDownloadCard extends StatelessWidget {
           const SizedBox(height: 8),
 
           // Actions Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+          Wrap(
+            alignment: WrapAlignment.spaceAround,
+            runAlignment: WrapAlignment.center,
+            spacing: 2,
+            runSpacing: 4,
             children: [
               if (!isFailed && isCompleted) ...[
                 _ActionButton(
-                  icon: Icons.play_circle_outline_rounded,
+                  icon: task.isImage
+                      ? Icons.image_outlined
+                      : Icons.play_circle_outline_rounded,
                   label: context.l10n.view,
                   color: AppColors.primary,
                   onTap: onPlay,

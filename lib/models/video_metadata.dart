@@ -8,6 +8,7 @@ class VideoQualityOption {
   final String downloadUrl;
   final int? sizeBytes;
   final bool isAudioOnly;
+  final bool isImage;
   final Map<String, String>? headers;
 
   const VideoQualityOption({
@@ -18,6 +19,7 @@ class VideoQualityOption {
     required this.downloadUrl,
     this.sizeBytes,
     this.isAudioOnly = false,
+    this.isImage = false,
     this.headers,
   });
 
@@ -29,6 +31,7 @@ class VideoQualityOption {
     'downloadUrl': downloadUrl,
     'sizeBytes': sizeBytes,
     'isAudioOnly': isAudioOnly,
+    'isImage': isImage,
     'headers': headers,
   };
 
@@ -41,6 +44,7 @@ class VideoQualityOption {
         downloadUrl: json['downloadUrl'] as String? ?? '',
         sizeBytes: json['sizeBytes'] as int?,
         isAudioOnly: json['isAudioOnly'] as bool? ?? false,
+        isImage: json['isImage'] as bool? ?? false,
         headers: (json['headers'] as Map<String, dynamic>?)?.map(
           (k, v) => MapEntry(k, v.toString()),
         ),

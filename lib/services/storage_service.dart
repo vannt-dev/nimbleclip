@@ -20,8 +20,16 @@ class StorageService {
   }
 
   /// Saves video or audio to device gallery
-  Future<bool> saveToGallery(String filePath, {bool isAudio = false}) async {
-    return await PlatformFileHelper.saveToGallery(filePath, isAudio: isAudio);
+  Future<bool> saveToGallery(
+    String filePath, {
+    bool isAudio = false,
+    bool isImage = false,
+  }) async {
+    return await PlatformFileHelper.saveToGallery(
+      filePath,
+      isAudio: isAudio,
+      isImage: isImage,
+    );
   }
 
   /// Persists task list to SharedPreferences

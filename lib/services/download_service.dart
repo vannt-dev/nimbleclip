@@ -186,7 +186,10 @@ class DownloadService {
       }
 
       if (autoSaveToGallery && !task.isAudioOnly) {
-        task.isSavedToGallery = await storage.saveToGallery(savePath);
+        task.isSavedToGallery = await storage.saveToGallery(
+          savePath,
+          isImage: task.isImage,
+        );
       }
 
       onComplete(task, savePath);

@@ -7,6 +7,7 @@ DownloadTask task({
   String id = 'abcdef01-2345-6789-abcd-ef0123456789',
   String title = 'A video',
   String format = 'mp4',
+  bool isImage = false,
 }) {
   return DownloadTask(
     id: id,
@@ -19,6 +20,7 @@ DownloadTask task({
     platform: VideoPlatform.generic,
     qualityLabel: '720p',
     format: format,
+    isImage: isImage,
   );
 }
 
@@ -74,6 +76,14 @@ void main() {
       expect(restored.title, 'Untitled Video');
       expect(restored.platform, VideoPlatform.generic);
       expect(restored.status, DownloadStatus.completed);
+    });
+
+    test('preserves the image media type', () {
+      final restored = DownloadTask.fromJson(
+        task(format: 'jpg', isImage: true).toJson(),
+      );
+      expect(restored.format, 'jpg');
+      expect(restored.isImage, isTrue);
     });
   });
 

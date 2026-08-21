@@ -58,8 +58,24 @@ class TikTokExtractor extends BaseVideoExtractor {
     final author = data['author'] as Map<String, dynamic>? ?? {};
     final qualities = <VideoQualityOption>[];
 
+    final images = data['images'] as List<dynamic>? ?? const [];
+    for (var index = 0; index < images.length; index++) {
+      final imageUrl = images[index]?.toString() ?? '';
+      if (imageUrl.isEmpty) continue;
+      qualities.add(
+        VideoQualityOption(
+          id: 'tt_image_${index + 1}_$id',
+          label: l10n.imageLabel(index + 1),
+          quality: l10n.imageLabel(index + 1),
+          format: _imageFormat(imageUrl),
+          downloadUrl: _absolute(imageUrl),
+          isImage: true,
+        ),
+      );
+    }
+
     final hdPlay = data['hdplay']?.toString();
-    if (hdPlay != null && hdPlay.isNotEmpty) {
+    if (images.isEmpty && hdPlay != null && hdPlay.isNotEmpty) {
       qualities.add(
         VideoQualityOption(
           id: 'tt_hd_$id',
@@ -73,7 +89,7 @@ class TikTokExtractor extends BaseVideoExtractor {
     }
 
     final play = data['play']?.toString();
-    if (play != null && play.isNotEmpty) {
+    if (images.isEmpty && play != null && play.isNotEmpty) {
       qualities.add(
         VideoQualityOption(
           id: 'tt_sd_$id',
@@ -87,7 +103,10 @@ class TikTokExtractor extends BaseVideoExtractor {
     }
 
     final wmPlay = data['wmplay']?.toString();
-    if (qualities.isEmpty && wmPlay != null && wmPlay.isNotEmpty) {
+    if (images.isEmpty &&
+        qualities.isEmpty &&
+        wmPlay != null &&
+        wmPlay.isNotEmpty) {
       qualities.add(
         VideoQualityOption(
           id: 'tt_wm_$id',
@@ -145,5 +164,12 @@ class TikTokExtractor extends BaseVideoExtractor {
       commentCount: (data['comment_count'] as num?)?.toInt(),
       shareCount: (data['share_count'] as num?)?.toInt(),
     );
+  }
+
+  String _imageFormat(String url) {
+    final path = Uri.tryParse(url)?.path.toLowerCase() ?? '';
+    if (path.endsWith('.png')) return 'png';
+    if (path.endsWith('.webp')) return 'webp';
+    return 'jpg';
   }
 }

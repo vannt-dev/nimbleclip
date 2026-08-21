@@ -4,6 +4,7 @@ class PlatformFileHelper {
   static Future<bool> saveToGallery(
     String filePath, {
     bool isAudio = false,
+    bool isImage = false,
   }) async => false;
   static Future<int> calculateCacheSize(String? dirPath) async => 0;
   static Future<void> clearDownloads(String? dirPath) async {}

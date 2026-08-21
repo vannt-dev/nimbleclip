@@ -9,7 +9,7 @@ class VideoResultCard extends StatefulWidget {
   final VideoMetadata metadata;
   final VideoQualityOption? selectedQuality;
   final Function(VideoQualityOption quality) onQualitySelected;
-  final VoidCallback onDownload;
+  final ValueChanged<List<VideoQualityOption>> onDownload;
   final VoidCallback onPreview;
 
   const VideoResultCard({
@@ -27,6 +27,177 @@ class VideoResultCard extends StatefulWidget {
 
 class _VideoResultCardState extends State<VideoResultCard> {
   int _selectedTab = 0; // 0 = Video, 1 = Audio
+  final Set<String> _selectedImageIds = {};
+
+  List<VideoQualityOption> get _imageOptions =>
+      widget.metadata.qualities.where((option) => option.isImage).toList();
+
+  @override
+  void initState() {
+    super.initState();
+    _selectAllImages();
+  }
+
+  @override
+  void didUpdateWidget(covariant VideoResultCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.metadata.id != widget.metadata.id ||
+        oldWidget.metadata.originalUrl != widget.metadata.originalUrl) {
+      _selectAllImages();
+    }
+  }
+
+  void _selectAllImages() {
+    _selectedImageIds
+      ..clear()
+      ..addAll(_imageOptions.map((option) => option.id));
+  }
+
+  void _toggleImage(VideoQualityOption option) {
+    setState(() {
+      if (!_selectedImageIds.add(option.id)) {
+        _selectedImageIds.remove(option.id);
+      }
+    });
+    widget.onQualitySelected(option);
+  }
+
+  Widget _buildImageGrid(
+    BuildContext context,
+    List<VideoQualityOption> options,
+    bool isDark,
+  ) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 8.0;
+        final tileWidth = (constraints.maxWidth - spacing * 2) / 3;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: options.map((option) {
+            final isSelected = _selectedImageIds.contains(option.id);
+            return SizedBox(
+              width: tileWidth,
+              height: tileWidth / 0.78,
+              child: Semantics(
+                label: option.label,
+                selected: isSelected,
+                button: true,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _toggleImage(option),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Ink(
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppColors.darkCardElevated
+                            : AppColors.lightCardElevated,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected
+                              ? AppColors.primary
+                              : (isDark
+                                    ? AppColors.darkBorder
+                                    : AppColors.lightBorder),
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            CachedNetworkImage(
+                              imageUrl: option.downloadUrl,
+                              httpHeaders: option.headers,
+                              fit: BoxFit.cover,
+                              placeholder: (_, _) => const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                              errorWidget: (_, _, _) =>
+                                  const Icon(Icons.broken_image_outlined),
+                            ),
+                            Positioned.fill(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.black.withAlpha(15),
+                                      Colors.transparent,
+                                      Colors.black.withAlpha(170),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: Icon(
+                                isSelected
+                                    ? Icons.check_circle_rounded
+                                    : Icons.circle_outlined,
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : Colors.white,
+                                size: 24,
+                                shadows: const [Shadow(blurRadius: 4)],
+                              ),
+                            ),
+                            Positioned(
+                              top: 2,
+                              left: 2,
+                              child: IconButton(
+                                tooltip: context.l10n.preview,
+                                visualDensity: VisualDensity.compact,
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.black54,
+                                  foregroundColor: Colors.white,
+                                ),
+                                onPressed: () {
+                                  widget.onQualitySelected(option);
+                                  widget.onPreview();
+                                },
+                                icon: const Icon(
+                                  Icons.zoom_in_rounded,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              left: 6,
+                              right: 6,
+                              bottom: 6,
+                              child: Text(
+                                option.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  shadows: [Shadow(blurRadius: 4)],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +207,16 @@ class _VideoResultCardState extends State<VideoResultCard> {
     final videoOptions = meta.qualities.where((q) => !q.isAudioOnly).toList();
     final audioOptions = meta.qualities.where((q) => q.isAudioOnly).toList();
     final currentOptions = _selectedTab == 0 ? videoOptions : audioOptions;
+    final hasOnlyImages =
+        videoOptions.isNotEmpty && videoOptions.every((q) => q.isImage);
+    final selectedImages = videoOptions
+        .where(
+          (option) => option.isImage && _selectedImageIds.contains(option.id),
+        )
+        .toList();
+    final previewUrl = widget.selectedQuality?.isImage == true
+        ? widget.selectedQuality!.downloadUrl
+        : meta.coverUrl;
 
     return Container(
       decoration: BoxDecoration(
@@ -60,14 +241,14 @@ class _VideoResultCardState extends State<VideoResultCard> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // 1. Thumbnail Header with Duration & Play overlay
-          if (meta.coverUrl.isNotEmpty)
+          if (previewUrl.isNotEmpty)
             Stack(
               alignment: Alignment.center,
               children: [
                 AspectRatio(
                   aspectRatio: 16 / 9,
                   child: CachedNetworkImage(
-                    imageUrl: meta.coverUrl,
+                    imageUrl: previewUrl,
                     fit: BoxFit.cover,
                     placeholder: (context, url) => Container(
                       color: isDark
@@ -115,8 +296,10 @@ class _VideoResultCardState extends State<VideoResultCard> {
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white70, width: 2),
                     ),
-                    child: const Icon(
-                      Icons.play_arrow_rounded,
+                    child: Icon(
+                      widget.selectedQuality?.isImage == true
+                          ? Icons.zoom_in_rounded
+                          : Icons.play_arrow_rounded,
                       color: Colors.white,
                       size: 32,
                     ),
@@ -311,7 +494,13 @@ class _VideoResultCardState extends State<VideoResultCard> {
                               ),
                               alignment: Alignment.center,
                               child: Text(
-                                context.l10n.videoOptions(videoOptions.length),
+                                hasOnlyImages
+                                    ? context.l10n.imageOptions(
+                                        videoOptions.length,
+                                      )
+                                    : context.l10n.videoOptions(
+                                        videoOptions.length,
+                                      ),
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
@@ -363,101 +552,148 @@ class _VideoResultCardState extends State<VideoResultCard> {
                   ),
 
                 // 4. Quality Selector List
-                Text(
-                  context.l10n.selectDownloadQuality,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ...currentOptions.map((opt) {
-                  final isSelected = widget.selectedQuality?.id == opt.id;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: InkWell(
-                      onTap: () => widget.onQualitySelected(opt),
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.primary.withAlpha(isDark ? 40 : 25)
-                              : (isDark
-                                    ? AppColors.darkCardElevated.withAlpha(120)
-                                    : AppColors.lightCardElevated),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSelected
-                                ? AppColors.primary
-                                : (isDark
-                                      ? AppColors.darkBorder
-                                      : AppColors.lightBorder),
-                            width: isSelected ? 1.5 : 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              isSelected
-                                  ? Icons.radio_button_checked_rounded
-                                  : Icons.radio_button_off_rounded,
-                              size: 18,
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : (isDark
-                                        ? AppColors.darkTextSecondary
-                                        : AppColors.lightTextSecondary),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                opt.label,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                  color: isSelected
-                                      ? (isDark
-                                            ? Colors.white
-                                            : AppColors.primaryDark)
-                                      : (isDark
-                                            ? AppColors.darkTextPrimary
-                                            : AppColors.lightTextPrimary),
-                                ),
-                              ),
-                            ),
-                            if (opt.sizeBytes != null && opt.sizeBytes! > 0)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isDark ? Colors.black26 : Colors.white,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  Formatters.formatBytes(opt.sizeBytes!),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark
-                                        ? AppColors.darkTextSecondary
-                                        : AppColors.lightTextSecondary,
-                                  ),
-                                ),
-                              ),
-                          ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        hasOnlyImages && _selectedTab == 0
+                            ? context.l10n.selectImages
+                            : context.l10n.selectDownloadQuality,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
-                  );
-                }),
+                    if (hasOnlyImages && _selectedTab == 0)
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            if (_selectedImageIds.length ==
+                                videoOptions.length) {
+                              _selectedImageIds.clear();
+                            } else {
+                              _selectedImageIds
+                                ..clear()
+                                ..addAll(
+                                  videoOptions.map((option) => option.id),
+                                );
+                            }
+                          });
+                        },
+                        child: Text(
+                          _selectedImageIds.length == videoOptions.length
+                              ? context.l10n.deselectAll
+                              : context.l10n.selectAll,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (hasOnlyImages && _selectedTab == 0)
+                  _buildImageGrid(context, videoOptions, isDark)
+                else
+                  ...currentOptions.map((opt) {
+                    final isImageChoice = hasOnlyImages && _selectedTab == 0;
+                    final isSelected = isImageChoice
+                        ? _selectedImageIds.contains(opt.id)
+                        : widget.selectedQuality?.id == opt.id;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: InkWell(
+                        onTap: () => isImageChoice
+                            ? _toggleImage(opt)
+                            : widget.onQualitySelected(opt),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? AppColors.primary.withAlpha(isDark ? 40 : 25)
+                                : (isDark
+                                      ? AppColors.darkCardElevated.withAlpha(
+                                          120,
+                                        )
+                                      : AppColors.lightCardElevated),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : (isDark
+                                        ? AppColors.darkBorder
+                                        : AppColors.lightBorder),
+                              width: isSelected ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isImageChoice
+                                    ? (isSelected
+                                          ? Icons.check_box_rounded
+                                          : Icons
+                                                .check_box_outline_blank_rounded)
+                                    : (isSelected
+                                          ? Icons.radio_button_checked_rounded
+                                          : Icons.radio_button_off_rounded),
+                                size: 18,
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : (isDark
+                                          ? AppColors.darkTextSecondary
+                                          : AppColors.lightTextSecondary),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  opt.label,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: isSelected
+                                        ? (isDark
+                                              ? Colors.white
+                                              : AppColors.primaryDark)
+                                        : (isDark
+                                              ? AppColors.darkTextPrimary
+                                              : AppColors.lightTextPrimary),
+                                  ),
+                                ),
+                              ),
+                              if (opt.sizeBytes != null && opt.sizeBytes! > 0)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? Colors.black26
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    Formatters.formatBytes(opt.sizeBytes!),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark
+                                          ? AppColors.darkTextSecondary
+                                          : AppColors.lightTextSecondary,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
 
                 const SizedBox(height: 12),
 
@@ -466,8 +702,10 @@ class _VideoResultCardState extends State<VideoResultCard> {
                   children: [
                     OutlinedButton.icon(
                       onPressed: widget.onPreview,
-                      icon: const Icon(
-                        Icons.play_circle_outline_rounded,
+                      icon: Icon(
+                        widget.selectedQuality?.isImage == true
+                            ? Icons.image_outlined
+                            : Icons.play_circle_outline_rounded,
                         size: 18,
                       ),
                       label: Text(context.l10n.preview),
@@ -484,12 +722,22 @@ class _VideoResultCardState extends State<VideoResultCard> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: widget.selectedQuality != null
-                            ? widget.onDownload
-                            : null,
+                        onPressed: hasOnlyImages && _selectedTab == 0
+                            ? (selectedImages.isNotEmpty
+                                  ? () => widget.onDownload(selectedImages)
+                                  : null)
+                            : (widget.selectedQuality != null
+                                  ? () => widget.onDownload([
+                                      widget.selectedQuality!,
+                                    ])
+                                  : null),
                         icon: const Icon(Icons.file_download_rounded, size: 20),
                         label: Text(
-                          context.l10n.downloadNow,
+                          hasOnlyImages && _selectedTab == 0
+                              ? context.l10n.downloadSelected(
+                                  selectedImages.length,
+                                )
+                              : context.l10n.downloadNow,
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,

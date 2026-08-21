@@ -22,6 +22,7 @@ class DownloadTask {
   final String qualityLabel;
   final String format; // "mp4", "mp3"
   final bool isAudioOnly;
+  final bool isImage;
   final Map<String, String>? headers;
 
   DownloadStatus status;
@@ -47,6 +48,7 @@ class DownloadTask {
     required this.qualityLabel,
     this.format = 'mp4',
     this.isAudioOnly = false,
+    this.isImage = false,
     this.headers,
     this.status = DownloadStatus.queued,
     this.progress = 0.0,
@@ -102,6 +104,7 @@ class DownloadTask {
       qualityLabel: qualityLabel,
       format: format,
       isAudioOnly: isAudioOnly,
+      isImage: isImage,
       headers: headers ?? this.headers,
       status: DownloadStatus.queued,
       createdAt: createdAt,
@@ -120,6 +123,7 @@ class DownloadTask {
     'qualityLabel': qualityLabel,
     'format': format,
     'isAudioOnly': isAudioOnly,
+    'isImage': isImage,
     'headers': headers,
     'status': status.name,
     'progress': progress,
@@ -147,6 +151,7 @@ class DownloadTask {
     qualityLabel: json['qualityLabel'] as String? ?? 'Default',
     format: json['format'] as String? ?? 'mp4',
     isAudioOnly: json['isAudioOnly'] as bool? ?? false,
+    isImage: json['isImage'] as bool? ?? false,
     headers: (json['headers'] as Map<String, dynamic>?)?.map(
       (k, v) => MapEntry(k, v.toString()),
     ),

@@ -230,6 +230,18 @@ abstract class AppLocalizations {
   /// **'Video ({count})'**
   String videoOptions(int count);
 
+  /// No description provided for @imageOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Images ({count})'**
+  String imageOptions(int count);
+
+  /// No description provided for @imageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Image {index}'**
+  String imageLabel(int index);
+
   /// No description provided for @audioOptions.
   ///
   /// In en, this message translates to:
@@ -241,6 +253,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choose download quality:'**
   String get selectDownloadQuality;
+
+  /// No description provided for @selectImages.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose images:'**
+  String get selectImages;
+
+  /// No description provided for @selectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get selectAll;
+
+  /// No description provided for @deselectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Deselect all'**
+  String get deselectAll;
+
+  /// No description provided for @downloadSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Download selected ({count})'**
+  String downloadSelected(int count);
+
+  /// No description provided for @batchDownloadStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading {count} selected images.'**
+  String batchDownloadStarted(int count);
 
   /// No description provided for @preview.
   ///

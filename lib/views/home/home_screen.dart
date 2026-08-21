@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/url_helper.dart';
 import '../../l10n/l10n.dart';
+import '../../models/video_metadata.dart';
 import '../../providers/download_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/video_extractor_provider.dart';
@@ -51,6 +53,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _checkClipboardAutoPaste() async {
     final settings = context.read<SettingsProvider>();
     if (!settings.autoPasteClipboard) return;
+    if (context.read<VideoExtractorProvider>().hasResult) return;
 
     try {
       final data = await Clipboard.getData('text/plain');
@@ -91,6 +94,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _onAnalyze() {
     final text = _urlController.text.trim();
     if (text.isNotEmpty) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       FocusScope.of(context).unfocus();
       final preferred = context.read<SettingsProvider>().preferredQuality;
       context.read<VideoExtractorProvider>().analyzeUrl(
@@ -107,16 +111,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     setState(() {});
   }
 
-  void _onStartDownload() {
+  void _onStartDownload([List<VideoQualityOption>? qualities]) {
     final extractor = context.read<VideoExtractorProvider>();
     final settings = context.read<SettingsProvider>();
     final meta = extractor.metadata;
-    final quality = extractor.selectedQuality;
+    final selected = qualities ?? [extractor.selectedQuality].nonNulls.toList();
 
-    if (meta != null && quality != null) {
-      context.read<DownloadProvider>().startNewDownload(
+    if (meta != null && selected.isNotEmpty) {
+      context.read<DownloadProvider>().startNewDownloads(
         metadata: meta,
-        quality: quality,
+        qualities: selected,
         l10n: context.l10n,
         autoSaveToGallery: settings.autoSaveGallery,
       );
@@ -124,7 +128,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            context.l10n.downloadStarted(meta.title, quality.quality),
+            selected.length == 1
+                ? context.l10n.downloadStarted(
+                    meta.title,
+                    selected.first.quality,
+                  )
+                : context.l10n.batchDownloadStarted(selected.length),
           ),
           action: SnackBarAction(
             label: context.l10n.viewProgress,
@@ -137,12 +146,49 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  void _onPreviewVideo() {
+  void _onPreviewMedia() {
     final extractor = context.read<VideoExtractorProvider>();
     final meta = extractor.metadata;
     final quality = extractor.selectedQuality;
 
     if (meta != null && quality != null) {
+      if (quality.isImage) {
+        showDialog<void>(
+          context: context,
+          builder: (dialogContext) => Dialog(
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              children: [
+                InteractiveViewer(
+                  minScale: 0.8,
+                  maxScale: 4,
+                  child: CachedNetworkImage(
+                    imageUrl: quality.downloadUrl,
+                    fit: BoxFit.contain,
+                    placeholder: (_, _) => const SizedBox(
+                      height: 320,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    errorWidget: (_, _, _) => const SizedBox(
+                      height: 240,
+                      child: Center(child: Icon(Icons.broken_image_outlined)),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: IconButton.filledTonal(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        return;
+      }
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -291,7 +337,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     selectedQuality: extractor.selectedQuality,
                     onQualitySelected: extractor.selectQuality,
                     onDownload: _onStartDownload,
-                    onPreview: _onPreviewVideo,
+                    onPreview: _onPreviewMedia,
                   ),
                   const SizedBox(height: 24),
                 ],

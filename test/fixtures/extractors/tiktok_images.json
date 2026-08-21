@@ -1,0 +1,13 @@
+{
+  "code": 0,
+  "data": {
+    "id": "tt-images-fixture",
+    "title": "TikTok image carousel",
+    "images": [
+      "https://cdn.example/tiktok/image-1.jpg",
+      "/images/image-2.webp"
+    ],
+    "music": "/audio/slideshow.mp3",
+    "author": {"nickname": "Fixture Creator"}
+  }
+}

@@ -103,34 +103,84 @@ class DownloadProvider extends ChangeNotifier {
     required AppLocalizations l10n,
     bool autoSaveToGallery = true,
   }) async {
+    final tasks = await startNewDownloads(
+      metadata: metadata,
+      qualities: [quality],
+      l10n: l10n,
+      autoSaveToGallery: autoSaveToGallery,
+    );
+    return tasks.first;
+  }
+
+  Future<List<DownloadTask>> startNewDownloads({
+    required VideoMetadata metadata,
+    required List<VideoQualityOption> qualities,
+    required AppLocalizations l10n,
+    bool autoSaveToGallery = true,
+  }) async {
     // Do not let the asynchronous history restore clear a task that the user
     // starts immediately after launch.
     await _historyReady;
 
-    final task = DownloadTask(
-      id: _uuid.v4(),
-      videoId: metadata.id,
-      title: metadata.title,
-      author: metadata.author,
-      thumbnailUrl: metadata.coverUrl,
-      downloadUrl: quality.downloadUrl,
-      originalUrl: metadata.originalUrl,
-      platform: metadata.platform,
-      qualityLabel: quality.label,
-      format: quality.format,
-      isAudioOnly: quality.isAudioOnly,
-      headers: quality.headers,
-      totalBytes: quality.sizeBytes ?? 0,
-    );
+    if (qualities.isEmpty) return [];
+    final tasks = qualities
+        .map(
+          (quality) => DownloadTask(
+            id: _uuid.v4(),
+            videoId: metadata.id,
+            title: quality.isImage
+                ? '${metadata.title} - ${quality.label}'
+                : metadata.title,
+            author: metadata.author,
+            thumbnailUrl: quality.isImage
+                ? quality.downloadUrl
+                : metadata.coverUrl,
+            downloadUrl: quality.downloadUrl,
+            originalUrl: metadata.originalUrl,
+            platform: metadata.platform,
+            qualityLabel: quality.label,
+            format: quality.format,
+            isAudioOnly: quality.isAudioOnly,
+            isImage: quality.isImage,
+            headers: quality.headers,
+            totalBytes: quality.sizeBytes ?? 0,
+          ),
+        )
+        .toList();
 
-    _tasks.insert(0, task);
+    _tasks.insertAll(0, tasks.reversed);
     notifyListeners();
     await _saveHistory();
 
     unawaited(
-      _executeDownload(task, l10n: l10n, autoSaveToGallery: autoSaveToGallery),
+      _executeDownloadBatch(
+        tasks,
+        l10n: l10n,
+        autoSaveToGallery: autoSaveToGallery,
+      ),
     );
-    return task;
+    return tasks;
+  }
+
+  Future<void> _executeDownloadBatch(
+    List<DownloadTask> tasks, {
+    required AppLocalizations l10n,
+    required bool autoSaveToGallery,
+  }) async {
+    var nextIndex = 0;
+    Future<void> worker() async {
+      while (nextIndex < tasks.length) {
+        final task = tasks[nextIndex++];
+        await _executeDownload(
+          task,
+          l10n: l10n,
+          autoSaveToGallery: autoSaveToGallery,
+        );
+      }
+    }
+
+    final workerCount = tasks.length.clamp(1, 3);
+    await Future.wait(List.generate(workerCount, (_) => worker()));
   }
 
   Future<void> _executeDownload(
@@ -296,6 +346,7 @@ class DownloadProvider extends ChangeNotifier {
     final success = await _storageService.saveToGallery(
       task.filePath!,
       isAudio: task.isAudioOnly,
+      isImage: task.isImage,
     );
     if (success) {
       task.isSavedToGallery = true;

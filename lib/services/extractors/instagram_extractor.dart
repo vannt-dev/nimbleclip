@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/http_helper.dart';
 import '../../core/utils/quality_helper.dart';
@@ -43,12 +45,143 @@ class InstagramExtractor extends BaseVideoExtractor {
     }
 
     final viaEmbed = await _fromEmbedPage(shortcode, cleanUrl, l10n);
-    if (viaEmbed != null) return viaEmbed;
+    if (viaEmbed != null) {
+      return await _enrichImagePost(viaEmbed, shortcode, cleanUrl, l10n);
+    }
 
     final viaPage = await _fromPostPage(shortcode, cleanUrl, l10n);
-    if (viaPage != null) return viaPage;
+    if (viaPage != null) {
+      return await _enrichImagePost(viaPage, shortcode, cleanUrl, l10n);
+    }
+
+    final viaSnapInsta = await _fromSnapInsta(shortcode, cleanUrl, l10n);
+    if (viaSnapInsta != null) return viaSnapInsta;
 
     throw ExtractionException(l10n.instagramLoginRequired);
+  }
+
+  Future<VideoMetadata> _enrichImagePost(
+    VideoMetadata metadata,
+    String shortcode,
+    String url,
+    AppLocalizations l10n,
+  ) async {
+    final images = metadata.qualities.where((option) => option.isImage);
+    if (images.length != 1) return metadata;
+    return await _fromSnapInsta(shortcode, url, l10n, fallback: metadata) ??
+        metadata;
+  }
+
+  /// SnapInsta exposes carousel slides that Instagram omits from anonymous
+  /// post HTML. Its search token is read from the public landing page for each
+  /// request instead of being persisted because the token is time-limited.
+  Future<VideoMetadata?> _fromSnapInsta(
+    String shortcode,
+    String url,
+    AppLocalizations l10n, {
+    VideoMetadata? fallback,
+  }) async {
+    try {
+      final landing = await ExtractorHttp.get(
+        'https://snap-insta.to/vi',
+        userAgent: AppConstants.defaultUserAgent,
+      );
+      if (landing.statusCode != 200) return null;
+
+      final expiry = RegExp(
+        r'\bk_exp\s*=\s*"([^"]+)"',
+      ).firstMatch(landing.body)?.group(1);
+      final token = RegExp(
+        r'\bk_token\s*=\s*"([^"]+)"',
+      ).firstMatch(landing.body)?.group(1);
+      if (expiry == null || token == null) return null;
+
+      final response = await ExtractorHttp.post(
+        'https://snap-insta.to/api/ajaxSearch',
+        userAgent: AppConstants.defaultUserAgent,
+        headers: const {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: {
+          'k_exp': expiry,
+          'k_token': token,
+          'q': url,
+          't': 'media',
+          'lang': 'vi',
+          'v': 'v2',
+        },
+      );
+      if (response.statusCode != 200) return null;
+
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      if (payload['status'] != 'ok') return null;
+      final resultHtml = payload['data']?.toString() ?? '';
+      if (resultHtml.isEmpty) return null;
+
+      final downloadUrls = <String>[];
+      final previewUrls = <String>[];
+      for (final match in RegExp(
+        r'<li[^>]*>([\s\S]*?)</li>',
+        caseSensitive: false,
+      ).allMatches(resultHtml)) {
+        final item = match.group(1) ?? '';
+        final preview = _firstGroup(item, [
+          RegExp(r'<img[^>]+src="([^"]+)"', caseSensitive: false),
+        ]);
+        final download = _firstGroup(item, [
+          RegExp(r'<option[^>]+value="([^"]+)"', caseSensitive: false),
+          RegExp(
+            r'<a[^>]+href="(https://dl\.snapcdn\.app/get\?[^\"]+)"',
+            caseSensitive: false,
+          ),
+        ]);
+        if (download == null || preview == null) continue;
+
+        final cleanDownload = decodeHtmlEntities(download);
+        final cleanPreview = decodeHtmlEntities(preview);
+        final downloadUri = Uri.tryParse(cleanDownload);
+        final previewUri = Uri.tryParse(cleanPreview);
+        if (downloadUri?.scheme != 'https' ||
+            downloadUri?.host != 'dl.snapcdn.app' ||
+            previewUri?.scheme != 'https' ||
+            previewUri?.host != 'i.snapcdn.app' ||
+            downloadUrls.contains(cleanDownload)) {
+          continue;
+        }
+        downloadUrls.add(cleanDownload);
+        previewUrls.add(cleanPreview);
+      }
+      if (downloadUrls.isEmpty) return null;
+
+      return VideoMetadata(
+        id: shortcode,
+        originalUrl: url,
+        title: fallback?.title ?? 'Instagram Post ($shortcode)',
+        description: fallback?.description,
+        author: fallback?.author ?? 'Instagram',
+        authorAvatar: fallback?.authorAvatar,
+        coverUrl: previewUrls.first,
+        platform: VideoPlatform.instagram,
+        qualities: [
+          for (var index = 0; index < downloadUrls.length; index++)
+            VideoQualityOption(
+              id: 'ig_image_${index + 1}_$shortcode',
+              label: l10n.imageLabel(index + 1),
+              quality: l10n.imageLabel(index + 1),
+              format: 'jpg',
+              downloadUrl: downloadUrls[index],
+              isImage: true,
+            ),
+        ],
+        viewCount: fallback?.viewCount,
+        likeCount: fallback?.likeCount,
+        commentCount: fallback?.commentCount,
+        shareCount: fallback?.shareCount,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   /// The embed player ships the media URL inside a `contextJSON` blob.
@@ -74,7 +207,26 @@ class InstagramExtractor extends BaseVideoExtractor {
       RegExp(r'"video_versions":\[\{[^}]*"url":"([^"]+)"'),
       RegExp(r'<meta[^>]+property="og:video"[^>]+content="([^"]+)"'),
     ]);
-    if (videoUrl == null) return null;
+    if (videoUrl == null) {
+      final imageUrls = _extractImageUrls(html);
+      if (imageUrls.isEmpty) return null;
+      return _buildImages(
+        l10n: l10n,
+        shortcode: shortcode,
+        originalUrl: url,
+        imageUrls: imageUrls,
+        author: _firstGroup(html, [
+          RegExp(r'"username"\s*:\s*"([^"]+)"'),
+          RegExp(r'"owner"\s*:\s*\{[^}]*"username"\s*:\s*"([^"]+)"'),
+        ]),
+        caption: _firstGroup(html, [
+          RegExp(
+            r'"edge_media_to_caption":\{"edges":\[\{"node":\{"text":"([^"]*)"',
+          ),
+          RegExp(r'"caption"\s*:\s*"([^"]{1,400})"'),
+        ]),
+      );
+    }
 
     return _build(
       l10n: l10n,
@@ -87,14 +239,14 @@ class InstagramExtractor extends BaseVideoExtractor {
         RegExp(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"'),
       ]),
       author: _firstGroup(html, [
-        RegExp(r'"username":"([^"]+)"'),
-        RegExp(r'"owner":\{[^}]*"username":"([^"]+)"'),
+        RegExp(r'"username"\s*:\s*"([^"]+)"'),
+        RegExp(r'"owner"\s*:\s*\{[^}]*"username"\s*:\s*"([^"]+)"'),
       ]),
       caption: _firstGroup(html, [
         RegExp(
           r'"edge_media_to_caption":\{"edges":\[\{"node":\{"text":"([^"]*)"',
         ),
-        RegExp(r'"caption":"([^"]{1,400})"'),
+        RegExp(r'"caption"\s*:\s*"([^"]{1,400})"'),
       ]),
       durationSeconds: _duration(html),
       viewCount:
@@ -127,7 +279,20 @@ class InstagramExtractor extends BaseVideoExtractor {
       RegExp(r'<meta[^>]+property="og:video"[^>]+content="([^"]+)"'),
       RegExp(r'"video_url":"([^"]+)"'),
     ]);
-    if (videoUrl == null) return null;
+    if (videoUrl == null) {
+      final imageUrls = _extractImageUrls(html);
+      if (imageUrls.isEmpty) return null;
+      return _buildImages(
+        l10n: l10n,
+        shortcode: shortcode,
+        originalUrl: url,
+        imageUrls: imageUrls,
+        author: _firstGroup(html, [RegExp(r'"username"\s*:\s*"([^"]+)"')]),
+        caption: _firstGroup(html, [
+          RegExp(r'<meta[^>]+property="og:title"[^>]+content="([^"]*)"'),
+        ]),
+      );
+    }
 
     return _build(
       l10n: l10n,
@@ -137,7 +302,7 @@ class InstagramExtractor extends BaseVideoExtractor {
       thumbnail: _firstGroup(html, [
         RegExp(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"'),
       ]),
-      author: _firstGroup(html, [RegExp(r'"username":"([^"]+)"')]),
+      author: _firstGroup(html, [RegExp(r'"username"\s*:\s*"([^"]+)"')]),
       caption: _firstGroup(html, [
         RegExp(r'<meta[^>]+property="og:title"[^>]+content="([^"]*)"'),
       ]),
@@ -193,6 +358,142 @@ class InstagramExtractor extends BaseVideoExtractor {
       viewCount: viewCount,
       likeCount: likeCount,
     );
+  }
+
+  VideoMetadata _buildImages({
+    required AppLocalizations l10n,
+    required String shortcode,
+    required String originalUrl,
+    required List<String> imageUrls,
+    required String? author,
+    required String? caption,
+  }) {
+    final cleanCaption = caption == null || caption.trim().isEmpty
+        ? null
+        : decodeHtmlEntities(decodeJsonEscapes(caption)).trim();
+    final username = author == null || author.isEmpty
+        ? 'Instagram'
+        : decodeJsonEscapes(author);
+    final decodedUrls = imageUrls
+        .map((url) => decodeHtmlEntities(decodeJsonEscapes(url)))
+        .toList();
+
+    return VideoMetadata(
+      id: shortcode,
+      originalUrl: originalUrl,
+      title: cleanCaption != null && cleanCaption.isNotEmpty
+          ? cleanCaption
+          : 'Instagram Post ($shortcode)',
+      description: cleanCaption,
+      author: username,
+      coverUrl: decodedUrls.first,
+      platform: VideoPlatform.instagram,
+      qualities: [
+        for (var index = 0; index < decodedUrls.length; index++)
+          VideoQualityOption(
+            id: 'ig_image_${index + 1}_$shortcode',
+            label: l10n.imageLabel(index + 1),
+            quality: l10n.imageLabel(index + 1),
+            format: _imageFormat(decodedUrls[index]),
+            downloadUrl: decodedUrls[index],
+            isImage: true,
+          ),
+      ],
+    );
+  }
+
+  List<String> _extractImageUrls(String html) {
+    final urls = <String>[];
+
+    void addUrl(dynamic value) {
+      final url = value?.toString() ?? '';
+      if (url.isNotEmpty && !urls.contains(url)) urls.add(url);
+    }
+
+    void addMedia(dynamic value) {
+      if (value is! Map<String, dynamic>) return;
+      if (value['is_video'] == true || value['media_type'] == 2) return;
+      final node = value['node'];
+      if (node is Map<String, dynamic>) {
+        addMedia(node);
+        return;
+      }
+      final displayUrl = value['display_url'];
+      if (displayUrl != null) {
+        addUrl(displayUrl);
+        return;
+      }
+      final versions = value['image_versions2'];
+      if (versions is Map<String, dynamic>) {
+        final candidates = versions['candidates'];
+        if (candidates is List && candidates.isNotEmpty) {
+          final first = candidates.first;
+          if (first is Map<String, dynamic>) addUrl(first['url']);
+        }
+      }
+    }
+
+    void visit(dynamic value) {
+      if (value is Map<String, dynamic>) {
+        final carousel = value['carousel_media'];
+        if (carousel is List) {
+          for (final item in carousel) {
+            addMedia(item);
+          }
+        }
+        final sidecar = value['edge_sidecar_to_children'];
+        if (sidecar is Map<String, dynamic>) {
+          final edges = sidecar['edges'];
+          if (edges is List) {
+            for (final edge in edges) {
+              addMedia(edge);
+            }
+          }
+        }
+        for (final child in value.values) {
+          visit(child);
+        }
+      } else if (value is List) {
+        for (final child in value) {
+          visit(child);
+        }
+      }
+    }
+
+    final scripts = RegExp(
+      r'''<script[^>]*type=["']application/json["'][^>]*>([\s\S]*?)</script>''',
+      caseSensitive: false,
+    ).allMatches(html);
+    for (final script in scripts) {
+      try {
+        visit(jsonDecode(decodeHtmlEntities(script.group(1) ?? '')));
+      } catch (_) {
+        // Instagram changes its bootstrap payload often; the metadata fallbacks
+        // below still cover simple public image posts.
+      }
+    }
+
+    if (urls.isEmpty) {
+      for (final match in RegExp(r'"display_url":"([^"]+)"').allMatches(html)) {
+        addUrl(match.group(1));
+      }
+    }
+    if (urls.isEmpty) {
+      addUrl(
+        RegExp(
+          r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"',
+          caseSensitive: false,
+        ).firstMatch(html)?.group(1),
+      );
+    }
+    return urls;
+  }
+
+  String _imageFormat(String url) {
+    final path = Uri.tryParse(url)?.path.toLowerCase() ?? '';
+    if (path.endsWith('.png')) return 'png';
+    if (path.endsWith('.webp')) return 'webp';
+    return 'jpg';
   }
 
   String? _firstGroup(String html, List<RegExp> patterns) {

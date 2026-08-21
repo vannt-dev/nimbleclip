@@ -84,12 +84,41 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String imageOptions(int count) {
+    return 'Ảnh ($count)';
+  }
+
+  @override
+  String imageLabel(int index) {
+    return 'Ảnh $index';
+  }
+
+  @override
   String audioOptions(int count) {
     return 'Âm thanh ($count)';
   }
 
   @override
   String get selectDownloadQuality => 'Chọn chất lượng tải về:';
+
+  @override
+  String get selectImages => 'Chọn ảnh:';
+
+  @override
+  String get selectAll => 'Chọn tất cả';
+
+  @override
+  String get deselectAll => 'Bỏ chọn tất cả';
+
+  @override
+  String downloadSelected(int count) {
+    return 'Tải ảnh đã chọn ($count)';
+  }
+
+  @override
+  String batchDownloadStarted(int count) {
+    return 'Đang tải $count ảnh đã chọn.';
+  }
 
   @override
   String get preview => 'Xem trước';

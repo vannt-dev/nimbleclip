@@ -36,6 +36,7 @@ class PlatformFileHelper {
   static Future<bool> saveToGallery(
     String filePath, {
     bool isAudio = false,
+    bool isImage = false,
   }) async {
     if (isAudio) return true;
     try {
@@ -44,7 +45,11 @@ class PlatformFileHelper {
         final granted = await Gal.requestAccess();
         if (!granted) return false;
       }
-      await Gal.putVideo(filePath);
+      if (isImage) {
+        await Gal.putImage(filePath);
+      } else {
+        await Gal.putVideo(filePath);
+      }
       return true;
     } catch (_) {
       return false;

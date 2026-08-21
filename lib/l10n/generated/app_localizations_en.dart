@@ -84,12 +84,41 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String imageOptions(int count) {
+    return 'Images ($count)';
+  }
+
+  @override
+  String imageLabel(int index) {
+    return 'Image $index';
+  }
+
+  @override
   String audioOptions(int count) {
     return 'Audio ($count)';
   }
 
   @override
   String get selectDownloadQuality => 'Choose download quality:';
+
+  @override
+  String get selectImages => 'Choose images:';
+
+  @override
+  String get selectAll => 'Select all';
+
+  @override
+  String get deselectAll => 'Deselect all';
+
+  @override
+  String downloadSelected(int count) {
+    return 'Download selected ($count)';
+  }
+
+  @override
+  String batchDownloadStarted(int count) {
+    return 'Downloading $count selected images.';
+  }
 
   @override
   String get preview => 'Preview';
