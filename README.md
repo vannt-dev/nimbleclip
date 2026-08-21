@@ -18,10 +18,13 @@ management, local playback, and gallery export.
 ## Features
 
 - Detects supported links pasted from the clipboard.
-- Extracts available video and audio qualities before downloading.
+- Extracts available video, audio, and image options before downloading.
 - Shows Instagram and TikTok carousel thumbnails in a lazy full-screen picker,
   with preview, select-all, and multi-image download.
-- Tracks progress, transfer speed, and downloaded file size in real time.
+- Uses one shared download queue with at most three concurrent transfers, so
+  separate batches cannot overload the device or network.
+- Tracks progress, transfer speed, and downloaded file size per task without
+  rebuilding the entire download list.
 - Pauses and resumes native downloads when the source server supports HTTP
   range requests.
 - Refreshes expired media URLs before retrying a failed download.
@@ -75,6 +78,8 @@ builds.
   - Android Studio and an Android SDK for Android
   - Xcode on macOS for iOS and macOS
   - Visual Studio with Desktop development with C++ for Windows
+  - Windows Developer Mode enabled when building the Windows target, because
+    Flutter plugins require symbolic-link support
   - The Flutter Linux desktop prerequisites for Linux
 - Node.js 22 or later when running the Web build or server tests
 
@@ -182,13 +187,14 @@ environment variables:
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET/POST /cors-proxy?url=<url>` | Proxies an HTTP request and forwards range headers for media seeking. Add `filename=<name>` to return a download response. |
+| `GET/POST/HEAD /cors-proxy?url=<url>` | Proxies an HTTP request and forwards range headers for media seeking. Add `filename=<name>` to return a download response. |
 | `GET /resolve?url=<url>` | Resolves redirects for shortened links such as `t.co`, `fb.watch`, and `vm.tiktok.com`. |
 
 The proxy only accepts HTTP and HTTPS destinations on ports 80 and 443. It
 validates every redirect and rejects loopback, private, link-local, and other
 non-public destination addresses to reduce SSRF risk. Static files are served
-only from `build/web`.
+only from `build/web`. Every route also enforces an explicit HTTP method
+allowlist; unsupported methods return `405 Method Not Allowed`.
 
 Some YouTube streams use `signatureCipher`, which requires YouTube's JavaScript
 signature transformation and is not currently handled by the Web extractor.
@@ -234,7 +240,8 @@ lib/
 
 integration_test/        Device-level Android storage tests
 test/                    Flutter unit, widget, fixture, and Node server tests
-tool/                    Local integration-test fixture server
+tool/                    Quality checks, fixture server, emulator launcher,
+                         icon generator, and release/signing helpers
 server.js                Web static server, URL resolver, and CORS proxy
 ```
 
