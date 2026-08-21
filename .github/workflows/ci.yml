@@ -130,20 +130,19 @@ jobs:
           current_version=${current_full%%+*}
           previous_version=${previous_full%%+*}
 
-          if [ "$current_version" = "$previous_version" ]; then
-            echo "pubspec.yaml release version is unchanged ($current_version)."
-            exit 0
-          fi
-
           if ! printf '%s' "$current_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "::error::pubspec.yaml must use a semantic X.Y.Z release version."
             exit 1
           fi
 
-          oldest=$(printf '%s\n%s\n' "$previous_version" "$current_version" | sort -V | head -1)
-          if [ "$oldest" != "$previous_version" ]; then
-            echo "::error::Version must increase ($previous_version -> $current_version)."
-            exit 1
+          if [ "$current_version" != "$previous_version" ]; then
+            oldest=$(printf '%s\n%s\n' "$previous_version" "$current_version" | sort -V | head -1)
+            if [ "$oldest" != "$previous_version" ]; then
+              echo "::error::Version must increase ($previous_version -> $current_version)."
+              exit 1
+            fi
+          else
+            echo "Version is unchanged; checking for an interrupted release."
           fi
 
           if ! awk -v header="## [$current_version]" '

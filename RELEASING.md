@@ -39,7 +39,8 @@ source of truth; rerunning the script reuses them instead of rotating the key.
 No manual tag is required. CI compares the release version with the previous
 `main` revision. If the semantic version increased, the changelog contains a
 non-empty matching section, and the tag does not already exist, publishing
-starts only after all normal CI jobs pass.
+starts only after all normal CI jobs pass. If publishing is interrupted before
+the tag is created, the next successful `main` push retries the pending release.
 
 The `Release` workflow rejects malformed or decreasing versions, version/tag
 mismatches, missing release notes or signing secrets, failed checks, and
