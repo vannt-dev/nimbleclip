@@ -74,6 +74,7 @@ jobs:
           node-version: 22
       - run: node --check server.js
       - run: node --check tool/fixture_server.js
+      - run: sh -n tool/check.sh tool/run_android_integration_ci.sh
       - run: node --test test/server_test.js
 
   android:
@@ -104,22 +105,9 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          script: |
-            node tool/fixture_server.js > fixture-server.log 2>&1 &
-            fixture_pid=$!
-            trap 'kill "$fixture_pid" 2>/dev/null || true' EXIT
-            for attempt in $(seq 1 60); do
-              if curl --fail --silent http://127.0.0.1:8097/health | grep -q nimbleclip-fixture; then
-                break
-              fi
-              if ! kill -0 "$fixture_pid" 2>/dev/null; then
-                cat fixture-server.log
-                exit 1
-              fi
-              sleep 1
-            done
-            curl --fail --silent http://127.0.0.1:8097/health | grep -q nimbleclip-fixture
-            flutter test integration_test/android_storage_test.dart -d emulator-5554
+          # The action executes each YAML script line separately. Keep loops,
+          # PID ownership, and traps inside one shell process.
+          script: sh tool/run_android_integration_ci.sh
 
   release-candidate:
     name: Detect version release
