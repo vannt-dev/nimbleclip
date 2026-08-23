@@ -156,18 +156,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         l10n: context.l10n,
         autoSaveToGallery: settings.autoSaveGallery,
       );
-      if (!mounted || tasks.isEmpty) return;
+      if (!mounted) return;
+      if (tasks.isEmpty) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(context.l10n.downloadAlreadyInProgress),
+              action: SnackBarAction(
+                label: context.l10n.viewProgress,
+                onPressed: widget.onNavigateDownloads,
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        return;
+      }
 
       final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
       final notification = messenger.showSnackBar(
         SnackBar(
           content: Text(
-            selected.length == 1
+            tasks.length == 1
                 ? context.l10n.downloadStarted(
                     meta.title,
-                    selected.first.quality,
+                    tasks.first.qualityLabel,
                   )
-                : context.l10n.batchDownloadStarted(selected.length),
+                : context.l10n.batchDownloadStarted(tasks.length),
           ),
           action: SnackBarAction(
             label: context.l10n.viewProgress,

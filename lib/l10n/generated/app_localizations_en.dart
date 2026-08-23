@@ -50,6 +50,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadAgain => 'Download again';
 
   @override
+  String get downloadAlreadyInProgress =>
+      'This file is already being downloaded.';
+
+  @override
   String get viewProgress => 'View progress';
 
   @override
@@ -294,6 +298,15 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get localFileMissing =>
       'The downloaded file was not found. It may have been deleted.';
+
+  @override
+  String get noAppForFile => 'No installed app can open this file type.';
+
+  @override
+  String get fileOpenFailed => 'Could not open this file.';
+
+  @override
+  String get fileShareFailed => 'Could not share this file.';
 
   @override
   String get noVideoSource => 'No video source is available.';

@@ -251,6 +251,74 @@ void main() {
     downloads.finish(tasks.single.id);
   });
 
+  test(
+    'does not queue the same source option twice while it is active',
+    () async {
+      final downloads = _ControlledDownloadService();
+      final provider = DownloadProvider(
+        downloadService: downloads,
+        storageService: _MemoryStorageService(),
+      );
+      final metadata = _metadata(1);
+
+      final first = await provider.startNewDownloads(
+        metadata: metadata,
+        qualities: metadata.qualities,
+        l10n: l10n,
+        autoSaveToGallery: false,
+      );
+      final duplicate = await provider.startNewDownloads(
+        metadata: metadata,
+        qualities: metadata.qualities,
+        l10n: l10n,
+        autoSaveToGallery: false,
+      );
+
+      expect(first, hasLength(1));
+      expect(duplicate, isEmpty);
+      expect(downloads.started, hasLength(1));
+      downloads.finish(first.single.id);
+    },
+  );
+
+  test(
+    'marks a missing local file as failed and removes its receipt',
+    () async {
+      final metadata = _metadata(1);
+      final missing = DownloadTask(
+        id: 'missing-local',
+        videoId: metadata.id,
+        title: metadata.title,
+        author: metadata.author,
+        thumbnailUrl: '',
+        downloadUrl: metadata.qualities.single.downloadUrl,
+        originalUrl: metadata.originalUrl,
+        platform: metadata.platform,
+        sourceOptionId: metadata.qualities.single.id,
+        qualityLabel: metadata.qualities.single.label,
+        format: 'jpg',
+        kind: MediaKind.image,
+        status: DownloadStatus.completed,
+        filePath: 'Z:/nimbleclip/definitely-missing.jpg',
+      );
+      final storage = _MemoryStorageService()
+        ..history = [missing]
+        ..receipts = [missing];
+      final provider = DownloadProvider(
+        downloadService: _ControlledDownloadService(),
+        storageService: storage,
+      );
+      await _waitUntil(() => provider.allTasks.isNotEmpty);
+      final restored = provider.allTasks.single;
+
+      expect(await provider.ensureLocalFileAvailable(restored), isFalse);
+      expect(restored.status, DownloadStatus.failed);
+      expect(restored.errorMessage, 'local_file_missing');
+      expect(restored.filePath, isNull);
+      expect(storage.receipts, isEmpty);
+    },
+  );
+
   test('finds an already downloaded source option', () async {
     final metadata = _metadata(1);
     final existing = DownloadTask(

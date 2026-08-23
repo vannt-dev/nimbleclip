@@ -47,6 +47,18 @@ function serve() {
 
   http
     .createServer((req, res) => {
+      if (req.url === '/health') {
+        const body = JSON.stringify({
+          service: 'nimbleclip-fixture',
+          status: 'ok',
+        });
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Content-Length': Buffer.byteLength(body),
+        });
+        return res.end(body);
+      }
+
       if (req.url.startsWith('/invalid.mp4')) {
         const body = Buffer.from('<html><body>expired media link</body></html>');
         res.writeHead(200, {

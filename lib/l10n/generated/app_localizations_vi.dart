@@ -50,6 +50,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get downloadAgain => 'Tải lại';
 
   @override
+  String get downloadAlreadyInProgress => 'File này đang được tải xuống.';
+
+  @override
   String get viewProgress => 'Xem tiến trình';
 
   @override
@@ -292,6 +295,16 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get localFileMissing =>
       'Không tìm thấy file đã tải. File có thể đã bị xóa.';
+
+  @override
+  String get noAppForFile =>
+      'Không có ứng dụng nào trên thiết bị có thể mở loại file này.';
+
+  @override
+  String get fileOpenFailed => 'Không thể mở file này.';
+
+  @override
+  String get fileShareFailed => 'Không thể chia sẻ file này.';
 
   @override
   String get noVideoSource => 'Không có nguồn video để phát.';

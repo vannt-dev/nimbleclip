@@ -6,11 +6,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nimble_clip/l10n/generated/app_localizations.dart';
 import 'package:nimble_clip/core/utils/formatters.dart';
 import 'package:nimble_clip/models/video_platform.dart';
+import 'package:nimble_clip/models/download_task.dart';
+import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/providers/download_provider.dart';
 import 'package:nimble_clip/providers/settings_provider.dart';
 import 'package:nimble_clip/providers/video_extractor_provider.dart';
 import 'package:nimble_clip/services/extractors/registry.dart';
 import 'package:nimble_clip/views/home/home_screen.dart';
+import 'package:nimble_clip/views/downloads/widgets/completed_download_card.dart';
 
 void main() {
   final l10n = lookupAppLocalizations(const Locale('en'));
@@ -128,5 +131,46 @@ void main() {
     expect(find.text('NimbleClip'), findsOneWidget);
     expect(find.text('Paste a video link'), findsOneWidget);
     expect(find.text('Analyze & Download'), findsOneWidget);
+  });
+
+  testWidgets('completed audio does not offer a fake gallery save action', (
+    WidgetTester tester,
+  ) async {
+    final task = DownloadTask(
+      id: 'audio-task',
+      videoId: 'post',
+      title: 'Audio clip',
+      author: 'Author',
+      thumbnailUrl: '',
+      downloadUrl: 'https://example.com/audio.m4a',
+      originalUrl: 'https://example.com/post',
+      platform: VideoPlatform.generic,
+      qualityLabel: 'Audio',
+      format: 'm4a',
+      kind: MediaKind.audio,
+      status: DownloadStatus.completed,
+      filePath: '/tmp/audio.m4a',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: CompletedDownloadCard(
+            task: task,
+            onPlay: () {},
+            onSaveGallery: () {},
+            onShare: () {},
+            onOpenExternal: () {},
+            onDelete: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Save'), findsNothing);
+    expect(find.text('Share'), findsOneWidget);
+    expect(find.text('Open with'), findsOneWidget);
   });
 }

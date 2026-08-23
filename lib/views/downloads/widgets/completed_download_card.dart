@@ -192,9 +192,12 @@ class CompletedDownloadCard extends StatelessWidget {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      task.errorMessage == 'download_interrupted'
-                          ? context.l10n.downloadInterrupted
-                          : task.errorMessage ?? context.l10n.downloadFailed,
+                      switch (task.errorMessage) {
+                        'download_interrupted' =>
+                          context.l10n.downloadInterrupted,
+                        'local_file_missing' => context.l10n.localFileMissing,
+                        _ => task.errorMessage ?? context.l10n.downloadFailed,
+                      },
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.error,
@@ -275,20 +278,21 @@ class CompletedDownloadCard extends StatelessWidget {
                   color: AppColors.primary,
                   onTap: onPlay,
                 ),
-                _ActionButton(
-                  icon: task.isSavedToGallery
-                      ? Icons.check_circle_rounded
-                      : Icons.photo_library_outlined,
-                  label: task.isSavedToGallery
-                      ? context.l10n.saved
-                      : context.l10n.saveToGallery,
-                  color: task.isSavedToGallery
-                      ? AppColors.success
-                      : (isDark
-                            ? AppColors.darkTextSecondary
-                            : AppColors.lightTextSecondary),
-                  onTap: onSaveGallery,
-                ),
+                if (!task.isAudioOnly)
+                  _ActionButton(
+                    icon: task.isSavedToGallery
+                        ? Icons.check_circle_rounded
+                        : Icons.photo_library_outlined,
+                    label: task.isSavedToGallery
+                        ? context.l10n.saved
+                        : context.l10n.saveToGallery,
+                    color: task.isSavedToGallery
+                        ? AppColors.success
+                        : (isDark
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightTextSecondary),
+                    onTap: onSaveGallery,
+                  ),
                 _ActionButton(
                   icon: Icons.share_outlined,
                   label: context.l10n.share,

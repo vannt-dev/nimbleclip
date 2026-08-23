@@ -121,8 +121,10 @@ class DownloadProvider extends ChangeNotifier {
     await _historyReady;
     final receipts = await _storageService.loadDownloadReceipts();
     final candidates = <String, DownloadTask>{
-      for (final receipt in receipts) receipt.id: receipt,
       for (final task in _tasks) task.id: task,
+      // A receipt represents a verified device/Gallery copy and should win over
+      // a visible history entry that may since have lost its app-local file.
+      for (final receipt in receipts) receipt.id: receipt,
     }.values;
     final receiptIds = receipts.map((receipt) => receipt.id).toSet();
     final matches = <DownloadTask>[];
@@ -193,7 +195,14 @@ class DownloadProvider extends ChangeNotifier {
     await _historyReady;
 
     if (qualities.isEmpty) return [];
-    final tasks = qualities
+    final pendingQualities = qualities.where(
+      (quality) => !_tasks.any(
+        (task) =>
+            (task.isActive || task.status == DownloadStatus.paused) &&
+            _matchesSelection(task, metadata, [quality]),
+      ),
+    );
+    final tasks = pendingQualities
         .map(
           (quality) => DownloadTask(
             id: _uuid.v4(),
@@ -217,6 +226,8 @@ class DownloadProvider extends ChangeNotifier {
           ),
         )
         .toList();
+
+    if (tasks.isEmpty) return [];
 
     _tasks.insertAll(0, tasks.reversed);
     notifyListeners();
@@ -463,7 +474,7 @@ class DownloadProvider extends ChangeNotifier {
   }
 
   Future<bool> saveToGalleryManually(DownloadTask task) async {
-    if (task.filePath == null) return false;
+    if (task.filePath == null || task.isAudioOnly) return false;
     final success = await _storageService.saveToGallery(
       task.filePath!,
       isAudio: task.isAudioOnly,
@@ -477,14 +488,65 @@ class DownloadProvider extends ChangeNotifier {
     return success;
   }
 
-  Future<void> openFile(DownloadTask task) async {
-    if (task.filePath == null) return;
-    await _downloadService.openFile(task.filePath!);
+  Future<bool> ensureLocalFileAvailable(DownloadTask task) async {
+    await _historyReady;
+    final filePath = task.filePath;
+    if (filePath != null && PlatformFileHelper.fileExists(filePath)) {
+      return true;
+    }
+    await _markLocalFileMissing(task);
+    return false;
   }
 
-  Future<void> shareFile(DownloadTask task, String message) async {
-    if (task.filePath == null) return;
-    await _downloadService.shareFile(task.filePath!, text: message);
+  Future<FileActionResult> openFile(DownloadTask task) async {
+    if (!await ensureLocalFileAvailable(task)) {
+      return FileActionResult.fileMissing;
+    }
+    final result = await _downloadService.openFile(task.filePath!);
+    if (result == FileActionResult.fileMissing) {
+      await _markLocalFileMissing(task);
+    }
+    return result;
+  }
+
+  Future<FileActionResult> shareFile(DownloadTask task, String message) async {
+    if (!await ensureLocalFileAvailable(task)) {
+      return FileActionResult.fileMissing;
+    }
+    final result = await _downloadService.shareFile(
+      task.filePath!,
+      text: message,
+    );
+    if (result == FileActionResult.fileMissing) {
+      await _markLocalFileMissing(task);
+    }
+    return result;
+  }
+
+  Future<void> _markLocalFileMissing(DownloadTask task) async {
+    final missingPath = task.filePath;
+    task
+      ..status = DownloadStatus.failed
+      ..errorMessage = 'local_file_missing'
+      ..filePath = null
+      ..downloadSpeed = 0;
+
+    var galleryStillExists = false;
+    if (task.isSavedToGallery && !task.isAudioOnly && missingPath != null) {
+      final checked = await _storageService.galleryFileExists(
+        missingPath,
+        isImage: task.isImage,
+      );
+      galleryStillExists = checked ?? true;
+      if (checked == false) {
+        task.isSavedToGallery = false;
+      }
+    }
+    if (!galleryStillExists) {
+      await _storageService.removeDownloadReceipts({task.id});
+    }
+    notifyListeners();
+    await _saveHistory();
   }
 
   DownloadTask? _findTask(String taskId) {

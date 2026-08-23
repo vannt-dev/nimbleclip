@@ -158,6 +158,12 @@ abstract class AppLocalizations {
   /// **'Download again'**
   String get downloadAgain;
 
+  /// No description provided for @downloadAlreadyInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is already being downloaded.'**
+  String get downloadAlreadyInProgress;
+
   /// No description provided for @viewProgress.
   ///
   /// In en, this message translates to:
@@ -571,6 +577,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The downloaded file was not found. It may have been deleted.'**
   String get localFileMissing;
+
+  /// No description provided for @noAppForFile.
+  ///
+  /// In en, this message translates to:
+  /// **'No installed app can open this file type.'**
+  String get noAppForFile;
+
+  /// No description provided for @fileOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open this file.'**
+  String get fileOpenFailed;
+
+  /// No description provided for @fileShareFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not share this file.'**
+  String get fileShareFailed;
 
   /// No description provided for @noVideoSource.
   ///

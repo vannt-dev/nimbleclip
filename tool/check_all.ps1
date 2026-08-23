@@ -46,6 +46,23 @@ function Test-LocalPort {
     }
 }
 
+function Test-FixtureServer {
+    try {
+        $response = Invoke-WebRequest `
+            -Uri 'http://127.0.0.1:8097/health' `
+            -UseBasicParsing `
+            -TimeoutSec 2
+        if ($response.StatusCode -ne 200) {
+            return $false
+        }
+        $health = $response.Content | ConvertFrom-Json
+        return $health.service -eq 'nimbleclip-fixture' -and $health.status -eq 'ok'
+    }
+    catch {
+        return $false
+    }
+}
+
 foreach ($requiredCommand in @('dart', 'flutter', 'node')) {
     if ($null -eq (Get-Command $requiredCommand -ErrorAction SilentlyContinue)) {
         throw "Required command not found: $requiredCommand"
@@ -115,7 +132,12 @@ try {
             throw 'Android launcher did not return a device id.'
         }
 
-        if (-not (Test-LocalPort -Port 8097)) {
+        $portInUse = Test-LocalPort -Port 8097
+        if ($portInUse -and -not (Test-FixtureServer)) {
+            throw 'Port 8097 is occupied by a process that is not the NimbleClip fixture server.'
+        }
+
+        if (-not $portInUse) {
             Write-Host 'Starting the Android fixture server...' -ForegroundColor DarkGray
             $fixtureProcess = Start-Process `
                 -FilePath 'node' `
@@ -125,7 +147,7 @@ try {
                 -PassThru
 
             $fixtureDeadline = (Get-Date).AddSeconds(30)
-            while (-not (Test-LocalPort -Port 8097)) {
+            while (-not (Test-FixtureServer)) {
                 if ($fixtureProcess.HasExited) {
                     throw "Fixture server exited with code $($fixtureProcess.ExitCode)."
                 }
@@ -136,7 +158,7 @@ try {
             }
         }
         else {
-            Write-Host 'Reusing the fixture server already listening on port 8097.' `
+            Write-Host 'Reusing the verified fixture server on port 8097.' `
                 -ForegroundColor DarkGray
         }
 

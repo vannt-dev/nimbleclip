@@ -6,6 +6,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 
+import 'file_action_result.dart';
+
 class PlatformFileHelper {
   static const MethodChannel _mediaStoreChannel = MethodChannel(
     'com.vannt.nimbleclip/media_store',
@@ -43,7 +45,7 @@ class PlatformFileHelper {
     bool isAudio = false,
     bool isImage = false,
   }) async {
-    if (isAudio) return true;
+    if (isAudio) return false;
     try {
       final hasAccess = await Gal.hasAccess();
       if (!hasAccess) {
@@ -162,23 +164,40 @@ class PlatformFileHelper {
     }
   }
 
-  static Future<void> openFile(String filePath) async {
+  static Future<FileActionResult> openFile(String filePath) async {
     try {
       final file = File(filePath);
-      if (await file.exists()) {
-        await OpenFilex.open(filePath);
+      if (!await file.exists()) return FileActionResult.fileMissing;
+      final result = await OpenFilex.open(filePath);
+      switch (result.type) {
+        case ResultType.done:
+          return FileActionResult.success;
+        case ResultType.fileNotFound:
+          return FileActionResult.fileMissing;
+        case ResultType.noAppToOpen:
+          return FileActionResult.unsupported;
+        case ResultType.permissionDenied:
+        case ResultType.error:
+          return FileActionResult.failed;
       }
-    } catch (_) {}
+    } catch (_) {
+      return FileActionResult.failed;
+    }
   }
 
-  static Future<void> shareFile(String filePath, {String? text}) async {
+  static Future<FileActionResult> shareFile(
+    String filePath, {
+    String? text,
+  }) async {
     try {
       final file = File(filePath);
-      if (await file.exists()) {
-        // ignore: deprecated_member_use
-        await Share.shareXFiles([XFile(filePath)], text: text);
-      }
-    } catch (_) {}
+      if (!await file.exists()) return FileActionResult.fileMissing;
+      // ignore: deprecated_member_use
+      await Share.shareXFiles([XFile(filePath)], text: text);
+      return FileActionResult.success;
+    } catch (_) {
+      return FileActionResult.failed;
+    }
   }
 
   static bool fileExists(String filePath) {

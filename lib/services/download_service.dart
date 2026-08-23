@@ -33,8 +33,8 @@ abstract interface class DownloadGateway {
   void cancelDownload(String taskId);
   bool pauseDownload(String taskId);
   bool isRunning(String taskId);
-  Future<void> openFile(String filePath);
-  Future<void> shareFile(String filePath, {String? text});
+  Future<FileActionResult> openFile(String filePath);
+  Future<FileActionResult> shareFile(String filePath, {String? text});
 }
 
 class DownloadService implements DownloadGateway {
@@ -447,10 +447,10 @@ class DownloadService implements DownloadGateway {
   }
 
   @override
-  Future<void> openFile(String filePath) =>
+  Future<FileActionResult> openFile(String filePath) =>
       PlatformFileHelper.openFile(filePath);
 
   @override
-  Future<void> shareFile(String filePath, {String? text}) =>
+  Future<FileActionResult> shareFile(String filePath, {String? text}) =>
       PlatformFileHelper.shareFile(filePath, text: text);
 }

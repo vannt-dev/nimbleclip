@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/platform_file.dart';
 import '../../l10n/l10n.dart';
 import '../../models/download_task.dart';
 import '../../providers/download_provider.dart';
@@ -36,23 +37,61 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     super.dispose();
   }
 
-  void _openMedia(BuildContext context, DownloadTask task) {
-    if (task.filePath == null) return;
-    if (task.isImage) {
-      unawaited(context.read<DownloadProvider>().openFile(task));
+  Future<void> _openMedia(BuildContext context, DownloadTask task) async {
+    final provider = context.read<DownloadProvider>();
+    if (!await provider.ensureLocalFileAvailable(task)) {
+      if (context.mounted) {
+        _showFileActionResult(context, FileActionResult.fileMissing);
+      }
       return;
     }
-    unawaited(
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => VideoPlayerScreen(
-            title: task.title,
-            localFilePath: task.filePath,
-          ),
-        ),
+    if (!context.mounted) return;
+    if (task.isImage) {
+      final result = await provider.openFile(task);
+      if (context.mounted) _showFileActionResult(context, result);
+      return;
+    }
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            VideoPlayerScreen(title: task.title, localFilePath: task.filePath),
       ),
     );
+  }
+
+  void _showFileActionResult(
+    BuildContext context,
+    FileActionResult result, {
+    bool sharing = false,
+  }) {
+    if (result == FileActionResult.success) return;
+    final message = switch (result) {
+      FileActionResult.fileMissing => context.l10n.localFileMissing,
+      FileActionResult.unsupported => context.l10n.noAppForFile,
+      FileActionResult.failed =>
+        sharing ? context.l10n.fileShareFailed : context.l10n.fileOpenFailed,
+      FileActionResult.success => '',
+    };
+    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  Future<void> _openExternal(BuildContext context, DownloadTask task) async {
+    final result = await context.read<DownloadProvider>().openFile(task);
+    if (context.mounted) _showFileActionResult(context, result);
+  }
+
+  Future<void> _shareMedia(BuildContext context, DownloadTask task) async {
+    final result = await context.read<DownloadProvider>().shareFile(
+      task,
+      context.l10n.shareFromNimbleClip(task.title),
+    );
+    if (context.mounted) {
+      _showFileActionResult(context, result, sharing: true);
+    }
   }
 
   Future<void> _confirmDelete(BuildContext context, DownloadTask task) async {
@@ -240,7 +279,7 @@ class _DownloadsScreenState extends State<DownloadsScreen>
         final task = tasks[index];
         return CompletedDownloadCard(
           task: task,
-          onPlay: () => _openMedia(context, task),
+          onPlay: () => unawaited(_openMedia(context, task)),
           onSaveGallery: () async {
             final saved = await context
                 .read<DownloadProvider>()
@@ -258,11 +297,8 @@ class _DownloadsScreenState extends State<DownloadsScreen>
               );
             }
           },
-          onShare: () => context.read<DownloadProvider>().shareFile(
-            task,
-            context.l10n.shareFromNimbleClip(task.title),
-          ),
-          onOpenExternal: () => context.read<DownloadProvider>().openFile(task),
+          onShare: () => unawaited(_shareMedia(context, task)),
+          onOpenExternal: () => unawaited(_openExternal(context, task)),
           onDelete: () => _confirmDelete(context, task),
           onRetry: () => context.read<DownloadProvider>().retryTask(
             task,
@@ -296,7 +332,7 @@ class _DownloadsScreenState extends State<DownloadsScreen>
         } else {
           return CompletedDownloadCard(
             task: task,
-            onPlay: () => _openMedia(context, task),
+            onPlay: () => unawaited(_openMedia(context, task)),
             onSaveGallery: () async {
               final saved = await context
                   .read<DownloadProvider>()
@@ -314,12 +350,8 @@ class _DownloadsScreenState extends State<DownloadsScreen>
                 );
               }
             },
-            onShare: () => context.read<DownloadProvider>().shareFile(
-              task,
-              context.l10n.shareFromNimbleClip(task.title),
-            ),
-            onOpenExternal: () =>
-                context.read<DownloadProvider>().openFile(task),
+            onShare: () => unawaited(_shareMedia(context, task)),
+            onOpenExternal: () => unawaited(_openExternal(context, task)),
             onDelete: () => _confirmDelete(context, task),
             onRetry: () => context.read<DownloadProvider>().retryTask(
               task,

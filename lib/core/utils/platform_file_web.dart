@@ -1,3 +1,5 @@
+import 'file_action_result.dart';
+
 class PlatformFileHelper {
   static Future<String?> getDownloadDirectoryPath() async => null;
   static Future<bool> requestStoragePermissions() async => true;
@@ -20,8 +22,12 @@ class PlatformFileHelper {
     int length = 64,
   }) async => const [];
   static Future<bool> isPlayableVideo(String filePath) async => false;
-  static Future<void> openFile(String filePath) async {}
-  static Future<void> shareFile(String filePath, {String? text}) async {}
+  static Future<FileActionResult> openFile(String filePath) async =>
+      FileActionResult.unsupported;
+  static Future<FileActionResult> shareFile(
+    String filePath, {
+    String? text,
+  }) async => FileActionResult.unsupported;
   static bool fileExists(String filePath) => false;
   static Future<int> fileSize(String filePath) async => 0;
 }
