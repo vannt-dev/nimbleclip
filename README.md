@@ -23,14 +23,24 @@ management, local playback, and gallery export.
   with preview, select-all, and multi-image download.
 - Uses one shared download queue with at most three concurrent transfers, so
   separate batches cannot overload the device or network.
+- Prevents the same source option from being queued twice while it is already
+  downloading, and asks for confirmation before downloading an existing
+  completed file again.
 - Tracks progress, transfer speed, and downloaded file size per task without
   rebuilding the entire download list.
 - Pauses and resumes native downloads when the source server supports HTTP
   range requests.
 - Refreshes expired media URLs before retrying a failed download.
+- Uses compact, filesystem-safe UUID filenames and validates downloaded media
+  from its actual file signature. Native video downloads are also opened by the
+  platform player once before they are marked complete, preventing an HTML
+  error page or broken video from appearing as a successful download.
 - Previews remote media and plays downloaded files inside the app.
-- Saves completed media to the device gallery on Android and iOS.
-- Opens or shares downloaded files with other installed applications.
+- Saves completed videos and images to the device gallery on Android and iOS;
+  audio remains available from NimbleClip's download directory.
+- Opens or shares downloaded files with other installed applications, reports
+  missing handlers and operation failures, and reconciles history when a local
+  file has been removed outside the app.
 - Persists download history and user preferences locally.
 - Supports light, dark, and system themes.
 - Supports English and Vietnamese, with automatic device-locale detection and
@@ -177,8 +187,14 @@ node tool/fixture_server.js
 flutter test integration_test/android_storage_test.dart -d <device-id>
 ```
 
-The test covers file storage, download progress, pause/resume behavior, and
-gallery export.
+The fixture exposes `GET /health` on port `8097`. The all-in-one verification
+script checks this identity before reusing the port, so an unrelated local
+process cannot be mistaken for the test server.
+
+The suite covers scoped storage, file integrity, playable video validation,
+cleartext development-host access, clean and resumed downloads, servers that
+ignore or change range behavior, Gallery/MediaStore export, and cache cleanup.
+The same suite runs on an Android emulator in CI.
 
 ## Web build
 
@@ -285,9 +301,10 @@ streams that do not support the default policy.
 
 The GitHub Actions workflow runs on every pull request and every push to
 `main`. It validates commit messages and formatting, performs Flutter static
-analysis and tests, checks an Android build and a release Web build, and runs
-the Node server checks. A version-bump commit on `main` automatically starts
-the signed release workflow after every CI job succeeds, as documented in
+analysis and tests, builds an Android APK and release Web bundle, runs the Node
+server checks, and executes the Android storage/download integration suite on
+an API 34 emulator. A version-bump commit on `main` automatically starts the
+signed release workflow after every CI job succeeds, as documented in
 [RELEASING.md](RELEASING.md).
 
 ## Contributing

@@ -6,6 +6,27 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- Hardened native downloads with media signature inspection, real video
+  playback validation, extension correction, and clean restart behavior when a
+  server mishandles HTTP range requests.
+- Switched downloaded files to compact UUID-style names and added persistent
+  download receipts so completed local or Gallery copies are detected even
+  after visible history is cleared.
+- Added confirmation before downloading an existing file again and prevented
+  duplicate tasks while the same source option is queued, downloading, or
+  paused.
+- Fixed long-lived download notifications so they close when every task in the
+  batch reaches a terminal state.
+- Improved open and share actions with explicit missing-file, unsupported-app,
+  and failure feedback; stale local files are now reconciled with history.
+- Removed the misleading Gallery action for audio while retaining Gallery
+  export for videos and images.
+- Added a single Windows verification command covering formatting, analysis,
+  Flutter and Node tests, Web release build, emulator setup, fixture lifecycle,
+  and Android integration tests.
+- Added fixture-server identity checks and Android emulator integration tests
+  to continuous integration.
+
 ## [1.1.0] - 2026-08-21
 
 - Added public Instagram and TikTok image-post support, including carousel
