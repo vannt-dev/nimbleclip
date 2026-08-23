@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-08-23
+
 - Hardened native downloads with media signature inspection, real video
   playback validation, extension correction, and clean restart behavior when a
   server mishandles HTTP range requests.
