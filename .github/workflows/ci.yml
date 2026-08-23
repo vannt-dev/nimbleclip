@@ -78,7 +78,7 @@ jobs:
       - run: node --test test/server_test.js
 
   android:
-    name: Android build and integration tests
+    name: Android integration tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -87,6 +87,11 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+      - name: Enable KVM acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
       - uses: gradle/actions/setup-gradle@v5
       - uses: subosito/flutter-action@v2
         with:
@@ -97,7 +102,6 @@ jobs:
         with:
           node-version: 22
       - run: flutter pub get
-      - run: flutter build apk --debug --target-platform android-arm64
       - name: Run Android integration tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
