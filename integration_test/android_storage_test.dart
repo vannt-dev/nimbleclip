@@ -8,6 +8,7 @@ import 'package:nimble_clip/l10n/generated/app_localizations.dart';
 import 'package:nimble_clip/models/download_task.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/services/download_service.dart';
+import 'package:video_player/video_player.dart';
 
 /// On-device checks for the Android storage and download paths.
 ///
@@ -118,7 +119,42 @@ void main() {
       final header = await file.openRead(4, 8).first;
       expect(String.fromCharCodes(header), 'ftyp');
 
+      final player = VideoPlayerController.file(file);
+      await player.initialize();
+      expect(player.value.isInitialized, isTrue);
+      expect(player.value.duration, greaterThan(Duration.zero));
+      await player.dispose();
+
       await file.delete();
+    });
+
+    test('rejects an HTML error page disguised as MP4', () async {
+      final task = DownloadTask(
+        id: 'aaaaaa06-html',
+        videoId: 'fixture-invalid',
+        title: 'Invalid media',
+        author: 'Fixture',
+        thumbnailUrl: '',
+        downloadUrl: '$fixtureHost/invalid.mp4',
+        originalUrl: '$fixtureHost/invalid.mp4',
+        platform: VideoPlatform.generic,
+        qualityLabel: 'Original',
+      );
+      String? failure;
+
+      await service.startDownload(
+        task: task,
+        l10n: l10n,
+        autoSaveToGallery: true,
+        onProgress: (_, _, _, _, _) {},
+        onComplete: (_, _) {},
+        onError: (_, error) => failure = error,
+      );
+
+      expect(task.status, DownloadStatus.failed);
+      expect(failure, contains('invalid or unsupported'));
+      expect(task.isSavedToGallery, isFalse);
+      expect(File(task.filePath!).existsSync(), isFalse);
     });
 
     test('resumes from a partial file using a byte range', () async {

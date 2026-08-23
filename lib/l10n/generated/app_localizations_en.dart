@@ -32,6 +32,24 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get duplicateDownloadTitle => 'Already downloaded';
+
+  @override
+  String duplicateDownloadMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count selected files have already been downloaded. Download them again?',
+      one: 'This file has already been downloaded. Download it again?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get downloadAgain => 'Download again';
+
+  @override
   String get viewProgress => 'View progress';
 
   @override
@@ -241,6 +259,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get unknownNetworkError => 'Unknown network error.';
+
+  @override
+  String get invalidDownloadedMedia =>
+      'The server returned an invalid or unsupported media file.';
 
   @override
   String get retry => 'Retry';

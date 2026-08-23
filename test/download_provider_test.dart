@@ -60,7 +60,8 @@ class _MemoryStorageService implements StorageService {
   int maxConcurrentSaves = 0;
 
   @override
-  Future<List<DownloadTask>> loadHistory() async => [];
+  Future<List<DownloadTask>> loadHistory() async =>
+      history.map((task) => DownloadTask.fromJson(task.toJson())).toList();
 
   @override
   Future<void> saveHistory(List<DownloadTask> tasks) async {
@@ -193,5 +194,37 @@ void main() {
     expect(await provider.clearDownloadedFiles(), isFalse);
     expect(storage.downloadsCleared, isFalse);
     downloads.finish(tasks.single.id);
+  });
+
+  test('finds an already downloaded source option', () async {
+    final metadata = _metadata(1);
+    final existing = DownloadTask(
+      id: 'existing',
+      videoId: metadata.id,
+      title: metadata.title,
+      author: metadata.author,
+      thumbnailUrl: '',
+      downloadUrl: metadata.qualities.single.downloadUrl,
+      originalUrl: metadata.originalUrl,
+      platform: metadata.platform,
+      sourceOptionId: metadata.qualities.single.id,
+      qualityLabel: metadata.qualities.single.label,
+      format: metadata.qualities.single.format,
+      kind: metadata.qualities.single.kind,
+      status: DownloadStatus.completed,
+      isSavedToGallery: true,
+    );
+    final provider = DownloadProvider(
+      downloadService: _ControlledDownloadService(),
+      storageService: _MemoryStorageService()..history = [existing],
+    );
+
+    final matches = await provider.findExistingDownloads(
+      metadata: metadata,
+      qualities: metadata.qualities,
+    );
+
+    expect(matches, hasLength(1));
+    expect(matches.single.id, existing.id);
   });
 }

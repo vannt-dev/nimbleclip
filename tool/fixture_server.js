@@ -47,6 +47,15 @@ function serve() {
 
   http
     .createServer((req, res) => {
+      if (req.url.startsWith('/invalid.mp4')) {
+        const body = Buffer.from('<html><body>expired media link</body></html>');
+        res.writeHead(200, {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Content-Length': body.length,
+        });
+        return res.end(body);
+      }
+
       // `?norange` simulates a server that ignores Range, so the test can check
       // the client restarts cleanly instead of appending onto a partial file.
       const ignoreRange = req.url.includes('norange');

@@ -8,6 +8,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/url_helper.dart';
 import '../../l10n/l10n.dart';
+import '../../models/download_task.dart';
 import '../../models/video_metadata.dart';
 import '../../providers/download_provider.dart';
 import '../../providers/settings_provider.dart';
@@ -114,23 +115,51 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     context.read<VideoExtractorProvider>().clear();
   }
 
-  void _onStartDownload([List<VideoQualityOption>? qualities]) {
+  Future<void> _onStartDownload([List<VideoQualityOption>? qualities]) async {
     final extractor = context.read<VideoExtractorProvider>();
     final settings = context.read<SettingsProvider>();
     final meta = extractor.metadata;
     final selected = qualities ?? [extractor.selectedQuality].nonNulls.toList();
 
     if (meta != null && selected.isNotEmpty) {
-      unawaited(
-        context.read<DownloadProvider>().startNewDownloads(
-          metadata: meta,
-          qualities: selected,
-          l10n: context.l10n,
-          autoSaveToGallery: settings.autoSaveGallery,
-        ),
+      final provider = context.read<DownloadProvider>();
+      final existing = await provider.findExistingDownloads(
+        metadata: meta,
+        qualities: selected,
       );
+      if (!mounted) return;
+      if (existing.isNotEmpty) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(context.l10n.duplicateDownloadTitle),
+            content: Text(
+              context.l10n.duplicateDownloadMessage(existing.length),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(context.l10n.cancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(context.l10n.downloadAgain),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true || !mounted) return;
+      }
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      final tasks = await provider.startNewDownloads(
+        metadata: meta,
+        qualities: selected,
+        l10n: context.l10n,
+        autoSaveToGallery: settings.autoSaveGallery,
+      );
+      if (!mounted || tasks.isEmpty) return;
+
+      final notification = ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             selected.length == 1
@@ -146,8 +175,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             onPressed: widget.onNavigateDownloads,
           ),
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(days: 1),
         ),
       );
+      void closeWhenFinished() {
+        final finished = tasks.every(
+          (task) => !task.isActive && task.status != DownloadStatus.paused,
+        );
+        if (!finished) return;
+        provider.removeListener(closeWhenFinished);
+        notification.close();
+      }
+
+      provider.addListener(closeWhenFinished);
+      closeWhenFinished();
     }
   }
 

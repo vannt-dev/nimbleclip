@@ -97,6 +97,31 @@ class PlatformFileHelper {
     } catch (_) {}
   }
 
+  static Future<String> renameFile(String filePath, String newPath) async {
+    if (filePath == newPath) return filePath;
+    final source = File(filePath);
+    if (!await source.exists()) return filePath;
+    final destination = File(newPath);
+    if (await destination.exists()) {
+      await destination.delete();
+    }
+    return (await source.rename(newPath)).path;
+  }
+
+  static Future<List<int>> readFileHeader(
+    String filePath, {
+    int length = 64,
+  }) async {
+    final file = File(filePath);
+    if (!await file.exists()) return const [];
+    final handle = await file.open();
+    try {
+      return await handle.read(length);
+    } finally {
+      await handle.close();
+    }
+  }
+
   static Future<void> openFile(String filePath) async {
     try {
       final file = File(filePath);

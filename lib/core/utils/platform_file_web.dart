@@ -9,6 +9,12 @@ class PlatformFileHelper {
   static Future<int> calculateCacheSize(String? dirPath) async => 0;
   static Future<void> clearDownloads(String? dirPath) async {}
   static Future<void> deleteFile(String filePath) async {}
+  static Future<String> renameFile(String filePath, String newPath) async =>
+      filePath;
+  static Future<List<int>> readFileHeader(
+    String filePath, {
+    int length = 64,
+  }) async => const [];
   static Future<void> openFile(String filePath) async {}
   static Future<void> shareFile(String filePath, {String? text}) async {}
   static bool fileExists(String filePath) => false;

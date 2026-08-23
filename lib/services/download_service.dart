@@ -38,26 +38,16 @@ class DownloadService {
 
   static const String _pauseReason = 'paused-by-user';
 
-  /// Builds a filesystem-safe name. Windows reserves `\/:*?"<>|`, and a name
-  /// that is only punctuation collapses to empty, so a fallback is applied.
-  String buildFileName(DownloadTask task) {
-    final sanitized = task.title
-        .replaceAll(RegExp(r'[\\/:*?"<>|\x00-\x1f]'), '_')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        // A title made entirely of reserved characters collapses to a run of
-        // underscores, which is a legal but meaningless file name.
-        .replaceAll(RegExp(r'^[_\s.]+|[_\s.]+$'), '')
-        .trim();
-
-    // Leave room for the suffix and extension within the common 255-byte limit.
-    var base = sanitized.isEmpty ? 'NimbleClip' : sanitized;
-    if (base.length > 120) base = base.substring(0, 120).trim();
-
-    final suffix = task.id.length >= 6 ? task.id.substring(0, 6) : task.id;
-    final ext = task.format.replaceAll('.', '').trim();
-    final extension = ext.isEmpty ? 'mp4' : ext;
-
-    return suffix.isEmpty ? '$base.$extension' : '${base}_$suffix.$extension';
+  /// Uses a short UUID-style name so Gallery apps receive a predictable,
+  /// filesystem-safe display name regardless of the post caption.
+  String buildFileName(DownloadTask task, {String? extension}) {
+    final compactId = task.id.replaceAll(RegExp('[^a-zA-Z0-9]'), '');
+    final base = compactId.isEmpty
+        ? 'NimbleClip'
+        : compactId.substring(0, compactId.length.clamp(0, 12));
+    final ext = (extension ?? task.format).replaceAll('.', '').trim();
+    final safeExtension = ext.isEmpty ? 'mp4' : ext;
+    return '$base.$safeExtension';
   }
 
   Future<void> startDownload({
@@ -176,23 +166,40 @@ class DownloadService {
       }
 
       _cancelTokens.remove(task.id);
+      final contentType = response.headers.value('content-type');
+      await _validateDownloadedMedia(task, savePath, contentType, l10n);
+      final actualExtension = _extensionForContentType(contentType);
+      var completedPath = savePath;
+      if (actualExtension != null &&
+          actualExtension.toLowerCase() != task.format.toLowerCase()) {
+        final correctedName = buildFileName(task, extension: actualExtension);
+        final separator = savePath.lastIndexOf(RegExp(r'[/\\]'));
+        final correctedPath = separator == -1
+            ? correctedName
+            : '${savePath.substring(0, separator + 1)}$correctedName';
+        completedPath = await PlatformFileHelper.renameFile(
+          savePath,
+          correctedPath,
+        );
+      }
+      task.filePath = completedPath;
       task.status = DownloadStatus.completed;
       task.progress = 1.0;
       task.downloadSpeed = 0.0;
       task.completedAt = DateTime.now();
       if (task.totalBytes == 0) {
-        task.totalBytes = await PlatformFileHelper.fileSize(savePath);
+        task.totalBytes = await PlatformFileHelper.fileSize(completedPath);
         task.receivedBytes = task.totalBytes;
       }
 
       if (autoSaveToGallery && !task.isAudioOnly) {
         task.isSavedToGallery = await storage.saveToGallery(
-          savePath,
+          completedPath,
           isImage: task.isImage,
         );
       }
 
-      onComplete(task, savePath);
+      onComplete(task, completedPath);
     } on DioException catch (e) {
       _cancelTokens.remove(task.id);
       task.downloadSpeed = 0.0;
@@ -321,6 +328,66 @@ class DownloadService {
       caseSensitive: false,
     ).firstMatch(value.trim());
     return match != null && int.tryParse(match.group(1)!) == offset;
+  }
+
+  Future<void> _validateDownloadedMedia(
+    DownloadTask task,
+    String filePath,
+    String? contentType,
+    AppLocalizations l10n,
+  ) async {
+    final normalizedType = contentType?.split(';').first.trim().toLowerCase();
+    if (normalizedType != null &&
+        (normalizedType.startsWith('text/') ||
+            normalizedType == 'application/json' ||
+            normalizedType == 'application/xml')) {
+      throw FormatException(l10n.invalidDownloadedMedia);
+    }
+
+    final header = await PlatformFileHelper.readFileHeader(filePath);
+    if (header.isEmpty || _looksLikeMarkup(header)) {
+      throw FormatException(l10n.invalidDownloadedMedia);
+    }
+
+    final expectedPrefix = task.isImage
+        ? 'image/'
+        : task.isAudioOnly
+        ? 'audio/'
+        : 'video/';
+    if (normalizedType != null &&
+        normalizedType.isNotEmpty &&
+        normalizedType != 'application/octet-stream' &&
+        normalizedType != 'binary/octet-stream' &&
+        normalizedType != 'application/force-download' &&
+        !normalizedType.startsWith(expectedPrefix)) {
+      throw FormatException(l10n.invalidDownloadedMedia);
+    }
+  }
+
+  bool _looksLikeMarkup(List<int> bytes) {
+    final prefix = String.fromCharCodes(bytes).trimLeft().toLowerCase();
+    return prefix.startsWith('<!doctype') ||
+        prefix.startsWith('<html') ||
+        prefix.startsWith('<?xml') ||
+        prefix.startsWith('{"') ||
+        prefix.startsWith('[');
+  }
+
+  String? _extensionForContentType(String? contentType) {
+    final type = contentType?.split(';').first.trim().toLowerCase();
+    return switch (type) {
+      'video/mp4' => 'mp4',
+      'video/webm' => 'webm',
+      'video/quicktime' => 'mov',
+      'image/jpeg' => 'jpg',
+      'image/png' => 'png',
+      'image/webp' => 'webp',
+      'image/gif' => 'gif',
+      'audio/mpeg' => 'mp3',
+      'audio/mp4' || 'audio/x-m4a' => 'm4a',
+      'audio/ogg' => 'ogg',
+      _ => null,
+    };
   }
 
   /// Stops a download and discards its partial file.

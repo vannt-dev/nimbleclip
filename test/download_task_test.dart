@@ -148,46 +148,29 @@ void main() {
   group('DownloadService.buildFileName', () {
     final service = DownloadService();
 
-    test('replaces characters the filesystem rejects', () {
-      final name = service.buildFileName(task(title: r'a/b\c:d*e?f"g<h>i|j'));
-      expect(name, isNot(contains(RegExp(r'[\\/:*?"<>|]'))));
-      expect(name, endsWith('.mp4'));
+    test('uses a compact UUID-style name', () {
+      expect(service.buildFileName(task(title: 'My Clip')), 'abcdef012345.mp4');
     });
 
-    test('keeps a readable base and appends a short id', () {
-      expect(
-        service.buildFileName(task(title: 'My Clip')),
-        'My Clip_abcdef.mp4',
-      );
-    });
-
-    test('falls back when the title sanitises to nothing', () {
-      expect(
-        service.buildFileName(task(title: '///')),
-        'NimbleClip_abcdef.mp4',
-      );
-      expect(
-        service.buildFileName(task(title: '   ')),
-        'NimbleClip_abcdef.mp4',
-      );
-    });
-
-    test('truncates very long titles', () {
-      final name = service.buildFileName(task(title: 'x' * 500));
-      expect(name.length, lessThan(140));
-      expect(name, endsWith('.mp4'));
+    test('does not depend on the title', () {
+      expect(service.buildFileName(task(title: '///')), 'abcdef012345.mp4');
+      expect(service.buildFileName(task(title: 'x' * 500)), 'abcdef012345.mp4');
     });
 
     test('does not crash on a short or empty id', () {
       // Regression: substring(0, 6) threw RangeError for a task restored from a
       // history entry with a missing id.
-      expect(service.buildFileName(task(id: '')), 'A video.mp4');
-      expect(service.buildFileName(task(id: 'ab')), 'A video_ab.mp4');
+      expect(service.buildFileName(task(id: '')), 'NimbleClip.mp4');
+      expect(service.buildFileName(task(id: 'ab')), 'ab.mp4');
     });
 
     test('normalises the extension', () {
       expect(service.buildFileName(task(format: '.mp3')), endsWith('.mp3'));
       expect(service.buildFileName(task(format: '')), endsWith('.mp4'));
+      expect(
+        service.buildFileName(task(), extension: 'webm'),
+        'abcdef012345.webm',
+      );
     });
   });
 }

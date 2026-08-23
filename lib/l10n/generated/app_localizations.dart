@@ -140,6 +140,24 @@ abstract class AppLocalizations {
   /// **'Downloading: {title} ({quality})'**
   String downloadStarted(String title, String quality);
 
+  /// No description provided for @duplicateDownloadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Already downloaded'**
+  String get duplicateDownloadTitle;
+
+  /// No description provided for @duplicateDownloadMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{This file has already been downloaded. Download it again?} other{{count} selected files have already been downloaded. Download them again?}}'**
+  String duplicateDownloadMessage(num count);
+
+  /// No description provided for @downloadAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Download again'**
+  String get downloadAgain;
+
   /// No description provided for @viewProgress.
   ///
   /// In en, this message translates to:
@@ -493,6 +511,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unknown network error.'**
   String get unknownNetworkError;
+
+  /// No description provided for @invalidDownloadedMedia.
+  ///
+  /// In en, this message translates to:
+  /// **'The server returned an invalid or unsupported media file.'**
+  String get invalidDownloadedMedia;
 
   /// No description provided for @retry.
   ///

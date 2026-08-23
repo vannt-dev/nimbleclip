@@ -102,6 +102,39 @@ class DownloadProvider extends ChangeNotifier {
     return tasks.first;
   }
 
+  /// Finds selected media that already has a completed local or Gallery copy.
+  /// The source option id is stable across re-analysis; older history entries
+  /// fall back to quality and media kind when that id was not persisted.
+  Future<List<DownloadTask>> findExistingDownloads({
+    required VideoMetadata metadata,
+    required List<VideoQualityOption> qualities,
+  }) async {
+    await _historyReady;
+    return _tasks
+        .where((task) {
+          if (task.status != DownloadStatus.completed) return false;
+          final hasCopy =
+              task.isSavedToGallery ||
+              (task.filePath != null &&
+                  PlatformFileHelper.fileExists(task.filePath!));
+          if (!hasCopy) return false;
+          final sameSource =
+              task.platform == metadata.platform &&
+              (task.videoId == metadata.id ||
+                  (task.originalUrl.isNotEmpty &&
+                      task.originalUrl == metadata.originalUrl));
+          if (!sameSource) return false;
+          return qualities.any((quality) {
+            if (task.sourceOptionId.isNotEmpty && quality.id.isNotEmpty) {
+              return task.sourceOptionId == quality.id;
+            }
+            return task.qualityLabel == quality.label &&
+                task.kind == quality.kind;
+          });
+        })
+        .toList(growable: false);
+  }
+
   Future<List<DownloadTask>> startNewDownloads({
     required VideoMetadata metadata,
     required List<VideoQualityOption> qualities,

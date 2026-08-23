@@ -33,6 +33,23 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String get duplicateDownloadTitle => 'Nội dung đã được tải';
+
+  @override
+  String duplicateDownloadMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Có $count file đã được tải. Bạn có muốn tải lại không?',
+      one: 'File này đã được tải. Bạn có muốn tải lại không?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get downloadAgain => 'Tải lại';
+
+  @override
   String get viewProgress => 'Xem tiến trình';
 
   @override
@@ -240,6 +257,10 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get unknownNetworkError => 'Lỗi mạng không xác định.';
+
+  @override
+  String get invalidDownloadedMedia =>
+      'Máy chủ trả về file media không hợp lệ hoặc không được hỗ trợ.';
 
   @override
   String get retry => 'Thử lại';
