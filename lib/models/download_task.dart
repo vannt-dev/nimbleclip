@@ -28,7 +28,7 @@ class DownloadTask extends ChangeNotifier {
   final VideoPlatform platform;
   final String sourceOptionId;
   final String qualityLabel;
-  final String format; // "mp4", "mp3"
+  String format; // "mp4", "mp3"
   final MediaKind kind;
   final Map<String, String>? headers;
 

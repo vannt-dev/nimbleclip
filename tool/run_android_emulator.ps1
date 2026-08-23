@@ -6,7 +6,8 @@ param(
     [ValidateRange(15, 300)]
     [int]$BootTimeoutSeconds = 90,
     [switch]$Release,
-    [switch]$KeepRunningApp
+    [switch]$KeepRunningApp,
+    [switch]$PrepareOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -80,6 +81,11 @@ if ($null -eq $device) {
 }
 
 Write-Host "Using $($device.name) [$($device.id)]." -ForegroundColor Green
+
+if ($PrepareOnly) {
+    Write-Output $device.id
+    return
+}
 
 if (-not $KeepRunningApp) {
     $adbPath = Get-AdbPath

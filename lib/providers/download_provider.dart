@@ -14,7 +14,7 @@ import '../services/storage_service.dart';
 
 class DownloadProvider extends ChangeNotifier {
   DownloadProvider({
-    DownloadService? downloadService,
+    DownloadGateway? downloadService,
     StorageService? storageService,
   }) : _downloadService = downloadService ?? DownloadService(),
        _storageService = storageService ?? StorageService() {
@@ -22,7 +22,7 @@ class DownloadProvider extends ChangeNotifier {
   }
 
   final List<DownloadTask> _tasks = [];
-  final DownloadService _downloadService;
+  final DownloadGateway _downloadService;
   final StorageService _storageService;
   final Uuid _uuid = const Uuid();
   late final Future<void> _historyReady;
@@ -74,16 +74,25 @@ class DownloadProvider extends ChangeNotifier {
     _tasks
       ..clear()
       ..addAll(loaded);
+    await _storageService.saveDownloadReceipts(
+      loaded.where((task) => task.status == DownloadStatus.completed),
+    );
     notifyListeners();
   }
 
-  Future<void> _saveHistory() {
+  Future<void> _saveHistory({DownloadTask? receipt}) {
     final snapshot = _tasks
         .map((task) => DownloadTask.fromJson(task.toJson()))
         .toList(growable: false);
-    _persistenceTail = _persistenceTail.then(
-      (_) => _storageService.saveHistory(snapshot),
-    );
+    final receiptSnapshot = receipt == null
+        ? null
+        : DownloadTask.fromJson(receipt.toJson());
+    _persistenceTail = _persistenceTail.then((_) async {
+      if (receiptSnapshot != null) {
+        await _storageService.saveDownloadReceipt(receiptSnapshot);
+      }
+      await _storageService.saveHistory(snapshot);
+    });
     return _persistenceTail;
   }
 
@@ -110,29 +119,67 @@ class DownloadProvider extends ChangeNotifier {
     required List<VideoQualityOption> qualities,
   }) async {
     await _historyReady;
-    return _tasks
-        .where((task) {
-          if (task.status != DownloadStatus.completed) return false;
-          final hasCopy =
-              task.isSavedToGallery ||
-              (task.filePath != null &&
-                  PlatformFileHelper.fileExists(task.filePath!));
-          if (!hasCopy) return false;
-          final sameSource =
-              task.platform == metadata.platform &&
-              (task.videoId == metadata.id ||
-                  (task.originalUrl.isNotEmpty &&
-                      task.originalUrl == metadata.originalUrl));
-          if (!sameSource) return false;
-          return qualities.any((quality) {
-            if (task.sourceOptionId.isNotEmpty && quality.id.isNotEmpty) {
-              return task.sourceOptionId == quality.id;
-            }
-            return task.qualityLabel == quality.label &&
-                task.kind == quality.kind;
-          });
-        })
-        .toList(growable: false);
+    final receipts = await _storageService.loadDownloadReceipts();
+    final candidates = <String, DownloadTask>{
+      for (final receipt in receipts) receipt.id: receipt,
+      for (final task in _tasks) task.id: task,
+    }.values;
+    final receiptIds = receipts.map((receipt) => receipt.id).toSet();
+    final matches = <DownloadTask>[];
+    final staleReceiptIds = <String>{};
+    var historyChanged = false;
+
+    for (final task in candidates) {
+      if (task.status != DownloadStatus.completed ||
+          !_matchesSelection(task, metadata, qualities)) {
+        continue;
+      }
+      final localExists =
+          task.filePath != null &&
+          PlatformFileHelper.fileExists(task.filePath!);
+      var galleryExists = task.isSavedToGallery && task.filePath == null;
+      if (task.isSavedToGallery && task.filePath != null) {
+        final checked = await _storageService.galleryFileExists(
+          task.filePath!,
+          isImage: task.isImage,
+        );
+        galleryExists = checked ?? true;
+        if (checked == false) {
+          task.isSavedToGallery = false;
+          historyChanged = _tasks.contains(task) || historyChanged;
+        }
+      }
+      if (localExists || galleryExists) {
+        matches.add(task);
+      } else if (receiptIds.contains(task.id)) {
+        staleReceiptIds.add(task.id);
+      }
+    }
+
+    if (staleReceiptIds.isNotEmpty) {
+      await _storageService.removeDownloadReceipts(staleReceiptIds);
+    }
+    if (historyChanged) await _saveHistory();
+    return matches;
+  }
+
+  bool _matchesSelection(
+    DownloadTask task,
+    VideoMetadata metadata,
+    List<VideoQualityOption> qualities,
+  ) {
+    final sameSource =
+        task.platform == metadata.platform &&
+        (task.videoId == metadata.id ||
+            (task.originalUrl.isNotEmpty &&
+                task.originalUrl == metadata.originalUrl));
+    if (!sameSource) return false;
+    return qualities.any((quality) {
+      if (task.sourceOptionId.isNotEmpty && quality.id.isNotEmpty) {
+        return task.sourceOptionId == quality.id;
+      }
+      return task.qualityLabel == quality.label && task.kind == quality.kind;
+    });
   }
 
   Future<List<DownloadTask>> startNewDownloads({
@@ -222,16 +269,16 @@ class DownloadProvider extends ChangeNotifier {
           changedTask.notifyProgressChanged(),
       onComplete: (_, _) {
         notifyListeners();
-        unawaited(_saveHistory());
       },
       onError: (_, _) {
         notifyListeners();
-        unawaited(_saveHistory());
       },
     );
     // Covers the pause / cancel paths, which finish without a callback.
     notifyListeners();
-    await _saveHistory();
+    await _saveHistory(
+      receipt: task.status == DownloadStatus.completed ? task : null,
+    );
   }
 
   void cancelTask(String taskId) {
@@ -425,7 +472,7 @@ class DownloadProvider extends ChangeNotifier {
     if (success) {
       task.isSavedToGallery = true;
       notifyListeners();
-      await _saveHistory();
+      await _saveHistory(receipt: task);
     }
     return success;
   }

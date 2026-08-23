@@ -1,10 +1,15 @@
 import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:gal/gal.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:video_player/video_player.dart';
 
 class PlatformFileHelper {
+  static const MethodChannel _mediaStoreChannel = MethodChannel(
+    'com.vannt.nimbleclip/media_store',
+  );
   static Future<String?> getDownloadDirectoryPath() async {
     Directory? dir;
     if (Platform.isAndroid) {
@@ -53,6 +58,24 @@ class PlatformFileHelper {
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Returns null on platforms where Gallery contents cannot be queried.
+  static Future<bool?> galleryFileExists(
+    String filePath, {
+    required bool isImage,
+  }) async {
+    if (!Platform.isAndroid) return null;
+    try {
+      final fileName = filePath.replaceAll('\\', '/').split('/').last;
+      return await _mediaStoreChannel.invokeMethod<bool>('mediaExists', {
+            'fileName': fileName,
+            'isImage': isImage,
+          }) ??
+          false;
+    } on PlatformException {
+      return null;
     }
   }
 
@@ -119,6 +142,23 @@ class PlatformFileHelper {
       return await handle.read(length);
     } finally {
       await handle.close();
+    }
+  }
+
+  static Future<bool> isPlayableVideo(String filePath) async {
+    final file = File(filePath);
+    if (!await file.exists()) return false;
+    final controller = VideoPlayerController.file(file);
+    try {
+      await controller.initialize();
+      return controller.value.isInitialized &&
+          controller.value.duration > Duration.zero &&
+          controller.value.size.width > 0 &&
+          controller.value.size.height > 0;
+    } catch (_) {
+      return false;
+    } finally {
+      await controller.dispose();
     }
   }
 

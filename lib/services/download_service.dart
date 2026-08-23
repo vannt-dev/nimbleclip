@@ -3,10 +3,12 @@ import 'package:flutter/foundation.dart';
 
 import '../core/constants/app_constants.dart';
 import '../core/utils/cors_helper.dart';
+import '../core/utils/media_file_validator.dart';
 import '../core/utils/platform_file.dart';
 import '../core/utils/web_download_helper.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../models/download_task.dart';
+import '../models/video_metadata.dart' show MediaKind;
 import 'storage_service.dart';
 
 typedef DownloadProgressCallback =
@@ -18,18 +20,42 @@ typedef DownloadProgressCallback =
       double speedBytesPerSec,
     );
 
-class DownloadService {
-  static final DownloadService _instance = DownloadService._internal();
-  factory DownloadService() => _instance;
-  DownloadService._internal();
+abstract interface class DownloadGateway {
+  Future<void> startDownload({
+    required DownloadTask task,
+    required DownloadProgressCallback onProgress,
+    required void Function(DownloadTask task, String filePath) onComplete,
+    required void Function(DownloadTask task, String error) onError,
+    required AppLocalizations l10n,
+    bool autoSaveToGallery = true,
+  });
 
-  final Dio _dio = Dio(
+  void cancelDownload(String taskId);
+  bool pauseDownload(String taskId);
+  bool isRunning(String taskId);
+  Future<void> openFile(String filePath);
+  Future<void> shareFile(String filePath, {String? text});
+}
+
+class DownloadService implements DownloadGateway {
+  DownloadService({
+    Dio? dio,
+    StorageService? storageService,
+    this.validator = const MediaFileValidator(),
+  }) : _dio = dio ?? _createDio(),
+       _storage = storageService ?? StorageService();
+
+  static Dio _createDio() => Dio(
     BaseOptions(
       connectTimeout: AppConstants.connectTimeout,
       receiveTimeout: AppConstants.receiveTimeout,
       headers: {'User-Agent': AppConstants.defaultUserAgent, 'Accept': '*/*'},
     ),
   );
+
+  final Dio _dio;
+  final StorageService _storage;
+  final MediaFileValidator validator;
 
   final Map<String, CancelToken> _cancelTokens = {};
   // Task ids cancelled by a pause rather than by the user abandoning the
@@ -50,6 +76,7 @@ class DownloadService {
     return '$base.$safeExtension';
   }
 
+  @override
   Future<void> startDownload({
     required DownloadTask task,
     required DownloadProgressCallback onProgress,
@@ -64,8 +91,7 @@ class DownloadService {
       return _startWebDownload(task, fileName, onProgress, onComplete, onError);
     }
 
-    final storage = StorageService();
-    final downloadDirPath = await storage.getDownloadDirectory();
+    final downloadDirPath = await _storage.getDownloadDirectory();
     final savePath = downloadDirPath != null
         ? '$downloadDirPath/$fileName'
         : fileName;
@@ -91,6 +117,7 @@ class DownloadService {
     var lastBytes = existingBytes;
     var lastTime = DateTime.now();
     var currentSpeed = 0.0;
+    var currentSavePath = savePath;
 
     try {
       final response = await _dio.download(
@@ -167,11 +194,14 @@ class DownloadService {
 
       _cancelTokens.remove(task.id);
       final contentType = response.headers.value('content-type');
-      await _validateDownloadedMedia(task, savePath, contentType, l10n);
-      final actualExtension = _extensionForContentType(contentType);
+      final actualExtension = await _validateDownloadedMedia(
+        task,
+        savePath,
+        contentType,
+        l10n,
+      );
       var completedPath = savePath;
-      if (actualExtension != null &&
-          actualExtension.toLowerCase() != task.format.toLowerCase()) {
+      if (actualExtension.toLowerCase() != task.format.toLowerCase()) {
         final correctedName = buildFileName(task, extension: actualExtension);
         final separator = savePath.lastIndexOf(RegExp(r'[/\\]'));
         final correctedPath = separator == -1
@@ -181,8 +211,14 @@ class DownloadService {
           savePath,
           correctedPath,
         );
+        currentSavePath = completedPath;
       }
       task.filePath = completedPath;
+      task.format = actualExtension;
+      if (task.kind == MediaKind.video &&
+          !await PlatformFileHelper.isPlayableVideo(completedPath)) {
+        throw FormatException(l10n.invalidDownloadedMedia);
+      }
       task.status = DownloadStatus.completed;
       task.progress = 1.0;
       task.downloadSpeed = 0.0;
@@ -193,7 +229,7 @@ class DownloadService {
       }
 
       if (autoSaveToGallery && !task.isAudioOnly) {
-        task.isSavedToGallery = await storage.saveToGallery(
+        task.isSavedToGallery = await _storage.saveToGallery(
           completedPath,
           isImage: task.isImage,
         );
@@ -238,14 +274,14 @@ class DownloadService {
 
       task.status = DownloadStatus.failed;
       task.errorMessage = _describe(e, l10n);
-      await PlatformFileHelper.deleteFile(savePath);
+      await PlatformFileHelper.deleteFile(currentSavePath);
       onError(task, task.errorMessage!);
     } catch (e) {
       _cancelTokens.remove(task.id);
       task.downloadSpeed = 0.0;
       task.status = DownloadStatus.failed;
       task.errorMessage = e.toString();
-      await PlatformFileHelper.deleteFile(savePath);
+      await PlatformFileHelper.deleteFile(currentSavePath);
       onError(task, task.errorMessage!);
     }
   }
@@ -330,7 +366,7 @@ class DownloadService {
     return match != null && int.tryParse(match.group(1)!) == offset;
   }
 
-  Future<void> _validateDownloadedMedia(
+  Future<String> _validateDownloadedMedia(
     DownloadTask task,
     String filePath,
     String? contentType,
@@ -344,8 +380,13 @@ class DownloadService {
       throw FormatException(l10n.invalidDownloadedMedia);
     }
 
-    final header = await PlatformFileHelper.readFileHeader(filePath);
-    if (header.isEmpty || _looksLikeMarkup(header)) {
+    final header = await PlatformFileHelper.readFileHeader(
+      filePath,
+      length: 512,
+    );
+    final inspection = validator.inspect(header);
+    if (inspection == null ||
+        !validator.matchesExpectedKind(inspection, task.kind)) {
       throw FormatException(l10n.invalidDownloadedMedia);
     }
 
@@ -362,35 +403,11 @@ class DownloadService {
         !normalizedType.startsWith(expectedPrefix)) {
       throw FormatException(l10n.invalidDownloadedMedia);
     }
-  }
-
-  bool _looksLikeMarkup(List<int> bytes) {
-    final prefix = String.fromCharCodes(bytes).trimLeft().toLowerCase();
-    return prefix.startsWith('<!doctype') ||
-        prefix.startsWith('<html') ||
-        prefix.startsWith('<?xml') ||
-        prefix.startsWith('{"') ||
-        prefix.startsWith('[');
-  }
-
-  String? _extensionForContentType(String? contentType) {
-    final type = contentType?.split(';').first.trim().toLowerCase();
-    return switch (type) {
-      'video/mp4' => 'mp4',
-      'video/webm' => 'webm',
-      'video/quicktime' => 'mov',
-      'image/jpeg' => 'jpg',
-      'image/png' => 'png',
-      'image/webp' => 'webp',
-      'image/gif' => 'gif',
-      'audio/mpeg' => 'mp3',
-      'audio/mp4' || 'audio/x-m4a' => 'm4a',
-      'audio/ogg' => 'ogg',
-      _ => null,
-    };
+    return validator.extensionFor(inspection, task.kind);
   }
 
   /// Stops a download and discards its partial file.
+  @override
   void cancelDownload(String taskId) {
     _pausedTaskIds.remove(taskId);
     _cancelTokens.remove(taskId)?.cancel('User cancelled download');
@@ -398,6 +415,7 @@ class DownloadService {
 
   /// Stops a download but keeps the partial file so it can be resumed.
   /// Returns false when the task was not running.
+  @override
   bool pauseDownload(String taskId) {
     final token = _cancelTokens.remove(taskId);
     if (token == null) return false;
@@ -406,6 +424,7 @@ class DownloadService {
     return true;
   }
 
+  @override
   bool isRunning(String taskId) => _cancelTokens.containsKey(taskId);
 
   String _describe(DioException e, AppLocalizations l10n) {
@@ -427,9 +446,11 @@ class DownloadService {
     }
   }
 
+  @override
   Future<void> openFile(String filePath) =>
       PlatformFileHelper.openFile(filePath);
 
+  @override
   Future<void> shareFile(String filePath, {String? text}) =>
       PlatformFileHelper.shareFile(filePath, text: text);
 }

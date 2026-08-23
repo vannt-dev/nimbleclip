@@ -96,9 +96,24 @@ git config core.hooksPath .githooks
 
 The repository hooks enforce Conventional Commits, run formatting and static
 analysis before commits, and run tests plus a release Web build before pushes.
-Run `tool/check.sh all` at any time to execute every local gate.
+Run `tool/check.sh all` at any time to execute the platform-independent local
+gates. On Windows, the all-in-one command below also manages the emulator,
+fixture server, and Android integration suite.
 
 ### Verify the project
+
+One command runs formatting, static analysis, Flutter and Node tests, a release
+Web build, and the Android integration suite. It reuses or starts the configured
+emulator and shuts down the temporary fixture server when finished:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tool\check_all.ps1
+```
+
+Use `-SkipAndroid` for the faster platform-independent gates, or
+`-SkipWebBuild` when a Web bundle is not needed.
+
+The equivalent individual commands are:
 
 ```bash
 flutter analyze

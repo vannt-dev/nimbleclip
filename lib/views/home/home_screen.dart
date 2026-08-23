@@ -8,7 +8,6 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/url_helper.dart';
 import '../../l10n/l10n.dart';
-import '../../models/download_task.dart';
 import '../../models/video_metadata.dart';
 import '../../providers/download_provider.dart';
 import '../../providers/settings_provider.dart';
@@ -159,7 +158,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
       if (!mounted || tasks.isEmpty) return;
 
-      final notification = ScaffoldMessenger.of(context).showSnackBar(
+      final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+      final notification = messenger.showSnackBar(
         SnackBar(
           content: Text(
             selected.length == 1
@@ -179,15 +179,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       );
       void closeWhenFinished() {
-        final finished = tasks.every(
-          (task) => !task.isActive && task.status != DownloadStatus.paused,
-        );
+        final finished = tasks.every((task) => !task.isActive);
         if (!finished) return;
         provider.removeListener(closeWhenFinished);
         notification.close();
       }
 
       provider.addListener(closeWhenFinished);
+      unawaited(
+        notification.closed.then((_) {
+          provider.removeListener(closeWhenFinished);
+        }),
+      );
       closeWhenFinished();
     }
   }

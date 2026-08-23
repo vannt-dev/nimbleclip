@@ -10,6 +10,7 @@ class AppConstants {
   static const String keyPreferredQuality = 'preferred_quality';
   static const String keyLanguageCode = 'language_code';
   static const String keyDownloadHistory = 'download_history_list';
+  static const String keyDownloadReceipts = 'download_receipts_list';
 
   // Network timeouts
   static const Duration connectTimeout = Duration(seconds: 15);

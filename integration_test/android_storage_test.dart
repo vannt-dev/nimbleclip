@@ -285,6 +285,14 @@ void main() {
         isTrue,
         reason: 'MediaStore insert failed under scoped storage',
       );
+      expect(
+        await PlatformFileHelper.galleryFileExists(
+          task.filePath!,
+          isImage: false,
+        ),
+        isTrue,
+        reason: 'the MediaStore receipt could not be verified',
+      );
 
       await File(task.filePath!).delete();
     });

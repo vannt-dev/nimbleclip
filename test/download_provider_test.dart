@@ -10,7 +10,7 @@ import 'package:nimble_clip/providers/download_provider.dart';
 import 'package:nimble_clip/services/download_service.dart';
 import 'package:nimble_clip/services/storage_service.dart';
 
-class _ControlledDownloadService implements DownloadService {
+class _ControlledDownloadService implements DownloadGateway {
   final Map<String, Completer<void>> pending = {};
   final List<String> started = [];
   int running = 0;
@@ -55,7 +55,10 @@ class _ControlledDownloadService implements DownloadService {
 
 class _MemoryStorageService implements StorageService {
   List<DownloadTask> history = [];
+  List<DownloadTask> receipts = [];
   bool downloadsCleared = false;
+  bool? galleryExists;
+  int historySaveCount = 0;
   int concurrentSaves = 0;
   int maxConcurrentSaves = 0;
 
@@ -65,6 +68,7 @@ class _MemoryStorageService implements StorageService {
 
   @override
   Future<void> saveHistory(List<DownloadTask> tasks) async {
+    historySaveCount++;
     concurrentSaves++;
     maxConcurrentSaves = concurrentSaves > maxConcurrentSaves
         ? concurrentSaves
@@ -75,6 +79,34 @@ class _MemoryStorageService implements StorageService {
         .toList();
     concurrentSaves--;
   }
+
+  @override
+  Future<List<DownloadTask>> loadDownloadReceipts() async =>
+      receipts.map((task) => DownloadTask.fromJson(task.toJson())).toList();
+
+  @override
+  Future<void> saveDownloadReceipt(DownloadTask task) async {
+    receipts.removeWhere((entry) => entry.id == task.id);
+    receipts.add(DownloadTask.fromJson(task.toJson()));
+  }
+
+  @override
+  Future<void> saveDownloadReceipts(Iterable<DownloadTask> tasks) async {
+    for (final task in tasks) {
+      await saveDownloadReceipt(task);
+    }
+  }
+
+  @override
+  Future<void> removeDownloadReceipts(Set<String> ids) async {
+    receipts.removeWhere((entry) => ids.contains(entry.id));
+  }
+
+  @override
+  Future<bool?> galleryFileExists(
+    String filePath, {
+    required bool isImage,
+  }) async => galleryExists;
 
   @override
   Future<void> clearDownloads() async {
@@ -176,6 +208,29 @@ void main() {
     expect(provider.allTasks, isEmpty);
   });
 
+  test('persists history once when a download completes', () async {
+    final downloads = _ControlledDownloadService();
+    final storage = _MemoryStorageService();
+    final provider = DownloadProvider(
+      downloadService: downloads,
+      storageService: storage,
+    );
+    final metadata = _metadata(1);
+    final tasks = await provider.startNewDownloads(
+      metadata: metadata,
+      qualities: metadata.qualities,
+      l10n: l10n,
+      autoSaveToGallery: false,
+    );
+    expect(storage.historySaveCount, 1);
+
+    downloads.finish(tasks.single.id);
+    await _flush();
+
+    expect(storage.historySaveCount, 2);
+    expect(storage.receipts, hasLength(1));
+  });
+
   test('clear downloaded files is rejected while a task is active', () async {
     final downloads = _ControlledDownloadService();
     final storage = _MemoryStorageService();
@@ -227,4 +282,80 @@ void main() {
     expect(matches, hasLength(1));
     expect(matches.single.id, existing.id);
   });
+
+  test('finds a receipt after visible history was cleared', () async {
+    final metadata = _metadata(1);
+    final receipt = DownloadTask(
+      id: 'receipt',
+      videoId: metadata.id,
+      title: metadata.title,
+      author: metadata.author,
+      thumbnailUrl: '',
+      downloadUrl: metadata.qualities.single.downloadUrl,
+      originalUrl: metadata.originalUrl,
+      platform: metadata.platform,
+      sourceOptionId: metadata.qualities.single.id,
+      qualityLabel: metadata.qualities.single.label,
+      format: 'jpg',
+      kind: MediaKind.image,
+      status: DownloadStatus.completed,
+      filePath: '/deleted/local/receipt.jpg',
+      isSavedToGallery: true,
+    );
+    final storage = _MemoryStorageService()
+      ..receipts = [receipt]
+      ..galleryExists = true;
+    final provider = DownloadProvider(
+      downloadService: _ControlledDownloadService(),
+      storageService: storage,
+    );
+
+    expect(
+      await provider.findExistingDownloads(
+        metadata: metadata,
+        qualities: metadata.qualities,
+      ),
+      hasLength(1),
+    );
+  });
+
+  test(
+    'purges a receipt when both local and Gallery copies are gone',
+    () async {
+      final metadata = _metadata(1);
+      final receipt = DownloadTask(
+        id: 'stale',
+        videoId: metadata.id,
+        title: metadata.title,
+        author: metadata.author,
+        thumbnailUrl: '',
+        downloadUrl: metadata.qualities.single.downloadUrl,
+        originalUrl: metadata.originalUrl,
+        platform: metadata.platform,
+        sourceOptionId: metadata.qualities.single.id,
+        qualityLabel: metadata.qualities.single.label,
+        format: 'jpg',
+        kind: MediaKind.image,
+        status: DownloadStatus.completed,
+        filePath: '/deleted/local/stale.jpg',
+        isSavedToGallery: true,
+      );
+      final storage = _MemoryStorageService()
+        ..receipts = [receipt]
+        ..galleryExists = false;
+      final provider = DownloadProvider(
+        downloadService: _ControlledDownloadService(),
+        storageService: storage,
+      );
+
+      expect(
+        await provider.findExistingDownloads(
+          metadata: metadata,
+          qualities: metadata.qualities,
+        ),
+        isEmpty,
+      );
+      expect(storage.receipts, isEmpty);
+    },
+  );
 }
