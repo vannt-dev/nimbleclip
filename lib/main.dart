@@ -7,6 +7,8 @@ import 'core/theme/app_theme.dart';
 import 'providers/download_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/video_extractor_provider.dart';
+import 'core/utils/external_service_policy.dart';
+import 'services/extractors/registry.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'views/main_navigation_screen.dart';
 
@@ -22,12 +24,31 @@ class NimbleClipApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => SettingsProvider()),
-        ChangeNotifierProvider(create: (_) => VideoExtractorProvider()),
+        Provider(create: (_) => ExtractionPolicy()),
+        ProxyProvider<ExtractionPolicy, ExtractorRegistry>(
+          update: (_, policy, _) =>
+              ExtractorRegistry(externalServiceAccess: policy),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => SettingsProvider(
+            extractionPolicy: context.read<ExtractionPolicy>(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => VideoExtractorProvider(
+            extractorRegistry: context.read<ExtractorRegistry>(),
+          ),
+        ),
         ChangeNotifierProxyProvider<SettingsProvider, DownloadProvider>(
-          create: (_) => DownloadProvider(),
-          update: (_, settings, downloads) {
-            final provider = downloads ?? DownloadProvider();
+          create: (context) => DownloadProvider(
+            extractorRegistry: context.read<ExtractorRegistry>(),
+          ),
+          update: (context, settings, downloads) {
+            final provider =
+                downloads ??
+                DownloadProvider(
+                  extractorRegistry: context.read<ExtractorRegistry>(),
+                );
             provider.maxConcurrentDownloads = settings.maxConcurrentDownloads;
             return provider;
           },

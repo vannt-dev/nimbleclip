@@ -11,7 +11,11 @@ import '../../models/video_platform.dart';
 import 'base_extractor.dart';
 
 class TwitterExtractor extends BaseVideoExtractor {
-  const TwitterExtractor();
+  final ExternalServiceAccess externalServiceAccess;
+
+  const TwitterExtractor({ExternalServiceAccess? externalServiceAccess})
+    : externalServiceAccess =
+          externalServiceAccess ?? const FixedExternalServiceAccess(true);
 
   @override
   VideoPlatform get platform => VideoPlatform.twitter;
@@ -36,7 +40,7 @@ class TwitterExtractor extends BaseVideoExtractor {
       throw ExtractionException(l10n.xInvalidPost);
     }
 
-    if (!ExternalServicePolicy.allowExternalServices) {
+    if (!externalServiceAccess.allowExternalServices) {
       throw ExtractionException(l10n.externalServicesDisabled);
     }
 

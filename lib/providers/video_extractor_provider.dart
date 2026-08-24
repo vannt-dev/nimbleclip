@@ -7,6 +7,10 @@ import '../models/video_metadata.dart';
 import '../services/extractors/registry.dart';
 
 class VideoExtractorProvider extends ChangeNotifier {
+  VideoExtractorProvider({ExtractorRegistry? extractorRegistry})
+    : _extractorRegistry = extractorRegistry ?? ExtractorRegistry();
+
+  final ExtractorRegistry _extractorRegistry;
   VideoMetadata? _metadata;
   VideoQualityOption? _selectedQuality;
   bool _isAnalyzing = false;
@@ -47,7 +51,7 @@ class VideoExtractorProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final metadata = await ExtractorRegistry.extract(cleanUrl, l10n);
+      final metadata = await _extractorRegistry.extract(cleanUrl, l10n);
       if (sequence != _requestSequence) return false;
 
       _metadata = metadata;

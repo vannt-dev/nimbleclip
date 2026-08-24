@@ -12,9 +12,20 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
+import 'facebook_fallback_client.dart';
+import 'facebook_page_parser.dart';
 
 class FacebookExtractor extends BaseVideoExtractor {
-  const FacebookExtractor();
+  final ExternalServiceAccess externalServiceAccess;
+  final FacebookFallbackClient fallbackClient;
+  static const _pageParser = FacebookPageParser();
+
+  const FacebookExtractor({
+    ExternalServiceAccess? externalServiceAccess,
+    FacebookFallbackClient? fallbackClient,
+  }) : externalServiceAccess =
+           externalServiceAccess ?? const FixedExternalServiceAccess(true),
+       fallbackClient = fallbackClient ?? const ToolspyFacebookFallbackClient();
 
   @override
   VideoPlatform get platform => VideoPlatform.facebook;
@@ -36,14 +47,7 @@ class FacebookExtractor extends BaseVideoExtractor {
   ];
 
   String? _firstMatch(String html, List<RegExp> patterns) {
-    for (final pattern in patterns) {
-      final value = pattern.firstMatch(html)?.group(1);
-      if (value != null && value.isNotEmpty) {
-        final decoded = MediaUrlHelper.decode(value);
-        if (MediaUrlHelper.isHttp(decoded)) return decoded;
-      }
-    }
-    return null;
+    return _pageParser.firstMediaUrl(html, patterns);
   }
 
   @override
@@ -134,7 +138,7 @@ class FacebookExtractor extends BaseVideoExtractor {
         .toList();
     if (!isPostPermalink ||
         currentImages.length > 1 ||
-        !ExternalServicePolicy.allowExternalServices) {
+        !externalServiceAccess.allowExternalServices) {
       return metadata;
     }
 
@@ -144,23 +148,7 @@ class FacebookExtractor extends BaseVideoExtractor {
     }
 
     try {
-      final response = await ExtractorHttp.postWithRetry(
-        'https://toolspy.net/api/facebook-image-extract/',
-        service: 'Toolspy',
-        body: jsonEncode({'url': postUrl}),
-        headers: const {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      );
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        return metadata;
-      }
-
-      final payload = jsonDecode(response.body);
-      if (payload is! Map<String, dynamic>) return metadata;
-      final rawImages = payload['images'];
-      if (rawImages is! List) return metadata;
+      final rawImages = await fallbackClient.extractImageUrls(postUrl);
 
       final fallbackImages = <String>[];
       final identities = <String>{};
@@ -308,65 +296,26 @@ class FacebookExtractor extends BaseVideoExtractor {
     );
   }
 
-  String? _videoId(String html) =>
-      RegExp(r'"video_id"\s*:\s*"(\d+)"').firstMatch(html)?.group(1) ??
-      RegExp(r'"videoId"\s*:\s*"(\d+)"').firstMatch(html)?.group(1);
+  String? _videoId(String html) => _pageParser.videoId(html);
 
   String _title(String html) {
-    final ogTitle = RegExp(
-      r'<meta[^>]+property="og:title"[^>]+content="([^"]*)"',
-    ).firstMatch(html)?.group(1);
-    final rawTitle =
-        ogTitle ??
-        RegExp(
-          r'<title[^>]*>(.*?)</title>',
-          caseSensitive: false,
-          dotAll: true,
-        ).firstMatch(html)?.group(1);
-    if (rawTitle == null || rawTitle.trim().isEmpty) return 'Facebook Video';
-
-    final title = decodeHtmlEntities(
-      decodeJsonEscapes(rawTitle),
-    ).replaceAll(RegExp(r'\s*\|\s*Facebook\s*$'), '').trim();
-    return title.isEmpty ? 'Facebook Video' : title;
+    return _pageParser.title(html);
   }
 
   String? _stringField(String html, String key) {
-    final value = RegExp('"$key":"([^"]{1,400})"').firstMatch(html)?.group(1);
-    return value == null ? null : decodeJsonEscapes(value);
+    return _pageParser.stringField(html, key);
   }
 
   String? _owner(String html) {
-    final owner =
-        RegExp(r'"owner":\{[^}]*"name":"([^"]+)"').firstMatch(html)?.group(1) ??
-        RegExp(r'"ownerName":"([^"]+)"').firstMatch(html)?.group(1);
-    return owner == null ? null : decodeJsonEscapes(owner);
+    return _pageParser.owner(html);
   }
 
   String? _thumbnail(String html) {
-    final raw =
-        RegExp(
-          r'"preferred_thumbnail":\{"image":\{"uri":"([^"]+)"',
-        ).firstMatch(html)?.group(1) ??
-        RegExp(
-          r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"',
-        ).firstMatch(html)?.group(1);
-    return raw == null ? null : MediaUrlHelper.decode(raw);
+    return _pageParser.thumbnail(html);
   }
 
   Duration? _duration(String html) {
-    final ms = RegExp(
-      r'"playable_duration_in_ms":(\d+)',
-    ).firstMatch(html)?.group(1);
-    if (ms != null) {
-      final value = int.tryParse(ms);
-      if (value != null && value > 0) return Duration(milliseconds: value);
-    }
-    final seconds = RegExp(
-      r'"video_duration":(\d+)',
-    ).firstMatch(html)?.group(1);
-    final value = int.tryParse(seconds ?? '');
-    return value != null && value > 0 ? Duration(seconds: value) : null;
+    return _pageParser.duration(html);
   }
 
   /// Extracts post photos from Facebook's public Relay payload. Multi-photo

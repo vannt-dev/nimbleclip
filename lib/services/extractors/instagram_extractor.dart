@@ -12,6 +12,8 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
+import 'instagram_fallback_client.dart';
+import 'instagram_page_parser.dart';
 
 /// Instagram extractor for public Reels and feed videos.
 ///
@@ -21,10 +23,16 @@ import 'base_extractor.dart';
 /// session for public posts. When every strategy fails the user is told plainly
 /// that the post needs a login rather than being handed a broken download.
 class InstagramExtractor extends BaseVideoExtractor {
-  const InstagramExtractor();
+  final ExternalServiceAccess externalServiceAccess;
+  final InstagramFallbackClient fallbackClient;
+  static const _pageParser = InstagramPageParser();
 
-  static String? _snapInstaExpiry;
-  static String? _snapInstaToken;
+  const InstagramExtractor({
+    ExternalServiceAccess? externalServiceAccess,
+    InstagramFallbackClient? fallbackClient,
+  }) : externalServiceAccess =
+           externalServiceAccess ?? const FixedExternalServiceAccess(true),
+       fallbackClient = fallbackClient ?? const SnapInstaFallbackClient();
 
   @override
   VideoPlatform get platform => VideoPlatform.instagram;
@@ -87,59 +95,10 @@ class InstagramExtractor extends BaseVideoExtractor {
     AppLocalizations l10n, {
     VideoMetadata? fallback,
   }) async {
-    if (!ExternalServicePolicy.allowExternalServices) return fallback;
+    if (!externalServiceAccess.allowExternalServices) return fallback;
     try {
-      var expiry = _snapInstaExpiry;
-      var token = _snapInstaToken;
-      final expirySeconds = int.tryParse(expiry ?? '');
-      final cacheValid =
-          !ExtractorHttp.isUsingOverrides &&
-          expirySeconds != null &&
-          expirySeconds > DateTime.now().millisecondsSinceEpoch ~/ 1000 + 30 &&
-          token != null;
-      if (!cacheValid) {
-        final landing = await ExtractorHttp.getWithRetry(
-          'https://snap-insta.to/vi',
-          service: 'SnapInsta',
-          userAgent: AppConstants.defaultUserAgent,
-        );
-        if (landing.statusCode != 200) return null;
-        expiry = RegExp(
-          r'\bk_exp\s*=\s*"([^"]+)"',
-        ).firstMatch(landing.body)?.group(1);
-        token = RegExp(
-          r'\bk_token\s*=\s*"([^"]+)"',
-        ).firstMatch(landing.body)?.group(1);
-        if (!ExtractorHttp.isUsingOverrides) {
-          _snapInstaExpiry = expiry;
-          _snapInstaToken = token;
-        }
-      }
-      if (expiry == null || token == null) return null;
-
-      final response = await ExtractorHttp.postWithRetry(
-        'https://snap-insta.to/api/ajaxSearch',
-        service: 'SnapInsta',
-        userAgent: AppConstants.defaultUserAgent,
-        headers: const {
-          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: {
-          'k_exp': expiry,
-          'k_token': token,
-          'q': url,
-          't': 'media',
-          'lang': 'vi',
-          'v': 'v2',
-        },
-      );
-      if (response.statusCode != 200) return null;
-
-      final payload = jsonDecode(response.body) as Map<String, dynamic>;
-      if (payload['status'] != 'ok') return null;
-      final resultHtml = payload['data']?.toString() ?? '';
-      if (resultHtml.isEmpty) return null;
+      final resultHtml = await fallbackClient.search(url);
+      if (resultHtml == null) return null;
 
       final downloadUrls = <String>[];
       final previewUrls = <String>[];
@@ -559,24 +518,14 @@ class InstagramExtractor extends BaseVideoExtractor {
   }
 
   String? _firstGroup(String html, List<RegExp> patterns) {
-    for (final pattern in patterns) {
-      final value = pattern.firstMatch(html)?.group(1);
-      if (value != null && value.isNotEmpty) return value;
-    }
-    return null;
+    return _pageParser.firstGroup(html, patterns);
   }
 
   int? _intField(String html, String key) {
-    final value =
-        RegExp('"$key":\\{?"?count"?:?\\s*(\\d+)').firstMatch(html) ??
-        RegExp('"$key":(\\d+)').firstMatch(html);
-    return int.tryParse(value?.group(1) ?? '');
+    return _pageParser.intField(html, key);
   }
 
   int? _duration(String html) {
-    final value = RegExp(
-      r'"video_duration":([\d.]+)',
-    ).firstMatch(html)?.group(1);
-    return double.tryParse(value ?? '')?.round();
+    return _pageParser.durationSeconds(html);
   }
 }

@@ -22,12 +22,14 @@ class DownloadProvider extends ChangeNotifier {
     StorageService? storageService,
     DownloadHistoryRepository? historyRepository,
     MediaFileActions? fileActions,
+    ExtractorRegistry? extractorRegistry,
   }) : _downloadService = downloadService ?? DownloadService(),
        _storageService = storageService ?? StorageService(),
        _historyRepository =
            historyRepository ??
            const SharedPreferencesDownloadHistoryRepository(),
        _fileActions = fileActions ?? const PlatformMediaFileActions() {
+    _extractorRegistry = extractorRegistry ?? ExtractorRegistry();
     _queue = AsyncWorkQueue<_QueuedDownload>(
       worker: _executeQueued,
       shouldRun: (queued) =>
@@ -43,6 +45,7 @@ class DownloadProvider extends ChangeNotifier {
   final StorageService _storageService;
   final DownloadHistoryRepository _historyRepository;
   final MediaFileActions _fileActions;
+  late final ExtractorRegistry _extractorRegistry;
   final Uuid _uuid = const Uuid();
   late final Future<void> _historyReady;
   late final AsyncWorkQueue<_QueuedDownload> _queue;
@@ -395,7 +398,7 @@ class DownloadProvider extends ChangeNotifier {
   ) async {
     if (task.originalUrl.isEmpty) return null;
     try {
-      final metadata = await ExtractorRegistry.extract(task.originalUrl, l10n);
+      final metadata = await _extractorRegistry.extract(task.originalUrl, l10n);
       if (task.sourceOptionId.isNotEmpty) {
         for (final option in metadata.qualities) {
           if (option.id == task.sourceOptionId) return option;

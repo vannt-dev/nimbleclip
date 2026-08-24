@@ -11,7 +11,11 @@ import '../../models/video_platform.dart';
 import 'base_extractor.dart';
 
 class TikTokExtractor extends BaseVideoExtractor {
-  const TikTokExtractor();
+  final ExternalServiceAccess externalServiceAccess;
+
+  const TikTokExtractor({ExternalServiceAccess? externalServiceAccess})
+    : externalServiceAccess =
+          externalServiceAccess ?? const FixedExternalServiceAccess(true);
 
   static const String _apiBase = 'https://www.tikwm.com';
 
@@ -24,7 +28,7 @@ class TikTokExtractor extends BaseVideoExtractor {
 
   @override
   Future<VideoMetadata> extract(String url, AppLocalizations l10n) async {
-    if (!ExternalServicePolicy.allowExternalServices) {
+    if (!externalServiceAccess.allowExternalServices) {
       throw ExtractionException(l10n.externalServicesDisabled);
     }
     final Map<String, dynamic> json;

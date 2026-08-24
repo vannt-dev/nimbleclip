@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:nimble_clip/core/utils/external_service_policy.dart';
 import 'package:nimble_clip/l10n/generated/app_localizations.dart';
 import 'package:nimble_clip/services/extractors/registry.dart';
 
@@ -11,7 +10,7 @@ const _instagramVideoUrl = String.fromEnvironment('INSTAGRAM_VIDEO_URL');
 void main() {
   final l10n = lookupAppLocalizations(const Locale('en'));
 
-  setUp(() => ExternalServicePolicy.allowExternalServices = true);
+  final registry = ExtractorRegistry();
 
   final cases = <String, ({String url, int minimumMedia})>{
     if (_instagramImageUrl.isNotEmpty)
@@ -44,7 +43,7 @@ void main() {
     test(
       entry.key,
       () async {
-        final metadata = await ExtractorRegistry.extract(entry.value.url, l10n);
+        final metadata = await registry.extract(entry.value.url, l10n);
         expect(
           metadata.qualities.length,
           greaterThanOrEqualTo(entry.value.minimumMedia),

@@ -62,21 +62,20 @@ void main() {
   });
 
   test('persists download, storage, and external-service controls', () async {
-    final provider = SettingsProvider();
+    final policy = ExtractionPolicy();
+    final provider = SettingsProvider(extractionPolicy: policy);
     await provider.initialized;
 
     await provider.setAllowExternalServices(false);
     await provider.setRemoveCacheAfterGallery(true);
     await provider.setMaxConcurrentDownloads(5);
 
-    final restored = SettingsProvider();
+    final restored = SettingsProvider(extractionPolicy: policy);
     await restored.initialized;
     expect(restored.allowExternalServices, isFalse);
-    expect(ExternalServicePolicy.allowExternalServices, isFalse);
+    expect(policy.allowExternalServices, isFalse);
     expect(restored.removeCacheAfterGallery, isTrue);
     expect(restored.maxConcurrentDownloads, 5);
-
-    ExternalServicePolicy.allowExternalServices = true;
   });
 
   test('clamps simultaneous downloads to the supported range', () async {

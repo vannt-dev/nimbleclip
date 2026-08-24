@@ -26,6 +26,8 @@ void main() {
   });
 
   group('ExtractorRegistry routing', () {
+    final registry = ExtractorRegistry();
+
     test('sends each link to the extractor that owns its platform', () {
       const expected = {
         'https://www.youtube.com/watch?v=dQw4w9WgXcQ': VideoPlatform.youtube,
@@ -37,28 +39,22 @@ void main() {
       };
 
       expected.forEach((url, platform) {
-        expect(
-          ExtractorRegistry.getExtractorFor(url).platform,
-          platform,
-          reason: url,
-        );
+        expect(registry.getExtractorFor(url).platform, platform, reason: url);
       });
     });
 
     test('every platform except generic has an extractor registered', () {
-      final registered = ExtractorRegistry.extractors
-          .map((e) => e.platform)
-          .toSet();
+      final registered = registry.extractors.map((e) => e.platform).toSet();
       expect(registered, containsAll(VideoPlatform.values));
     });
 
     test('the catch-all extractor is last', () {
-      expect(ExtractorRegistry.extractors.last.platform, VideoPlatform.generic);
+      expect(registry.extractors.last.platform, VideoPlatform.generic);
     });
 
     test('rejects a non-http link before touching the network', () async {
       await expectLater(
-        ExtractorRegistry.extract('not a url', l10n),
+        registry.extract('not a url', l10n),
         throwsA(isA<Exception>()),
       );
     });

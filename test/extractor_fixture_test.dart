@@ -22,16 +22,13 @@ void main() {
   final l10n = lookupAppLocalizations(const Locale('en'));
   tearDown(() {
     ExtractorHttp.resetOverrides();
-    ExternalServicePolicy.allowExternalServices = true;
   });
 
   test('external-only extractors respect the privacy policy', () async {
-    ExternalServicePolicy.allowExternalServices = false;
     await expectLater(
-      const TikTokExtractor().extract(
-        'https://www.tiktok.com/@u/video/1',
-        l10n,
-      ),
+      const TikTokExtractor(
+        externalServiceAccess: FixedExternalServiceAccess(false),
+      ).extract('https://www.tiktok.com/@u/video/1', l10n),
       throwsA(
         isA<Exception>().having(
           (error) => error.toString(),

@@ -8,29 +8,30 @@ import 'instagram_extractor.dart';
 import 'tiktok_extractor.dart';
 import 'twitter_extractor.dart';
 import 'youtube_extractor.dart';
+import '../../core/utils/external_service_policy.dart';
 
 class ExtractorRegistry {
-  /// GenericExtractor must stay last: its `canHandle` accepts everything.
-  static const List<BaseVideoExtractor> extractors = [
-    YouTubeExtractor(),
-    TikTokExtractor(),
-    TwitterExtractor(),
-    FacebookExtractor(),
-    InstagramExtractor(),
-    GenericExtractor(),
-  ];
+  ExtractorRegistry({ExternalServiceAccess? externalServiceAccess})
+    : extractors = [
+        const YouTubeExtractor(),
+        TikTokExtractor(externalServiceAccess: externalServiceAccess),
+        TwitterExtractor(externalServiceAccess: externalServiceAccess),
+        FacebookExtractor(externalServiceAccess: externalServiceAccess),
+        InstagramExtractor(externalServiceAccess: externalServiceAccess),
+        const GenericExtractor(),
+      ];
 
-  static BaseVideoExtractor getExtractorFor(String url) {
+  /// GenericExtractor must stay last: its `canHandle` accepts everything.
+  final List<BaseVideoExtractor> extractors;
+
+  BaseVideoExtractor getExtractorFor(String url) {
     for (final extractor in extractors) {
       if (extractor.canHandle(url)) return extractor;
     }
     return const GenericExtractor();
   }
 
-  static Future<VideoMetadata> extract(
-    String rawUrl,
-    AppLocalizations l10n,
-  ) async {
+  Future<VideoMetadata> extract(String rawUrl, AppLocalizations l10n) async {
     final cleanUrl = UrlHelper.extractCleanUrl(rawUrl);
     if (!UrlHelper.isValidVideoUrl(cleanUrl)) {
       throw ExtractionException(l10n.invalidLink);

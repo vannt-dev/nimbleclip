@@ -6,6 +6,7 @@ import '../services/storage_service.dart';
 import '../models/download_options.dart';
 
 class SettingsProvider extends ChangeNotifier {
+  final ExtractionPolicy _extractionPolicy;
   ThemeMode _themeMode = ThemeMode.system;
   Locale? _locale;
   bool _autoSaveGallery = true;
@@ -31,7 +32,8 @@ class SettingsProvider extends ChangeNotifier {
   );
   late final Future<void> initialized;
 
-  SettingsProvider() {
+  SettingsProvider({ExtractionPolicy? extractionPolicy})
+    : _extractionPolicy = extractionPolicy ?? ExtractionPolicy() {
     initialized = _loadSettings();
   }
 
@@ -53,7 +55,7 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getString(AppConstants.keyPreferredQuality) ?? 'Highest';
     _allowExternalServices =
         prefs.getBool(AppConstants.keyAllowExternalServices) ?? true;
-    ExternalServicePolicy.allowExternalServices = _allowExternalServices;
+    _extractionPolicy.setAllowExternalServices(_allowExternalServices);
     _removeCacheAfterGallery =
         prefs.getBool(AppConstants.keyRemoveCacheAfterGallery) ?? true;
     _maxConcurrentDownloads =
@@ -113,7 +115,7 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> setAllowExternalServices(bool value) async {
     _allowExternalServices = value;
-    ExternalServicePolicy.allowExternalServices = value;
+    _extractionPolicy.setAllowExternalServices(value);
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(AppConstants.keyAllowExternalServices, value);
