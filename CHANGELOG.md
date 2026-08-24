@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-24
+
 - Added complete image, video, and mixed-media extraction for public Facebook,
   Instagram, TikTok, X, and compatible Open Graph posts, including full
   Facebook galleries and X photo sets.
