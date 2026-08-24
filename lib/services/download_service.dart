@@ -34,8 +34,6 @@ abstract interface class DownloadGateway {
   void cancelDownload(String taskId);
   bool pauseDownload(String taskId);
   bool isRunning(String taskId);
-  Future<FileActionResult> openFile(String filePath);
-  Future<FileActionResult> shareFile(String filePath, {String? text});
 }
 
 class DownloadService implements DownloadGateway {
@@ -451,12 +449,4 @@ class DownloadService implements DownloadGateway {
         return e.message ?? l10n.unknownNetworkError;
     }
   }
-
-  @override
-  Future<FileActionResult> openFile(String filePath) =>
-      PlatformFileHelper.openFile(filePath);
-
-  @override
-  Future<FileActionResult> shareFile(String filePath, {String? text}) =>
-      PlatformFileHelper.shareFile(filePath, text: text);
 }

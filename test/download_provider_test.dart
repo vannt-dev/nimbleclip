@@ -9,6 +9,8 @@ import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/providers/download_provider.dart';
 import 'package:nimble_clip/services/download_service.dart';
+import 'package:nimble_clip/services/download_history_repository.dart';
+import 'package:nimble_clip/services/media_file_actions.dart';
 import 'package:nimble_clip/services/storage_service.dart';
 
 class _ControlledDownloadService implements DownloadGateway {
@@ -54,11 +56,12 @@ class _ControlledDownloadService implements DownloadGateway {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-class _MemoryStorageService implements StorageService {
+class _MemoryStorageService
+    implements StorageService, DownloadHistoryRepository, MediaFileActions {
   List<DownloadTask> history = [];
   List<DownloadTask> receipts = [];
   bool downloadsCleared = false;
-  bool? galleryExists;
+  bool? galleryExistsResult;
   int historySaveCount = 0;
   int concurrentSaves = 0;
   int maxConcurrentSaves = 0;
@@ -104,10 +107,11 @@ class _MemoryStorageService implements StorageService {
   }
 
   @override
-  Future<bool?> galleryFileExists(
-    String filePath, {
-    required bool isImage,
-  }) async => galleryExists;
+  Future<bool?> galleryExists(String filePath, {required bool isImage}) async =>
+      galleryExistsResult;
+
+  @override
+  bool exists(String filePath) => false;
 
   @override
   Future<void> clearDownloads() async {
@@ -117,6 +121,16 @@ class _MemoryStorageService implements StorageService {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
+
+DownloadProvider _provider(
+  DownloadGateway downloads,
+  _MemoryStorageService storage,
+) => DownloadProvider(
+  downloadService: downloads,
+  storageService: storage,
+  historyRepository: storage,
+  fileActions: storage,
+);
 
 VideoMetadata _metadata(int count) => VideoMetadata(
   id: 'post',
@@ -156,10 +170,7 @@ void main() {
     () async {
       final downloads = _ControlledDownloadService();
       final storage = _MemoryStorageService();
-      final provider = DownloadProvider(
-        downloadService: downloads,
-        storageService: storage,
-      );
+      final provider = _provider(downloads, storage);
 
       final tasks = await provider.startNewDownloads(
         metadata: _metadata(5),
@@ -190,10 +201,7 @@ void main() {
   test('clear downloaded files also clears finished history', () async {
     final downloads = _ControlledDownloadService();
     final storage = _MemoryStorageService();
-    final provider = DownloadProvider(
-      downloadService: downloads,
-      storageService: storage,
-    );
+    final provider = _provider(downloads, storage);
     final metadata = _metadata(1);
     final tasks = await provider.startNewDownloads(
       metadata: metadata,
@@ -212,10 +220,7 @@ void main() {
   test('persists history once when a download completes', () async {
     final downloads = _ControlledDownloadService();
     final storage = _MemoryStorageService();
-    final provider = DownloadProvider(
-      downloadService: downloads,
-      storageService: storage,
-    );
+    final provider = _provider(downloads, storage);
     final metadata = _metadata(1);
     final tasks = await provider.startNewDownloads(
       metadata: metadata,
@@ -235,10 +240,7 @@ void main() {
   test('clear downloaded files is rejected while a task is active', () async {
     final downloads = _ControlledDownloadService();
     final storage = _MemoryStorageService();
-    final provider = DownloadProvider(
-      downloadService: downloads,
-      storageService: storage,
-    );
+    final provider = _provider(downloads, storage);
     final metadata = _metadata(1);
     final tasks = await provider.startNewDownloads(
       metadata: metadata,
@@ -256,10 +258,7 @@ void main() {
     'does not queue the same source option twice while it is active',
     () async {
       final downloads = _ControlledDownloadService();
-      final provider = DownloadProvider(
-        downloadService: downloads,
-        storageService: _MemoryStorageService(),
-      );
+      final provider = _provider(downloads, _MemoryStorageService());
       final metadata = _metadata(1);
 
       final first = await provider.startNewDownloads(
@@ -305,10 +304,7 @@ void main() {
       final storage = _MemoryStorageService()
         ..history = [missing]
         ..receipts = [missing];
-      final provider = DownloadProvider(
-        downloadService: _ControlledDownloadService(),
-        storageService: storage,
-      );
+      final provider = _provider(_ControlledDownloadService(), storage);
       await _waitUntil(() => provider.allTasks.isNotEmpty);
       final restored = provider.allTasks.single;
 
@@ -338,10 +334,8 @@ void main() {
       status: DownloadStatus.completed,
       isSavedToGallery: true,
     );
-    final provider = DownloadProvider(
-      downloadService: _ControlledDownloadService(),
-      storageService: _MemoryStorageService()..history = [existing],
-    );
+    final storage = _MemoryStorageService()..history = [existing];
+    final provider = _provider(_ControlledDownloadService(), storage);
 
     final matches = await provider.findExistingDownloads(
       metadata: metadata,
@@ -373,11 +367,8 @@ void main() {
     );
     final storage = _MemoryStorageService()
       ..receipts = [receipt]
-      ..galleryExists = true;
-    final provider = DownloadProvider(
-      downloadService: _ControlledDownloadService(),
-      storageService: storage,
-    );
+      ..galleryExistsResult = true;
+    final provider = _provider(_ControlledDownloadService(), storage);
 
     expect(
       await provider.findExistingDownloads(
@@ -411,11 +402,8 @@ void main() {
       );
       final storage = _MemoryStorageService()
         ..receipts = [receipt]
-        ..galleryExists = false;
-      final provider = DownloadProvider(
-        downloadService: _ControlledDownloadService(),
-        storageService: storage,
-      );
+        ..galleryExistsResult = false;
+      final provider = _provider(_ControlledDownloadService(), storage);
 
       expect(
         await provider.findExistingDownloads(

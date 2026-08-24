@@ -3,43 +3,55 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
-import '../core/utils/platform_file.dart';
+import '../core/utils/file_action_result.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../core/utils/quality_helper.dart';
 import '../models/download_task.dart';
 import '../models/download_options.dart';
 import '../models/video_metadata.dart';
 import '../services/download_service.dart';
+import '../services/download_history_repository.dart';
+import '../services/async_work_queue.dart';
 import '../services/extractors/registry.dart';
+import '../services/media_file_actions.dart';
 import '../services/storage_service.dart';
 
 class DownloadProvider extends ChangeNotifier {
   DownloadProvider({
     DownloadGateway? downloadService,
     StorageService? storageService,
+    DownloadHistoryRepository? historyRepository,
+    MediaFileActions? fileActions,
   }) : _downloadService = downloadService ?? DownloadService(),
-       _storageService = storageService ?? StorageService() {
+       _storageService = storageService ?? StorageService(),
+       _historyRepository =
+           historyRepository ??
+           const SharedPreferencesDownloadHistoryRepository(),
+       _fileActions = fileActions ?? const PlatformMediaFileActions() {
+    _queue = AsyncWorkQueue<_QueuedDownload>(
+      worker: _executeQueued,
+      shouldRun: (queued) =>
+          queued.task.status == DownloadStatus.queued &&
+          _tasks.contains(queued.task),
+      maxConcurrent: defaultMaxConcurrentDownloads,
+    );
     _historyReady = _loadHistory();
   }
 
   final List<DownloadTask> _tasks = [];
   final DownloadGateway _downloadService;
   final StorageService _storageService;
+  final DownloadHistoryRepository _historyRepository;
+  final MediaFileActions _fileActions;
   final Uuid _uuid = const Uuid();
   late final Future<void> _historyReady;
-  final List<_QueuedDownload> _queue = [];
-  int _runningDownloads = 0;
+  late final AsyncWorkQueue<_QueuedDownload> _queue;
   Future<void> _persistenceTail = Future.value();
 
   static const int defaultMaxConcurrentDownloads = 3;
-  int _maxConcurrentDownloads = defaultMaxConcurrentDownloads;
-
-  int get maxConcurrentDownloads => _maxConcurrentDownloads;
+  int get maxConcurrentDownloads => _queue.maxConcurrent;
   set maxConcurrentDownloads(int value) {
-    final normalized = value.clamp(1, 5).toInt();
-    if (_maxConcurrentDownloads == normalized) return;
-    _maxConcurrentDownloads = normalized;
-    _drainQueue();
+    _queue.maxConcurrent = value;
   }
 
   bool _isDisposed = false;
@@ -60,6 +72,7 @@ class DownloadProvider extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    _queue.clear();
     for (final task in _tasks) {
       task.dispose();
     }
@@ -73,7 +86,7 @@ class DownloadProvider extends ChangeNotifier {
   }
 
   Future<void> _loadHistory() async {
-    final loaded = await _storageService.loadHistory();
+    final loaded = await _historyRepository.loadHistory();
     for (final task in loaded) {
       // fromJson already demotes interrupted downloads to `failed`; give them a
       // message so the UI explains why they need a retry.
@@ -84,7 +97,7 @@ class DownloadProvider extends ChangeNotifier {
     _tasks
       ..clear()
       ..addAll(loaded);
-    await _storageService.saveDownloadReceipts(
+    await _historyRepository.saveDownloadReceipts(
       loaded.where((task) => task.status == DownloadStatus.completed),
     );
     notifyListeners();
@@ -99,9 +112,9 @@ class DownloadProvider extends ChangeNotifier {
         : DownloadTask.fromJson(receipt.toJson());
     _persistenceTail = _persistenceTail.then((_) async {
       if (receiptSnapshot != null) {
-        await _storageService.saveDownloadReceipt(receiptSnapshot);
+        await _historyRepository.saveDownloadReceipt(receiptSnapshot);
       }
-      await _storageService.saveHistory(snapshot);
+      await _historyRepository.saveHistory(snapshot);
     });
     return _persistenceTail;
   }
@@ -129,7 +142,7 @@ class DownloadProvider extends ChangeNotifier {
     required List<VideoQualityOption> qualities,
   }) async {
     await _historyReady;
-    final receipts = await _storageService.loadDownloadReceipts();
+    final receipts = await _historyRepository.loadDownloadReceipts();
     final candidates = <String, DownloadTask>{
       for (final task in _tasks) task.id: task,
       // A receipt represents a verified device/Gallery copy and should win over
@@ -147,11 +160,10 @@ class DownloadProvider extends ChangeNotifier {
         continue;
       }
       final localExists =
-          task.filePath != null &&
-          PlatformFileHelper.fileExists(task.filePath!);
+          task.filePath != null && _fileActions.exists(task.filePath!);
       var galleryExists = task.isSavedToGallery && task.filePath == null;
       if (task.isSavedToGallery && task.filePath != null) {
-        final checked = await _storageService.galleryFileExists(
+        final checked = await _fileActions.galleryExists(
           task.filePath!,
           isImage: task.isImage,
         );
@@ -169,7 +181,7 @@ class DownloadProvider extends ChangeNotifier {
     }
 
     if (staleReceiptIds.isNotEmpty) {
-      await _storageService.removeDownloadReceipts(staleReceiptIds);
+      await _historyRepository.removeDownloadReceipts(staleReceiptIds);
     }
     if (historyChanged) await _saveHistory();
     return matches;
@@ -246,30 +258,11 @@ class DownloadProvider extends ChangeNotifier {
     for (final task in tasks) {
       _queue.add(_QueuedDownload(task: task, l10n: l10n, options: options));
     }
-    _drainQueue();
     return tasks;
   }
 
-  void _drainQueue() {
-    while (_runningDownloads < maxConcurrentDownloads && _queue.isNotEmpty) {
-      final queued = _queue.removeAt(0);
-      if (queued.task.status != DownloadStatus.queued ||
-          !_tasks.contains(queued.task)) {
-        continue;
-      }
-      _runningDownloads++;
-      unawaited(
-        _executeDownload(
-          queued.task,
-          l10n: queued.l10n,
-          options: queued.options,
-        ).whenComplete(() {
-          _runningDownloads--;
-          _drainQueue();
-        }),
-      );
-    }
-  }
+  Future<void> _executeQueued(_QueuedDownload queued) =>
+      _executeDownload(queued.task, l10n: queued.l10n, options: queued.options);
 
   Future<void> _executeDownload(
     DownloadTask task, {
@@ -294,7 +287,7 @@ class DownloadProvider extends ChangeNotifier {
         task.isSavedToGallery &&
         !task.isAudioOnly &&
         localPath != null) {
-      task.galleryUri = await _storageService.galleryFileUri(
+      task.galleryUri = await _fileActions.galleryUri(
         localPath,
         isImage: task.isImage,
       );
@@ -302,7 +295,7 @@ class DownloadProvider extends ChangeNotifier {
       // MediaStore URI. This keeps Open/Share functional and avoids data loss
       // on platforms where Gallery cannot be addressed directly.
       if (options.removeCacheAfterGallery && task.galleryUri != null) {
-        await PlatformFileHelper.deleteFile(localPath);
+        await _fileActions.delete(localPath);
         task.filePath = null;
       }
     }
@@ -346,7 +339,6 @@ class DownloadProvider extends ChangeNotifier {
     task.errorMessage = null;
     notifyListeners();
     _queue.add(_QueuedDownload(task: task, l10n: l10n, options: options));
-    _drainQueue();
     await _saveHistory();
   }
 
@@ -369,7 +361,7 @@ class DownloadProvider extends ChangeNotifier {
     notifyListeners();
 
     if (task.filePath != null) {
-      await PlatformFileHelper.deleteFile(task.filePath!);
+      await _fileActions.delete(task.filePath!);
     }
 
     final refreshedUrl = await _refreshDownloadUrl(task, l10n);
@@ -387,13 +379,11 @@ class DownloadProvider extends ChangeNotifier {
       _queue.add(
         _QueuedDownload(task: refreshed, l10n: l10n, options: options),
       );
-      _drainQueue();
       await _saveHistory();
       return;
     }
 
     _queue.add(_QueuedDownload(task: task, l10n: l10n, options: options));
-    _drainQueue();
     await _saveHistory();
   }
 
@@ -433,7 +423,7 @@ class DownloadProvider extends ChangeNotifier {
       _downloadService.cancelDownload(taskId);
     }
     if (deleteLocalFile && task.filePath != null) {
-      await PlatformFileHelper.deleteFile(task.filePath!);
+      await _fileActions.delete(task.filePath!);
     }
     _tasks.removeAt(index);
     task.dispose();
@@ -446,7 +436,7 @@ class DownloadProvider extends ChangeNotifier {
     final finished = _tasks.where((t) => t.isDone).toList();
     for (final task in finished) {
       if (deleteLocalFiles && task.filePath != null) {
-        await PlatformFileHelper.deleteFile(task.filePath!);
+        await _fileActions.delete(task.filePath!);
       }
     }
     _tasks.removeWhere((t) => t.isDone);
@@ -487,7 +477,7 @@ class DownloadProvider extends ChangeNotifier {
     );
     if (success) {
       task.isSavedToGallery = true;
-      task.galleryUri = await _storageService.galleryFileUri(
+      task.galleryUri = await _fileActions.galleryUri(
         task.filePath!,
         isImage: task.isImage,
       );
@@ -500,7 +490,7 @@ class DownloadProvider extends ChangeNotifier {
   Future<bool> ensureLocalFileAvailable(DownloadTask task) async {
     await _historyReady;
     final filePath = task.filePath;
-    if (filePath != null && PlatformFileHelper.fileExists(filePath)) {
+    if (filePath != null && _fileActions.exists(filePath)) {
       return true;
     }
     await _markLocalFileMissing(task);
@@ -509,14 +499,13 @@ class DownloadProvider extends ChangeNotifier {
 
   Future<FileActionResult> openFile(DownloadTask task) async {
     if (task.galleryUri != null &&
-        (task.filePath == null ||
-            !PlatformFileHelper.fileExists(task.filePath!))) {
-      return PlatformFileHelper.openGalleryUri(task.galleryUri!);
+        (task.filePath == null || !_fileActions.exists(task.filePath!))) {
+      return _fileActions.openGallery(task.galleryUri!);
     }
     if (!await ensureLocalFileAvailable(task)) {
       return FileActionResult.fileMissing;
     }
-    final result = await _downloadService.openFile(task.filePath!);
+    final result = await _fileActions.openLocal(task.filePath!);
     if (result == FileActionResult.fileMissing) {
       await _markLocalFileMissing(task);
     }
@@ -525,20 +514,13 @@ class DownloadProvider extends ChangeNotifier {
 
   Future<FileActionResult> shareFile(DownloadTask task, String message) async {
     if (task.galleryUri != null &&
-        (task.filePath == null ||
-            !PlatformFileHelper.fileExists(task.filePath!))) {
-      return PlatformFileHelper.shareGalleryUri(
-        task.galleryUri!,
-        text: message,
-      );
+        (task.filePath == null || !_fileActions.exists(task.filePath!))) {
+      return _fileActions.shareGallery(task.galleryUri!, text: message);
     }
     if (!await ensureLocalFileAvailable(task)) {
       return FileActionResult.fileMissing;
     }
-    final result = await _downloadService.shareFile(
-      task.filePath!,
-      text: message,
-    );
+    final result = await _fileActions.shareLocal(task.filePath!, text: message);
     if (result == FileActionResult.fileMissing) {
       await _markLocalFileMissing(task);
     }
@@ -555,7 +537,7 @@ class DownloadProvider extends ChangeNotifier {
 
     var galleryStillExists = false;
     if (task.isSavedToGallery && !task.isAudioOnly && missingPath != null) {
-      final checked = await _storageService.galleryFileExists(
+      final checked = await _fileActions.galleryExists(
         missingPath,
         isImage: task.isImage,
       );
@@ -565,7 +547,7 @@ class DownloadProvider extends ChangeNotifier {
       }
     }
     if (!galleryStillExists) {
-      await _storageService.removeDownloadReceipts({task.id});
+      await _historyRepository.removeDownloadReceipts({task.id});
     }
     notifyListeners();
     await _saveHistory();
