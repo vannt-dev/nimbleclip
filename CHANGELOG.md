@@ -26,6 +26,14 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   wrapping on smaller screens.
 - Added extractor fixtures, MediaStore URI integration coverage, and opt-in live
   smoke tests for public image and video posts.
+- Refactored download coordination into reusable queue, history repository, and
+  platform file-action services, with explicit download options shared across
+  call sites.
+- Refactored Facebook and Instagram extraction into dedicated page parsers and
+  injectable fallback clients, and replaced mutable global privacy state with
+  an injected application policy.
+- Consolidated media format, URL, quality construction, and batch-selection
+  logic, and removed duplicate download cards and settings selection tiles.
 
 ## [1.1.1] - 2026-08-23
 

@@ -291,8 +291,11 @@ lib/
 |-- models/              Video metadata and download task models
 |-- providers/           Application state and workflow coordination
 |-- services/
-|   |-- extractors/      Platform-specific media extractors and registry
+|   |-- extractors/      Extractors, page parsers, fallback clients, registry
+|   |-- async_work_queue.dart
+|   |-- download_history_repository.dart
 |   |-- download_service.dart
+|   |-- media_file_actions.dart
 |   `-- storage_service.dart
 |-- views/               Home, downloads, player, and settings screens
 `-- main.dart            Application entry point
@@ -303,6 +306,16 @@ tool/                    Quality checks, fixture server, emulator launcher,
                          icon generator, and release/signing helpers
 server.js                Web static server, URL resolver, and CORS proxy
 ```
+
+The extractor registry and external-service privacy policy are injected at the
+application boundary, so tests and providers do not depend on mutable global
+state. Extractors coordinate platform strategies while dedicated parsers and
+fallback clients handle response interpretation and third-party HTTP calls.
+
+The download provider coordinates the workflow but delegates transfer work,
+global concurrency, persistent history, and platform file actions to separate
+services. Shared media-format, URL, quality, and selection helpers keep image,
+video, and audio behavior consistent across platforms and screens.
 
 ## Storage and permissions
 
