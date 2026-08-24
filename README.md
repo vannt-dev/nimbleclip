@@ -19,10 +19,12 @@ management, local playback, and gallery export.
 
 - Detects supported links pasted from the clipboard.
 - Extracts available video, audio, and image options before downloading.
-- Shows Instagram and TikTok carousel thumbnails in a lazy full-screen picker,
-  with preview, select-all, and multi-image download.
-- Uses one shared download queue with at most three concurrent transfers, so
-  separate batches cannot overload the device or network.
+- Shows carousel thumbnails in a lazy full-screen picker, with preview,
+  select-all, and multi-image download for supported Facebook, Instagram,
+  TikTok, and X posts.
+- Uses one shared download queue with a configurable limit of one to five
+  concurrent transfers, so separate batches cannot overload the device or
+  network.
 - Prevents the same source option from being queued twice while it is already
   downloading, and asks for confirmation before downloading an existing
   completed file again.
@@ -31,17 +33,24 @@ management, local playback, and gallery export.
 - Pauses and resumes native downloads when the source server supports HTTP
   range requests.
 - Refreshes expired media URLs before retrying a failed download.
-- Uses compact, filesystem-safe UUID filenames and validates downloaded media
-  from its actual file signature. Native video downloads are also opened by the
-  platform player once before they are marked complete, preventing an HTML
-  error page or broken video from appearing as a successful download.
+- Uses compact, filesystem-safe, platform-prefixed UUID filenames such as
+  `facebook_<uuid>` and `x_<uuid>`, and validates downloaded media from its
+  actual file signature. Native video downloads are also opened by the platform
+  player once before they are marked complete, preventing an HTML error page or
+  broken video from appearing as a successful download.
 - Previews remote media and plays downloaded files inside the app.
 - Saves completed videos and images to the device gallery on Android and iOS;
   audio remains available from NimbleClip's download directory.
+- Keeps the Android MediaStore URI after Gallery export so media can still be
+  opened or shared when the app-local cache copy is removed. Safe cache cleanup
+  after Gallery export is enabled by default and can be changed in Settings.
 - Opens or shares downloaded files with other installed applications, reports
   missing handlers and operation failures, and reconciles history when a local
   file has been removed outside the app.
 - Persists download history and user preferences locally.
+- Lets users disable external extraction services. Some TikTok and X downloads,
+  plus carousel fallbacks for Facebook and Instagram, require these services
+  and may send the public post URL to them.
 - Supports light, dark, and system themes.
 - Supports English and Vietnamese, with automatic device-locale detection and
   a persisted in-app language preference.
@@ -53,10 +62,10 @@ management, local playback, and gallery export.
 | --- | --- |
 | YouTube | Public videos and available M4A audio streams |
 | TikTok | Public videos, slideshows/image posts, including watermark-free variants when exposed by the source, and audio |
-| Facebook | Public videos, Watch links, and Reels |
-| X / Twitter | Public posts containing video |
-| Instagram | Public image/carousel posts, video posts, and Reels |
-| Direct URLs | Public video/audio files and pages exposing standard Open Graph media metadata |
+| Facebook | Public videos, Watch links, Reels, image posts, carousels, and mixed-media posts |
+| X / Twitter | Public posts containing images, videos, or mixed media |
+| Instagram | Public image/carousel posts, video posts, Reels, and mixed-media posts |
+| Direct URLs | Public image, video, or audio files and pages exposing standard Open Graph media metadata |
 
 Extraction depends on public endpoints and page formats controlled by third
 parties. A platform change, regional restriction, authentication requirement,
@@ -122,6 +131,25 @@ powershell -ExecutionPolicy Bypass -File .\tool\check_all.ps1
 
 Use `-SkipAndroid` for the faster platform-independent gates, or
 `-SkipWebBuild` when a Web bundle is not needed.
+
+Live extractor smoke tests are kept opt-in because public posts can be removed
+or made private without notice. The default suite checks known public Facebook,
+X, and TikTok image/video posts:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tool\check_live_extractors.ps1
+```
+
+Pass current public Instagram examples when validating Instagram as well:
+
+```powershell
+.\tool\check_live_extractors.ps1 `
+  -InstagramImageUrl <public-carousel-url> `
+  -InstagramVideoUrl <public-reel-url>
+```
+
+The same live suite can be included in the all-in-one workflow with
+`-RunLiveExtractors` and the corresponding Instagram URL parameters.
 
 The equivalent individual commands are:
 
@@ -193,8 +221,8 @@ process cannot be mistaken for the test server.
 
 The suite covers scoped storage, file integrity, playable video validation,
 cleartext development-host access, clean and resumed downloads, servers that
-ignore or change range behavior, Gallery/MediaStore export, and cache cleanup.
-The same suite runs on an Android emulator in CI.
+ignore or change range behavior, Gallery/MediaStore export and URI lookup, and
+cache cleanup. The same suite runs on an Android emulator in CI.
 
 ## Web build
 

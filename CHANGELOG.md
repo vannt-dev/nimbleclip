@@ -6,6 +6,27 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- Added complete image, video, and mixed-media extraction for public Facebook,
+  Instagram, TikTok, X, and compatible Open Graph posts, including full
+  Facebook galleries and X photo sets.
+- Added batch selection and download controls for multi-image posts while
+  keeping one selectable quality per video stream.
+- Standardized compact platform-prefixed filenames, including `facebook_<uuid>`,
+  `instagram_<uuid>`, `tiktok_<uuid>`, and `x_<uuid>`.
+- Improved extractor resilience with retry handling, provider fallbacks, and
+  selection of the richest Facebook image result across page strategies.
+- Added a privacy control for external extraction services with localized
+  disclosure that public post URLs may be sent to those services.
+- Added configurable download concurrency from one to five simultaneous
+  transfers.
+- Added safe post-export cache cleanup on Android. NimbleClip now persists the
+  MediaStore URI so Gallery media remains available to open and share after the
+  app-local copy is removed.
+- Shortened the batch action label to `Download (n)` / `Tải xuống (n)` to avoid
+  wrapping on smaller screens.
+- Added extractor fixtures, MediaStore URI integration coverage, and opt-in live
+  smoke tests for public image and video posts.
+
 ## [1.1.1] - 2026-08-23
 
 - Hardened native downloads with media signature inspection, real video
