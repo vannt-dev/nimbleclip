@@ -1,9 +1,6 @@
-import 'dart:convert';
-
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/http_helper.dart';
 import '../../core/utils/media_format_helper.dart';
-import '../../core/utils/media_url_helper.dart';
 import '../../core/utils/external_service_policy.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/text_unescape.dart';
@@ -245,7 +242,7 @@ class FacebookExtractor extends BaseVideoExtractor {
     final hdUrl = _firstMatch(html, _hdPatterns);
     final sdUrl = _firstMatch(html, _sdPatterns);
     final thumbnailUrl = _thumbnail(html);
-    final photoUrls = _extractPhotoUrls(html);
+    final photoUrls = _pageParser.photoUrls(html);
     if (photoUrls.isEmpty && hdUrl == null && sdUrl == null) {
       if (thumbnailUrl == null) return null;
       photoUrls.add(thumbnailUrl);
@@ -316,85 +313,5 @@ class FacebookExtractor extends BaseVideoExtractor {
 
   Duration? _duration(String html) {
     return _pageParser.duration(html);
-  }
-
-  /// Extracts post photos from Facebook's public Relay payload. Multi-photo
-  /// posts are represented by `all_subattachments`; single photo pages expose
-  /// a `Photo` node. Restricting collection to those structures avoids pulling
-  /// avatars, reaction icons and the poster image of a video into the batch.
-  List<String> _extractPhotoUrls(String html) {
-    final urls = <String>[];
-
-    void addPhotoNode(dynamic value) {
-      if (value is! Map<String, dynamic>) return;
-      final candidates = <({String url, int area})>[];
-
-      void findImages(dynamic node, {bool insideImageField = false}) {
-        if (node is Map<String, dynamic>) {
-          final uri = node['uri']?.toString() ?? node['url']?.toString();
-          if (insideImageField && uri != null && MediaUrlHelper.isHttp(uri)) {
-            final width = (node['width'] as num?)?.toInt() ?? 0;
-            final height = (node['height'] as num?)?.toInt() ?? 0;
-            candidates.add((url: decodeJsonEscapes(uri), area: width * height));
-          }
-          for (final entry in node.entries) {
-            final key = entry.key.toLowerCase();
-            findImages(
-              entry.value,
-              insideImageField:
-                  insideImageField ||
-                  key == 'image' ||
-                  key.endsWith('_image') ||
-                  key.endsWith('image'),
-            );
-          }
-        } else if (node is List) {
-          for (final child in node) {
-            findImages(child, insideImageField: insideImageField);
-          }
-        }
-      }
-
-      findImages(value);
-      if (candidates.isEmpty) return;
-      candidates.sort((a, b) => b.area.compareTo(a.area));
-      final best = candidates.first.url;
-      if (!urls.contains(best)) urls.add(best);
-    }
-
-    void visit(dynamic value, {bool inSubattachments = false}) {
-      if (value is Map<String, dynamic>) {
-        final type = value['__typename']?.toString();
-        if (type == 'Photo') {
-          addPhotoNode(value);
-        } else if (inSubattachments && value['media'] != null) {
-          addPhotoNode(value['media']);
-        }
-
-        for (final entry in value.entries) {
-          final isSubattachments =
-              inSubattachments || entry.key == 'all_subattachments';
-          visit(entry.value, inSubattachments: isSubattachments);
-        }
-      } else if (value is List) {
-        for (final child in value) {
-          visit(child, inSubattachments: inSubattachments);
-        }
-      }
-    }
-
-    final scripts = RegExp(
-      r'''<script[^>]*type=["']application/json["'][^>]*>([\s\S]*?)</script>''',
-      caseSensitive: false,
-    ).allMatches(html);
-    for (final script in scripts) {
-      try {
-        visit(jsonDecode(decodeHtmlEntities(script.group(1) ?? '')));
-      } catch (_) {
-        // Facebook may mix non-JSON bootloader scripts into the page. Other
-        // payloads and the Open Graph fallback can still provide the media.
-      }
-    }
-    return urls;
   }
 }
