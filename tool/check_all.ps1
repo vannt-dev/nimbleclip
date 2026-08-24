@@ -5,7 +5,10 @@ param(
     [ValidateRange(15, 300)]
     [int]$BootTimeoutSeconds = 90,
     [switch]$SkipAndroid,
-    [switch]$SkipWebBuild
+    [switch]$SkipWebBuild,
+    [switch]$RunLiveExtractors,
+    [string]$InstagramImageUrl,
+    [string]$InstagramVideoUrl
 )
 
 $ErrorActionPreference = 'Stop'
@@ -92,6 +95,21 @@ try {
 
     Write-Host '4/7 Running Flutter tests...' -ForegroundColor Cyan
     Invoke-CheckedCommand 'flutter' @('test')
+    if ($RunLiveExtractors) {
+        Write-Host 'Running opt-in live extractor smoke tests...' -ForegroundColor Cyan
+        $liveArguments = @(
+            'test',
+            'test/live_extractor_smoke_test.dart',
+            '--dart-define=RUN_LIVE_EXTRACTOR_TESTS=true'
+        )
+        if (-not [string]::IsNullOrWhiteSpace($InstagramImageUrl)) {
+            $liveArguments += "--dart-define=INSTAGRAM_IMAGE_URL=$InstagramImageUrl"
+        }
+        if (-not [string]::IsNullOrWhiteSpace($InstagramVideoUrl)) {
+            $liveArguments += "--dart-define=INSTAGRAM_VIDEO_URL=$InstagramVideoUrl"
+        }
+        Invoke-CheckedCommand 'flutter' $liveArguments
+    }
 
     Write-Host '5/7 Running Node.js tests...' -ForegroundColor Cyan
     Invoke-CheckedCommand 'node' @('--test', 'test/server_test.js')

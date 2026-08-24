@@ -134,12 +134,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String downloadSelected(int count) {
-    return 'Download selected ($count)';
+    return 'Download ($count)';
   }
 
   @override
   String batchDownloadStarted(int count) {
-    return 'Downloading $count selected images.';
+    return 'Downloading $count selected media files.';
   }
 
   @override
@@ -394,6 +394,27 @@ class AppLocalizationsEn extends AppLocalizations {
       'Add media to your gallery after each download';
 
   @override
+  String get removeCacheAfterGallery => 'Remove local copy after saving';
+
+  @override
+  String get removeCacheAfterGalleryDescription =>
+      'Avoid duplicate storage; the Gallery copy stays available';
+
+  @override
+  String get allowExternalServices => 'Allow external extraction services';
+
+  @override
+  String get allowExternalServicesDescription =>
+      'Required for TikTok, X, and some Facebook or Instagram posts. The public post URL may be sent to these services.';
+
+  @override
+  String get concurrentDownloads => 'Simultaneous downloads';
+
+  @override
+  String get concurrentDownloadsDescription =>
+      'More downloads can be faster but use more bandwidth and battery';
+
+  @override
   String get autoDetectClipboard => 'Detect clipboard links automatically';
 
   @override
@@ -562,7 +583,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get facebookNoVideo =>
-      'Could not extract a Facebook video. Make sure it is public; private and closed-group videos require a login.';
+      'Could not extract media from this Facebook post. Make sure it is public; private posts and closed groups require a login.';
 
   @override
   String get highQuality720 => 'HD 720p (High quality)';
@@ -575,4 +596,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get unableToAnalyze => 'This link could not be analyzed.';
+
+  @override
+  String get externalServicesDisabled =>
+      'External extraction services are disabled in Settings. Enable them to download this post.';
 }

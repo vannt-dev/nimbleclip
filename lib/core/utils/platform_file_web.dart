@@ -12,6 +12,16 @@ class PlatformFileHelper {
     String filePath, {
     required bool isImage,
   }) async => null;
+  static Future<String?> galleryFileUri(
+    String filePath, {
+    required bool isImage,
+  }) async => null;
+  static Future<FileActionResult> openGalleryUri(String uri) async =>
+      FileActionResult.unsupported;
+  static Future<FileActionResult> shareGalleryUri(
+    String uri, {
+    String? text,
+  }) async => FileActionResult.unsupported;
   static Future<int> calculateCacheSize(String? dirPath) async => 0;
   static Future<void> clearDownloads(String? dirPath) async {}
   static Future<void> deleteFile(String filePath) async {}

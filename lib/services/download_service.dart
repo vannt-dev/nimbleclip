@@ -9,6 +9,7 @@ import '../core/utils/web_download_helper.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../models/download_task.dart';
 import '../models/video_metadata.dart' show MediaKind;
+import '../models/video_platform.dart';
 import 'storage_service.dart';
 
 typedef DownloadProgressCallback =
@@ -64,13 +65,18 @@ class DownloadService implements DownloadGateway {
 
   static const String _pauseReason = 'paused-by-user';
 
-  /// Uses a short UUID-style name so Gallery apps receive a predictable,
-  /// filesystem-safe display name regardless of the post caption.
+  /// Uses the source platform plus a short UUID-style name so Gallery apps
+  /// receive a predictable, filesystem-safe display name while files from
+  /// different services remain recognisable.
   String buildFileName(DownloadTask task, {String? extension}) {
     final compactId = task.id.replaceAll(RegExp('[^a-zA-Z0-9]'), '');
-    final base = compactId.isEmpty
+    final idPart = compactId.isEmpty
         ? 'NimbleClip'
         : compactId.substring(0, compactId.length.clamp(0, 12));
+    final platformPrefix = task.platform == VideoPlatform.twitter
+        ? 'x'
+        : task.platform.name;
+    final base = '${platformPrefix}_$idPart';
     final ext = (extension ?? task.format).replaceAll('.', '').trim();
     final safeExtension = ext.isEmpty ? 'mp4' : ext;
     return '$base.$safeExtension';

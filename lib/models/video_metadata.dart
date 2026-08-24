@@ -13,6 +13,10 @@ class VideoQualityOption {
   final MediaKind kind;
   final Map<String, String>? headers;
 
+  /// Identifies quality variants that belong to the same physical media item.
+  /// When omitted, all video options are treated as variants of one video.
+  final String? mediaId;
+
   const VideoQualityOption({
     required this.id,
     required this.label,
@@ -23,6 +27,7 @@ class VideoQualityOption {
     this.sizeBytes,
     this.kind = MediaKind.video,
     this.headers,
+    this.mediaId,
   });
 
   bool get isAudioOnly => kind == MediaKind.audio;
@@ -38,6 +43,7 @@ class VideoQualityOption {
     'sizeBytes': sizeBytes,
     'kind': kind.name,
     'headers': headers,
+    'mediaId': mediaId,
   };
 
   factory VideoQualityOption.fromJson(Map<String, dynamic> json) =>
@@ -60,6 +66,7 @@ class VideoQualityOption {
         headers: (json['headers'] as Map<String, dynamic>?)?.map(
           (k, v) => MapEntry(k, v.toString()),
         ),
+        mediaId: json['mediaId'] as String?,
       );
 }
 

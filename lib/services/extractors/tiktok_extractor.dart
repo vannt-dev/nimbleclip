@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/http_helper.dart';
+import '../../core/utils/external_service_policy.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
@@ -22,10 +23,14 @@ class TikTokExtractor extends BaseVideoExtractor {
 
   @override
   Future<VideoMetadata> extract(String url, AppLocalizations l10n) async {
+    if (!ExternalServicePolicy.allowExternalServices) {
+      throw ExtractionException(l10n.externalServicesDisabled);
+    }
     final Map<String, dynamic> json;
     try {
-      final response = await ExtractorHttp.post(
+      final response = await ExtractorHttp.postWithRetry(
         '$_apiBase/api/',
+        service: 'TikWM',
         userAgent: AppConstants.mobileUserAgent,
         headers: {'Accept': 'application/json'},
         body: {'url': url, 'count': '12', 'cursor': '0', 'web': '1', 'hd': '1'},
@@ -65,6 +70,7 @@ class TikTokExtractor extends BaseVideoExtractor {
       qualities.add(
         VideoQualityOption(
           id: 'tt_image_${index + 1}_$id',
+          mediaId: 'tt_image_${index + 1}_$id',
           label: l10n.imageLabel(index + 1),
           quality: l10n.imageLabel(index + 1),
           format: _imageFormat(imageUrl),
@@ -79,6 +85,7 @@ class TikTokExtractor extends BaseVideoExtractor {
       qualities.add(
         VideoQualityOption(
           id: 'tt_hd_$id',
+          mediaId: 'tt_video_$id',
           label: 'HD 1080p (${l10n.noWatermark})',
           quality: 'HD 1080p',
           format: 'mp4',
@@ -93,6 +100,7 @@ class TikTokExtractor extends BaseVideoExtractor {
       qualities.add(
         VideoQualityOption(
           id: 'tt_sd_$id',
+          mediaId: 'tt_video_$id',
           label: '720p (${l10n.noWatermark})',
           quality: '720p',
           format: 'mp4',
@@ -110,6 +118,7 @@ class TikTokExtractor extends BaseVideoExtractor {
       qualities.add(
         VideoQualityOption(
           id: 'tt_wm_$id',
+          mediaId: 'tt_video_$id',
           label: '720p (${l10n.withWatermark})',
           quality: '720p',
           format: 'mp4',

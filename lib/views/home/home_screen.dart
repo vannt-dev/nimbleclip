@@ -155,6 +155,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         qualities: selected,
         l10n: context.l10n,
         autoSaveToGallery: settings.autoSaveGallery,
+        removeCacheAfterGallery: settings.removeCacheAfterGallery,
       );
       if (!mounted) return;
       if (tasks.isEmpty) {

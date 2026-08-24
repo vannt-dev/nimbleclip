@@ -1,0 +1,20 @@
+{
+  "code": 200,
+  "tweet": {
+    "text": "Mixed X fixture",
+    "author": {"name": "Fixture User", "screen_name": "fixture"},
+    "media": {
+      "videos": [{
+        "thumbnail_url": "https://cdn.example/x-video.jpg",
+        "duration": 8,
+        "variants": [
+          {"content_type": "video/mp4", "bitrate": 832000, "url": "https://cdn.example/vid/1280x720/x.mp4"}
+        ]
+      }],
+      "photos": [
+        {"id": "photo-1", "format": "jpg", "type": "photo", "url": "https://cdn.example/x-1.jpg"},
+        {"id": "photo-2", "format": "webp", "type": "photo", "url": "https://cdn.example/x-2.webp"}
+      ]
+    }
+  }
+}

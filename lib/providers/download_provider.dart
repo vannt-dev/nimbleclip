@@ -30,7 +30,16 @@ class DownloadProvider extends ChangeNotifier {
   int _runningDownloads = 0;
   Future<void> _persistenceTail = Future.value();
 
-  static const int maxConcurrentDownloads = 3;
+  static const int defaultMaxConcurrentDownloads = 3;
+  int _maxConcurrentDownloads = defaultMaxConcurrentDownloads;
+
+  int get maxConcurrentDownloads => _maxConcurrentDownloads;
+  set maxConcurrentDownloads(int value) {
+    final normalized = value.clamp(1, 5).toInt();
+    if (_maxConcurrentDownloads == normalized) return;
+    _maxConcurrentDownloads = normalized;
+    _drainQueue();
+  }
 
   bool _isDisposed = false;
 
@@ -101,12 +110,14 @@ class DownloadProvider extends ChangeNotifier {
     required VideoQualityOption quality,
     required AppLocalizations l10n,
     bool autoSaveToGallery = true,
+    bool removeCacheAfterGallery = false,
   }) async {
     final tasks = await startNewDownloads(
       metadata: metadata,
       qualities: [quality],
       l10n: l10n,
       autoSaveToGallery: autoSaveToGallery,
+      removeCacheAfterGallery: removeCacheAfterGallery,
     );
     return tasks.first;
   }
@@ -189,6 +200,7 @@ class DownloadProvider extends ChangeNotifier {
     required List<VideoQualityOption> qualities,
     required AppLocalizations l10n,
     bool autoSaveToGallery = true,
+    bool removeCacheAfterGallery = false,
   }) async {
     // Do not let the asynchronous history restore clear a task that the user
     // starts immediately after launch.
@@ -239,6 +251,7 @@ class DownloadProvider extends ChangeNotifier {
           task: task,
           l10n: l10n,
           autoSaveToGallery: autoSaveToGallery,
+          removeCacheAfterGallery: removeCacheAfterGallery,
         ),
       );
     }
@@ -259,6 +272,7 @@ class DownloadProvider extends ChangeNotifier {
           queued.task,
           l10n: queued.l10n,
           autoSaveToGallery: queued.autoSaveToGallery,
+          removeCacheAfterGallery: queued.removeCacheAfterGallery,
         ).whenComplete(() {
           _runningDownloads--;
           _drainQueue();
@@ -271,6 +285,7 @@ class DownloadProvider extends ChangeNotifier {
     DownloadTask task, {
     required AppLocalizations l10n,
     bool autoSaveToGallery = true,
+    bool removeCacheAfterGallery = false,
   }) async {
     await _downloadService.startDownload(
       task: task,
@@ -285,6 +300,23 @@ class DownloadProvider extends ChangeNotifier {
         notifyListeners();
       },
     );
+    final localPath = task.filePath;
+    if (task.status == DownloadStatus.completed &&
+        task.isSavedToGallery &&
+        !task.isAudioOnly &&
+        localPath != null) {
+      task.galleryUri = await _storageService.galleryFileUri(
+        localPath,
+        isImage: task.isImage,
+      );
+      // Only remove the app-local copy when Android returned a durable
+      // MediaStore URI. This keeps Open/Share functional and avoids data loss
+      // on platforms where Gallery cannot be addressed directly.
+      if (removeCacheAfterGallery && task.galleryUri != null) {
+        await PlatformFileHelper.deleteFile(localPath);
+        task.filePath = null;
+      }
+    }
     // Covers the pause / cancel paths, which finish without a callback.
     notifyListeners();
     await _saveHistory(
@@ -319,6 +351,7 @@ class DownloadProvider extends ChangeNotifier {
     DownloadTask task, {
     required AppLocalizations l10n,
     bool autoSaveToGallery = true,
+    bool removeCacheAfterGallery = false,
   }) async {
     if (task.status != DownloadStatus.paused) return;
     task.status = DownloadStatus.queued;
@@ -329,6 +362,7 @@ class DownloadProvider extends ChangeNotifier {
         task: task,
         l10n: l10n,
         autoSaveToGallery: autoSaveToGallery,
+        removeCacheAfterGallery: removeCacheAfterGallery,
       ),
     );
     _drainQueue();
@@ -344,6 +378,7 @@ class DownloadProvider extends ChangeNotifier {
   Future<void> retryTask(
     DownloadTask task, {
     bool autoSaveToGallery = true,
+    bool removeCacheAfterGallery = false,
     required AppLocalizations l10n,
   }) async {
     task.status = DownloadStatus.queued;
@@ -374,6 +409,7 @@ class DownloadProvider extends ChangeNotifier {
           task: refreshed,
           l10n: l10n,
           autoSaveToGallery: autoSaveToGallery,
+          removeCacheAfterGallery: removeCacheAfterGallery,
         ),
       );
       _drainQueue();
@@ -386,6 +422,7 @@ class DownloadProvider extends ChangeNotifier {
         task: task,
         l10n: l10n,
         autoSaveToGallery: autoSaveToGallery,
+        removeCacheAfterGallery: removeCacheAfterGallery,
       ),
     );
     _drainQueue();
@@ -482,6 +519,10 @@ class DownloadProvider extends ChangeNotifier {
     );
     if (success) {
       task.isSavedToGallery = true;
+      task.galleryUri = await _storageService.galleryFileUri(
+        task.filePath!,
+        isImage: task.isImage,
+      );
       notifyListeners();
       await _saveHistory(receipt: task);
     }
@@ -499,6 +540,11 @@ class DownloadProvider extends ChangeNotifier {
   }
 
   Future<FileActionResult> openFile(DownloadTask task) async {
+    if (task.galleryUri != null &&
+        (task.filePath == null ||
+            !PlatformFileHelper.fileExists(task.filePath!))) {
+      return PlatformFileHelper.openGalleryUri(task.galleryUri!);
+    }
     if (!await ensureLocalFileAvailable(task)) {
       return FileActionResult.fileMissing;
     }
@@ -510,6 +556,14 @@ class DownloadProvider extends ChangeNotifier {
   }
 
   Future<FileActionResult> shareFile(DownloadTask task, String message) async {
+    if (task.galleryUri != null &&
+        (task.filePath == null ||
+            !PlatformFileHelper.fileExists(task.filePath!))) {
+      return PlatformFileHelper.shareGalleryUri(
+        task.galleryUri!,
+        text: message,
+      );
+    }
     if (!await ensureLocalFileAvailable(task)) {
       return FileActionResult.fileMissing;
     }
@@ -562,9 +616,11 @@ class _QueuedDownload {
     required this.task,
     required this.l10n,
     required this.autoSaveToGallery,
+    required this.removeCacheAfterGallery,
   });
 
   final DownloadTask task;
   final AppLocalizations l10n;
   final bool autoSaveToGallery;
+  final bool removeCacheAfterGallery;
 }

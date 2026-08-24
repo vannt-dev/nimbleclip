@@ -13,6 +13,7 @@ import 'package:nimble_clip/providers/settings_provider.dart';
 import 'package:nimble_clip/providers/video_extractor_provider.dart';
 import 'package:nimble_clip/services/extractors/registry.dart';
 import 'package:nimble_clip/views/home/home_screen.dart';
+import 'package:nimble_clip/views/home/widgets/video_result_card.dart';
 import 'package:nimble_clip/views/downloads/widgets/completed_download_card.dart';
 
 void main() {
@@ -173,4 +174,78 @@ void main() {
     expect(find.text('Share'), findsOneWidget);
     expect(find.text('Open with'), findsOneWidget);
   });
+
+  testWidgets(
+    'mixed post downloads one video quality and every selected image',
+    (WidgetTester tester) async {
+      const hd = VideoQualityOption(
+        id: 'video-hd',
+        mediaId: 'video-1',
+        label: 'HD',
+        quality: '720p',
+        format: 'mp4',
+        downloadUrl: 'https://example.com/video-hd.mp4',
+      );
+      const sd = VideoQualityOption(
+        id: 'video-sd',
+        mediaId: 'video-1',
+        label: 'SD',
+        quality: '480p',
+        format: 'mp4',
+        downloadUrl: 'https://example.com/video-sd.mp4',
+      );
+      const image1 = VideoQualityOption(
+        id: 'image-1',
+        mediaId: 'image-1',
+        label: 'Image 1',
+        quality: 'Original',
+        format: 'jpg',
+        downloadUrl: 'https://example.com/image-1.jpg',
+        kind: MediaKind.image,
+      );
+      const image2 = VideoQualityOption(
+        id: 'image-2',
+        mediaId: 'image-2',
+        label: 'Image 2',
+        quality: 'Original',
+        format: 'webp',
+        downloadUrl: 'https://example.com/image-2.webp',
+        kind: MediaKind.image,
+      );
+      const metadata = VideoMetadata(
+        id: 'mixed-post',
+        originalUrl: 'https://x.com/user/status/1',
+        title: 'Mixed post',
+        author: 'Author',
+        coverUrl: '',
+        platform: VideoPlatform.twitter,
+        qualities: [hd, sd, image1, image2],
+      );
+      List<VideoQualityOption>? submitted;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: VideoResultCard(
+                metadata: metadata,
+                selectedQuality: hd,
+                onQualitySelected: (_) {},
+                onDownload: (options) => submitted = options,
+                onPreview: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Download (3)'));
+      expect(submitted, isNotNull);
+      expect(submitted, hasLength(3));
+      expect(submitted!.where((option) => !option.isImage), [hd]);
+      expect(submitted!.where((option) => option.isImage), [image1, image2]);
+    },
+  );
 }

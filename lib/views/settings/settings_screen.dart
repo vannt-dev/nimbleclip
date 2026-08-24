@@ -198,6 +198,65 @@ class SettingsScreen extends StatelessWidget {
                 const Divider(height: 1),
                 SwitchListTile(
                   secondary: const Icon(
+                    Icons.delete_sweep_outlined,
+                    color: AppColors.primary,
+                  ),
+                  title: Text(l10n.removeCacheAfterGallery),
+                  subtitle: Text(
+                    l10n.removeCacheAfterGalleryDescription,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  value: settings.removeCacheAfterGallery,
+                  onChanged: settings.autoSaveGallery
+                      ? settings.setRemoveCacheAfterGallery
+                      : null,
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  secondary: const Icon(
+                    Icons.cloud_outlined,
+                    color: AppColors.primary,
+                  ),
+                  title: Text(l10n.allowExternalServices),
+                  subtitle: Text(
+                    l10n.allowExternalServicesDescription,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  value: settings.allowExternalServices,
+                  onChanged: settings.setAllowExternalServices,
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(
+                    Icons.multiple_stop_rounded,
+                    color: AppColors.primary,
+                  ),
+                  title: Text(l10n.concurrentDownloads),
+                  subtitle: Text(
+                    l10n.concurrentDownloadsDescription,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  trailing: DropdownButton<int>(
+                    value: settings.maxConcurrentDownloads,
+                    underline: const SizedBox.shrink(),
+                    items: const [1, 2, 3, 4, 5]
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text('$value'),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) async {
+                      if (value != null) {
+                        await settings.setMaxConcurrentDownloads(value);
+                      }
+                    },
+                  ),
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  secondary: const Icon(
                     Icons.content_paste_rounded,
                     color: AppColors.primary,
                   ),

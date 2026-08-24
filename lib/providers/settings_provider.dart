@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/app_constants.dart';
+import '../core/utils/external_service_policy.dart';
 import '../services/storage_service.dart';
 
 class SettingsProvider extends ChangeNotifier {
@@ -10,6 +11,9 @@ class SettingsProvider extends ChangeNotifier {
   bool _autoPasteClipboard = true;
   String _preferredQuality = 'Highest'; // Highest, 720p, 480p, Ask
   int _cacheSizeBytes = 0;
+  bool _allowExternalServices = true;
+  bool _removeCacheAfterGallery = true;
+  int _maxConcurrentDownloads = 3;
 
   ThemeMode get themeMode => _themeMode;
   Locale? get locale => _locale;
@@ -17,6 +21,9 @@ class SettingsProvider extends ChangeNotifier {
   bool get autoPasteClipboard => _autoPasteClipboard;
   String get preferredQuality => _preferredQuality;
   int get cacheSizeBytes => _cacheSizeBytes;
+  bool get allowExternalServices => _allowExternalServices;
+  bool get removeCacheAfterGallery => _removeCacheAfterGallery;
+  int get maxConcurrentDownloads => _maxConcurrentDownloads;
   late final Future<void> initialized;
 
   SettingsProvider() {
@@ -39,6 +46,15 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(AppConstants.keyAutoPasteClipboard) ?? true;
     _preferredQuality =
         prefs.getString(AppConstants.keyPreferredQuality) ?? 'Highest';
+    _allowExternalServices =
+        prefs.getBool(AppConstants.keyAllowExternalServices) ?? true;
+    ExternalServicePolicy.allowExternalServices = _allowExternalServices;
+    _removeCacheAfterGallery =
+        prefs.getBool(AppConstants.keyRemoveCacheAfterGallery) ?? true;
+    _maxConcurrentDownloads =
+        (prefs.getInt(AppConstants.keyMaxConcurrentDownloads) ?? 3)
+            .clamp(1, 5)
+            .toInt();
     final languageCode = prefs.getString(AppConstants.keyLanguageCode);
     _locale = languageCode == null ? null : Locale(languageCode);
 
@@ -88,6 +104,31 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(AppConstants.keyPreferredQuality, quality);
+  }
+
+  Future<void> setAllowExternalServices(bool value) async {
+    _allowExternalServices = value;
+    ExternalServicePolicy.allowExternalServices = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(AppConstants.keyAllowExternalServices, value);
+  }
+
+  Future<void> setRemoveCacheAfterGallery(bool value) async {
+    _removeCacheAfterGallery = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(AppConstants.keyRemoveCacheAfterGallery, value);
+  }
+
+  Future<void> setMaxConcurrentDownloads(int value) async {
+    _maxConcurrentDownloads = value.clamp(1, 5).toInt();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(
+      AppConstants.keyMaxConcurrentDownloads,
+      _maxConcurrentDownloads,
+    );
   }
 
   Future<void> refreshCacheSize() async {

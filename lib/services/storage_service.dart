@@ -35,6 +35,9 @@ class StorageService {
   Future<bool?> galleryFileExists(String filePath, {required bool isImage}) =>
       PlatformFileHelper.galleryFileExists(filePath, isImage: isImage);
 
+  Future<String?> galleryFileUri(String filePath, {required bool isImage}) =>
+      PlatformFileHelper.galleryFileUri(filePath, isImage: isImage);
+
   /// Persists task list to SharedPreferences
   Future<void> saveHistory(List<DownloadTask> tasks) async {
     final encoded = jsonEncode(tasks.map((task) => task.toJson()).toList());

@@ -81,6 +81,55 @@ class PlatformFileHelper {
     }
   }
 
+  static Future<String?> galleryFileUri(
+    String filePath, {
+    required bool isImage,
+  }) async {
+    if (!Platform.isAndroid) return null;
+    try {
+      final fileName = filePath.replaceAll('\\', '/').split('/').last;
+      return await _mediaStoreChannel.invokeMethod<String>('findMediaUri', {
+        'fileName': fileName,
+        'isImage': isImage,
+      });
+    } on PlatformException {
+      return null;
+    }
+  }
+
+  static Future<FileActionResult> openGalleryUri(String uri) async {
+    if (!Platform.isAndroid) return FileActionResult.unsupported;
+    try {
+      final opened = await _mediaStoreChannel.invokeMethod<bool>(
+        'openMediaUri',
+        {'uri': uri},
+      );
+      return opened == true
+          ? FileActionResult.success
+          : FileActionResult.unsupported;
+    } on PlatformException {
+      return FileActionResult.failed;
+    }
+  }
+
+  static Future<FileActionResult> shareGalleryUri(
+    String uri, {
+    String? text,
+  }) async {
+    if (!Platform.isAndroid) return FileActionResult.unsupported;
+    try {
+      final shared = await _mediaStoreChannel.invokeMethod<bool>(
+        'shareMediaUri',
+        {'uri': uri, 'text': text},
+      );
+      return shared == true
+          ? FileActionResult.success
+          : FileActionResult.unsupported;
+    } on PlatformException {
+      return FileActionResult.failed;
+    }
+  }
+
   static Future<int> calculateCacheSize(String? dirPath) async {
     if (dirPath == null) return 0;
     try {

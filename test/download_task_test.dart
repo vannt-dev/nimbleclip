@@ -9,6 +9,7 @@ DownloadTask task({
   String title = 'A video',
   String format = 'mp4',
   bool isImage = false,
+  VideoPlatform platform = VideoPlatform.generic,
 }) {
   return DownloadTask(
     id: id,
@@ -18,7 +19,7 @@ DownloadTask task({
     thumbnailUrl: '',
     downloadUrl: 'https://cdn.example.com/v.mp4',
     originalUrl: 'https://example.com/watch?v=1',
-    platform: VideoPlatform.generic,
+    platform: platform,
     qualityLabel: '720p',
     format: format,
     kind: isImage ? MediaKind.image : MediaKind.video,
@@ -34,6 +35,7 @@ void main() {
         ..totalBytes = 2048
         ..receivedBytes = 2048
         ..filePath = '/tmp/v.mp4'
+        ..galleryUri = 'content://media/external/video/42'
         ..isSavedToGallery = true;
 
       final restored = DownloadTask.fromJson(original.toJson());
@@ -42,6 +44,7 @@ void main() {
       expect(restored.status, DownloadStatus.completed);
       expect(restored.totalBytes, 2048);
       expect(restored.filePath, '/tmp/v.mp4');
+      expect(restored.galleryUri, 'content://media/external/video/42');
       expect(restored.isSavedToGallery, isTrue);
     });
 
@@ -149,19 +152,28 @@ void main() {
     final service = DownloadService();
 
     test('uses a compact UUID-style name', () {
-      expect(service.buildFileName(task(title: 'My Clip')), 'abcdef012345.mp4');
+      expect(
+        service.buildFileName(task(title: 'My Clip')),
+        'generic_abcdef012345.mp4',
+      );
     });
 
     test('does not depend on the title', () {
-      expect(service.buildFileName(task(title: '///')), 'abcdef012345.mp4');
-      expect(service.buildFileName(task(title: 'x' * 500)), 'abcdef012345.mp4');
+      expect(
+        service.buildFileName(task(title: '///')),
+        'generic_abcdef012345.mp4',
+      );
+      expect(
+        service.buildFileName(task(title: 'x' * 500)),
+        'generic_abcdef012345.mp4',
+      );
     });
 
     test('does not crash on a short or empty id', () {
       // Regression: substring(0, 6) threw RangeError for a task restored from a
       // history entry with a missing id.
-      expect(service.buildFileName(task(id: '')), 'NimbleClip.mp4');
-      expect(service.buildFileName(task(id: 'ab')), 'ab.mp4');
+      expect(service.buildFileName(task(id: '')), 'generic_NimbleClip.mp4');
+      expect(service.buildFileName(task(id: 'ab')), 'generic_ab.mp4');
     });
 
     test('normalises the extension', () {
@@ -169,8 +181,20 @@ void main() {
       expect(service.buildFileName(task(format: '')), endsWith('.mp4'));
       expect(
         service.buildFileName(task(), extension: 'webm'),
-        'abcdef012345.webm',
+        'generic_abcdef012345.webm',
       );
+    });
+
+    test('prefixes every file with its source platform', () {
+      for (final platform in VideoPlatform.values) {
+        final expectedPrefix = platform == VideoPlatform.twitter
+            ? 'x'
+            : platform.name;
+        expect(
+          service.buildFileName(task(platform: platform)),
+          '${expectedPrefix}_abcdef012345.mp4',
+        );
+      }
     });
   });
 }

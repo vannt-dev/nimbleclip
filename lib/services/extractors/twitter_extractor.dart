@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../../core/utils/http_helper.dart';
+import '../../core/utils/external_service_policy.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/url_helper.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -34,6 +35,10 @@ class TwitterExtractor extends BaseVideoExtractor {
       throw ExtractionException(l10n.xInvalidPost);
     }
 
+    if (!ExternalServicePolicy.allowExternalServices) {
+      throw ExtractionException(l10n.externalServicesDisabled);
+    }
+
     final viaFx = await _fromFxTwitter(tweetId, cleanUrl, l10n);
     if (viaFx != null) return viaFx;
 
@@ -50,8 +55,9 @@ class TwitterExtractor extends BaseVideoExtractor {
   ) async {
     final Map<String, dynamic> json;
     try {
-      final response = await ExtractorHttp.get(
+      final response = await ExtractorHttp.getWithRetry(
         'https://api.fxtwitter.com/status/$tweetId',
+        service: 'FxTwitter',
       );
       if (response.statusCode != 200) return null;
       json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -61,54 +67,86 @@ class TwitterExtractor extends BaseVideoExtractor {
 
     if (json['code'] != 200 || json['tweet'] == null) return null;
     final tweet = json['tweet'] as Map<String, dynamic>;
-    final videos =
-        (tweet['media'] as Map<String, dynamic>?)?['videos'] as List<dynamic>?;
-    if (videos == null || videos.isEmpty) return null;
-
-    final video = videos.first as Map<String, dynamic>;
-    final variants = (video['variants'] as List<dynamic>? ?? [])
-        .cast<Map<String, dynamic>>()
-        .where((v) => (v['content_type'] ?? '').toString().contains('mp4'))
-        .toList();
-    variants.sort(
-      (a, b) =>
-          ((b['bitrate'] as num?) ?? 0).compareTo((a['bitrate'] as num?) ?? 0),
-    );
-
+    final media = tweet['media'] as Map<String, dynamic>? ?? const {};
+    final videos = (media['videos'] as List<dynamic>? ?? const []);
+    final photos = (media['photos'] as List<dynamic>? ?? const []);
     final qualities = <VideoQualityOption>[];
-    for (var i = 0; i < variants.length; i++) {
-      final variant = variants[i];
-      final variantUrl = variant['url']?.toString();
-      if (variantUrl == null || variantUrl.isEmpty) continue;
+    for (var videoIndex = 0; videoIndex < videos.length; videoIndex++) {
+      final video = videos[videoIndex];
+      if (video is! Map<String, dynamic>) continue;
+      final variants =
+          (video['variants'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .where(
+                (v) => (v['content_type'] ?? '').toString().contains('mp4'),
+              )
+              .toList()
+            ..sort(
+              (a, b) => ((b['bitrate'] as num?) ?? 0).compareTo(
+                (a['bitrate'] as num?) ?? 0,
+              ),
+            );
 
-      final kbps = (((variant['bitrate'] as num?) ?? 0) / 1000).round();
-      // Twitter does not label variant resolution, but it is encoded in the CDN
-      // path (`/vid/avc1/1280x720/`). Fall back to a bitrate estimate.
-      final fromPath = RegExp(r'/(\d{2,4})x(\d{2,4})/').firstMatch(variantUrl);
-      final quality = fromPath != null
-          ? '${fromPath.group(2)}p'
-          : _qualityFromBitrate(kbps);
+      for (
+        var variantIndex = 0;
+        variantIndex < variants.length;
+        variantIndex++
+      ) {
+        final variant = variants[variantIndex];
+        final variantUrl = variant['url']?.toString();
+        if (variantUrl == null || variantUrl.isEmpty) continue;
+        final kbps = (((variant['bitrate'] as num?) ?? 0) / 1000).round();
+        final fromPath = RegExp(
+          r'/(\d{2,4})x(\d{2,4})/',
+        ).firstMatch(variantUrl);
+        final quality = fromPath != null
+            ? '${fromPath.group(2)}p'
+            : _qualityFromBitrate(kbps);
+        qualities.add(
+          VideoQualityOption(
+            id: 'x_${tweetId}_${videoIndex}_$variantIndex',
+            mediaId: 'x_video_${tweetId}_$videoIndex',
+            label: '$quality ($kbps kbps)',
+            quality: quality,
+            format: 'mp4',
+            downloadUrl: variantUrl,
+          ),
+        );
+      }
 
-      qualities.add(
-        VideoQualityOption(
-          id: 'x_${tweetId}_$i',
-          label: '$quality ($kbps kbps)',
-          quality: quality,
-          format: 'mp4',
-          downloadUrl: variantUrl,
-        ),
-      );
+      final directUrl = video['url']?.toString();
+      if (!qualities.any(
+            (option) => option.mediaId == 'x_video_${tweetId}_$videoIndex',
+          ) &&
+          directUrl != null &&
+          directUrl.isNotEmpty) {
+        qualities.add(
+          VideoQualityOption(
+            id: 'x_${tweetId}_${videoIndex}_default',
+            mediaId: 'x_video_${tweetId}_$videoIndex',
+            label: l10n.originalMp4,
+            quality: 'Original',
+            format: 'mp4',
+            downloadUrl: directUrl,
+          ),
+        );
+      }
     }
 
-    final directUrl = video['url']?.toString();
-    if (qualities.isEmpty && directUrl != null && directUrl.isNotEmpty) {
+    for (var photoIndex = 0; photoIndex < photos.length; photoIndex++) {
+      final photo = photos[photoIndex];
+      if (photo is! Map<String, dynamic>) continue;
+      final photoUrl = photo['url']?.toString();
+      if (photoUrl == null || photoUrl.isEmpty) continue;
       qualities.add(
         VideoQualityOption(
-          id: 'x_${tweetId}_default',
-          label: l10n.originalMp4,
+          id: 'x_image_${tweetId}_$photoIndex',
+          mediaId: 'x_image_${tweetId}_$photoIndex',
+          label: l10n.imageLabel(photoIndex + 1),
           quality: 'Original',
-          format: 'mp4',
-          downloadUrl: directUrl,
+          format: _imageFormat(photoUrl, photo['format']?.toString()),
+          downloadUrl: photoUrl,
+          kind: MediaKind.image,
         ),
       );
     }
@@ -116,7 +154,9 @@ class TwitterExtractor extends BaseVideoExtractor {
 
     final author = tweet['author'] as Map<String, dynamic>? ?? {};
     final text = tweet['text']?.toString().trim();
-    final durationSec = (video['duration'] as num?)?.toInt();
+    final firstVideo = videos.whereType<Map<String, dynamic>>().firstOrNull;
+    final firstPhoto = photos.whereType<Map<String, dynamic>>().firstOrNull;
+    final durationSec = (firstVideo?['duration'] as num?)?.toInt();
 
     return VideoMetadata(
       id: tweetId,
@@ -130,7 +170,10 @@ class TwitterExtractor extends BaseVideoExtractor {
           author['screen_name']?.toString() ??
           'X User',
       authorAvatar: author['avatar_url']?.toString(),
-      coverUrl: video['thumbnail_url']?.toString() ?? '',
+      coverUrl:
+          firstVideo?['thumbnail_url']?.toString() ??
+          firstPhoto?['url']?.toString() ??
+          '',
       duration: durationSec != null && durationSec > 0
           ? Duration(seconds: durationSec)
           : null,
@@ -150,8 +193,9 @@ class TwitterExtractor extends BaseVideoExtractor {
   ) async {
     final Map<String, dynamic> json;
     try {
-      final response = await ExtractorHttp.get(
+      final response = await ExtractorHttp.getWithRetry(
         'https://api.vxtwitter.com/Twitter/status/$tweetId',
+        service: 'VxTwitter',
         timeout: const Duration(seconds: 10),
       );
       if (response.statusCode != 200) return null;
@@ -160,11 +204,11 @@ class TwitterExtractor extends BaseVideoExtractor {
       return null;
     }
 
-    final videoUrls = (json['mediaURLs'] as List<dynamic>? ?? [])
+    final mediaUrls = (json['mediaURLs'] as List<dynamic>? ?? [])
         .map((u) => u.toString())
-        .where((u) => u.contains('.mp4'))
+        .where((u) => u.startsWith('http'))
         .toList();
-    if (videoUrls.isEmpty) return null;
+    if (mediaUrls.isEmpty) return null;
 
     final text = json['text']?.toString().trim();
     return VideoMetadata(
@@ -176,13 +220,22 @@ class TwitterExtractor extends BaseVideoExtractor {
       coverUrl: '',
       platform: VideoPlatform.twitter,
       qualities: [
-        VideoQualityOption(
-          id: 'vx_$tweetId',
-          label: l10n.originalMp4,
-          quality: 'Original',
-          format: 'mp4',
-          downloadUrl: videoUrls.first,
-        ),
+        for (var index = 0; index < mediaUrls.length; index++)
+          VideoQualityOption(
+            id: 'vx_${tweetId}_$index',
+            mediaId: 'vx_media_${tweetId}_$index',
+            label: _isImageUrl(mediaUrls[index])
+                ? l10n.imageLabel(index + 1)
+                : l10n.originalMp4,
+            quality: 'Original',
+            format: _isImageUrl(mediaUrls[index])
+                ? _imageFormat(mediaUrls[index], null)
+                : 'mp4',
+            downloadUrl: mediaUrls[index],
+            kind: _isImageUrl(mediaUrls[index])
+                ? MediaKind.image
+                : MediaKind.video,
+          ),
       ],
       likeCount: (json['likes'] as num?)?.toInt(),
       commentCount: (json['replies'] as num?)?.toInt(),
@@ -195,5 +248,22 @@ class TwitterExtractor extends BaseVideoExtractor {
     if (kbps > 800) return '720p';
     if (kbps > 400) return '480p';
     return '360p';
+  }
+
+  bool _isImageUrl(String url) => RegExp(
+    r'\.(?:jpe?g|png|gif|webp|avif)(?:$|[?#])',
+    caseSensitive: false,
+  ).hasMatch(url);
+
+  String _imageFormat(String url, String? declared) {
+    final normalized = declared?.toLowerCase();
+    if (normalized == 'jpeg') return 'jpg';
+    if (normalized != null &&
+        const {'jpg', 'png', 'gif', 'webp', 'avif'}.contains(normalized)) {
+      return normalized;
+    }
+    final match = RegExp(r'\.([a-zA-Z0-9]+)(?:$|[?#])').firstMatch(url);
+    final extension = match?.group(1)?.toLowerCase();
+    return extension == 'jpeg' ? 'jpg' : extension ?? 'jpg';
   }
 }

@@ -35,6 +35,10 @@ class ExtractorHttp {
   static bool get isUsingOverrides =>
       getOverride != null || postOverride != null || headOverride != null;
 
+  /// Lets extractors keep optional network fallbacks deterministic in tests
+  /// without reaching into the test-only callback itself.
+  static bool get hasPostOverride => postOverride != null;
+
   @visibleForTesting
   static void resetOverrides() {
     getOverride = null;
@@ -105,6 +109,75 @@ class ExtractorHttp {
     return _client
         .post(uri, headers: requestHeaders, body: body)
         .timeout(timeout);
+  }
+
+  static Future<http.Response> getWithRetry(
+    String url, {
+    String service = 'external service',
+    String userAgent = AppConstants.defaultUserAgent,
+    Map<String, String>? headers,
+    Duration timeout = defaultTimeout,
+    int maxAttempts = 2,
+  }) => _withRetry(
+    service,
+    () => get(url, userAgent: userAgent, headers: headers, timeout: timeout),
+    maxAttempts,
+  );
+
+  static Future<http.Response> postWithRetry(
+    String url, {
+    String service = 'external service',
+    Object? body,
+    String userAgent = AppConstants.defaultUserAgent,
+    Map<String, String>? headers,
+    Duration timeout = defaultTimeout,
+    int maxAttempts = 2,
+  }) => _withRetry(
+    service,
+    () => post(
+      url,
+      body: body,
+      userAgent: userAgent,
+      headers: headers,
+      timeout: timeout,
+    ),
+    maxAttempts,
+  );
+
+  static Future<http.Response> _withRetry(
+    String service,
+    Future<http.Response> Function() request,
+    int maxAttempts,
+  ) async {
+    // Test overrides describe one deterministic exchange. Replaying them can
+    // hide fixture mistakes and unexpectedly change call counts.
+    final attempts = isUsingOverrides ? 1 : maxAttempts.clamp(1, 3);
+    Object? lastError;
+    for (var attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        final response = await request();
+        final retryable =
+            response.statusCode == 408 ||
+            response.statusCode == 429 ||
+            response.statusCode >= 500;
+        if (!retryable || attempt == attempts) return response;
+        if (kDebugMode) {
+          debugPrint(
+            '$service returned ${response.statusCode}; retrying ($attempt/$attempts)',
+          );
+        }
+      } catch (error) {
+        lastError = error;
+        if (attempt == attempts) rethrow;
+        if (kDebugMode) {
+          debugPrint(
+            '$service request failed; retrying ($attempt/$attempts): $error',
+          );
+        }
+      }
+      await Future<void>.delayed(Duration(milliseconds: 250 * attempt));
+    }
+    throw lastError ?? StateError('$service request failed');
   }
 
   /// Expands a short link to its final destination.

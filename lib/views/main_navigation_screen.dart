@@ -18,12 +18,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   late final List<Widget> _screens;
 
+  void _selectTab(int index) {
+    // A floating SnackBar belongs to the currently visible nested Scaffold.
+    // Dismiss it before IndexedStack hides that Scaffold; otherwise Flutter
+    // can no longer position the bar and reports it as being off screen.
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    setState(() => _currentIndex = index);
+  }
+
   @override
   void initState() {
     super.initState();
     _screens = [
-      HomeScreen(onNavigateDownloads: () => setState(() => _currentIndex = 1)),
-      DownloadsScreen(onNavigateHome: () => setState(() => _currentIndex = 0)),
+      HomeScreen(onNavigateDownloads: () => _selectTab(1)),
+      DownloadsScreen(onNavigateHome: () => _selectTab(0)),
       const SettingsScreen(),
     ];
   }
@@ -45,9 +53,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         ),
         child: NavigationBar(
           selectedIndex: _currentIndex,
-          onDestinationSelected: (index) {
-            setState(() => _currentIndex = index);
-          },
+          onDestinationSelected: _selectTab,
           backgroundColor: Colors.transparent,
           indicatorColor: AppColors.primary.withAlpha(isDark ? 50 : 30),
           elevation: 0,

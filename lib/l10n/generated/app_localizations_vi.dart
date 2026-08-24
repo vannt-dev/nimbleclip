@@ -132,12 +132,12 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String downloadSelected(int count) {
-    return 'Tải ảnh đã chọn ($count)';
+    return 'Tải xuống ($count)';
   }
 
   @override
   String batchDownloadStarted(int count) {
-    return 'Đang tải $count ảnh đã chọn.';
+    return 'Đang tải $count file nội dung đã chọn.';
   }
 
   @override
@@ -391,6 +391,27 @@ class AppLocalizationsVi extends AppLocalizations {
       'Thêm nội dung vào thư viện sau khi tải xong';
 
   @override
+  String get removeCacheAfterGallery => 'Xóa bản lưu tạm sau khi lưu';
+
+  @override
+  String get removeCacheAfterGalleryDescription =>
+      'Tránh tốn dung lượng gấp đôi; bản trong Thư viện vẫn được giữ';
+
+  @override
+  String get allowExternalServices => 'Cho phép dịch vụ trích xuất bên ngoài';
+
+  @override
+  String get allowExternalServicesDescription =>
+      'Cần cho TikTok, X và một số bài Facebook hoặc Instagram. URL bài công khai có thể được gửi tới các dịch vụ này.';
+
+  @override
+  String get concurrentDownloads => 'Số lượt tải đồng thời';
+
+  @override
+  String get concurrentDownloadsDescription =>
+      'Tải nhiều có thể nhanh hơn nhưng dùng thêm mạng và pin';
+
+  @override
   String get autoDetectClipboard => 'Tự động nhận diện liên kết clipboard';
 
   @override
@@ -560,7 +581,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get facebookNoVideo =>
-      'Không lấy được video Facebook. Hãy đảm bảo video ở chế độ công khai; video riêng tư và nhóm kín cần đăng nhập.';
+      'Không lấy được nội dung từ bài Facebook này. Hãy đảm bảo bài viết ở chế độ công khai; bài riêng tư và nhóm kín cần đăng nhập.';
 
   @override
   String get highQuality720 => 'HD 720p (Chất lượng cao)';
@@ -574,4 +595,8 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get unableToAnalyze => 'Không thể phân tích liên kết này.';
+
+  @override
+  String get externalServicesDisabled =>
+      'Dịch vụ trích xuất bên ngoài đang bị tắt trong Cài đặt. Hãy bật để tải bài này.';
 }

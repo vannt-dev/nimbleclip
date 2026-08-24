@@ -24,7 +24,14 @@ class NimbleClipApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => VideoExtractorProvider()),
-        ChangeNotifierProvider(create: (_) => DownloadProvider()),
+        ChangeNotifierProxyProvider<SettingsProvider, DownloadProvider>(
+          create: (_) => DownloadProvider(),
+          update: (_, settings, downloads) {
+            final provider = downloads ?? DownloadProvider();
+            provider.maxConcurrentDownloads = settings.maxConcurrentDownloads;
+            return provider;
+          },
+        ),
       ],
       child: Consumer<SettingsProvider>(
         builder: (context, settings, _) {

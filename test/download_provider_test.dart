@@ -169,7 +169,7 @@ void main() {
       await _flush();
 
       expect(downloads.started, hasLength(3));
-      expect(downloads.maxRunning, DownloadProvider.maxConcurrentDownloads);
+      expect(downloads.maxRunning, provider.maxConcurrentDownloads);
 
       provider.cancelTask(tasks[3].id);
       for (final id in downloads.started.toList()) {
@@ -181,7 +181,7 @@ void main() {
       expect(downloads.started, isNot(contains(tasks[3].id)));
       downloads.finish(tasks[4].id);
       await _flush();
-      expect(downloads.maxRunning, DownloadProvider.maxConcurrentDownloads);
+      expect(downloads.maxRunning, provider.maxConcurrentDownloads);
       expect(storage.maxConcurrentSaves, 1);
     },
   );

@@ -36,6 +36,7 @@ class _VideoResultCardState extends State<VideoResultCard> {
   @override
   void initState() {
     super.initState();
+    _selectedTab = widget.selectedQuality?.isAudioOnly == true ? 1 : 0;
     _selectAllImages();
   }
 
@@ -45,6 +46,7 @@ class _VideoResultCardState extends State<VideoResultCard> {
     if (oldWidget.metadata.id != widget.metadata.id ||
         oldWidget.metadata.originalUrl != widget.metadata.originalUrl) {
       _selectAllImages();
+      _selectedTab = widget.selectedQuality?.isAudioOnly == true ? 1 : 0;
     }
   }
 
@@ -80,16 +82,35 @@ class _VideoResultCardState extends State<VideoResultCard> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final meta = widget.metadata;
 
-    final videoOptions = meta.qualities.where((q) => !q.isAudioOnly).toList();
+    final videoOptions = meta.qualities
+        .where((q) => !q.isAudioOnly && !q.isImage)
+        .toList();
+    final imageOptions = _imageOptions;
     final audioOptions = meta.qualities.where((q) => q.isAudioOnly).toList();
     final currentOptions = _selectedTab == 0 ? videoOptions : audioOptions;
-    final hasOnlyImages =
-        videoOptions.isNotEmpty && videoOptions.every((q) => q.isImage);
-    final selectedImages = videoOptions
+    final selectedImages = imageOptions
         .where(
           (option) => option.isImage && _selectedImageIds.contains(option.id),
         )
         .toList();
+    final selectedDownloads = <VideoQualityOption>[];
+    final selectedQuality = widget.selectedQuality;
+    if (selectedQuality?.isAudioOnly == true) {
+      selectedDownloads.add(selectedQuality!);
+    } else {
+      final videoGroups = <String, List<VideoQualityOption>>{};
+      for (final option in videoOptions) {
+        (videoGroups[option.mediaId ?? 'primary-video'] ??= []).add(option);
+      }
+      for (final group in videoGroups.values) {
+        selectedDownloads.add(
+          group.any((option) => option.id == selectedQuality?.id)
+              ? selectedQuality!
+              : group.first,
+        );
+      }
+      selectedDownloads.addAll(selectedImages);
+    }
     final previewUrl = widget.selectedQuality?.isImage == true
         ? widget.selectedQuality!.downloadUrl
         : meta.coverUrl;
@@ -339,7 +360,8 @@ class _VideoResultCardState extends State<VideoResultCard> {
                 const SizedBox(height: 16),
 
                 // 3. Video / Audio Mode Tabs
-                if (audioOptions.isNotEmpty && videoOptions.isNotEmpty)
+                if (audioOptions.isNotEmpty &&
+                    (videoOptions.isNotEmpty || imageOptions.isNotEmpty))
                   Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(4),
@@ -357,6 +379,8 @@ class _VideoResultCardState extends State<VideoResultCard> {
                               setState(() => _selectedTab = 0);
                               if (videoOptions.isNotEmpty) {
                                 widget.onQualitySelected(videoOptions.first);
+                              } else if (imageOptions.isNotEmpty) {
+                                widget.onQualitySelected(imageOptions.first);
                               }
                             },
                             borderRadius: BorderRadius.circular(10),
@@ -370,12 +394,12 @@ class _VideoResultCardState extends State<VideoResultCard> {
                               ),
                               alignment: Alignment.center,
                               child: Text(
-                                hasOnlyImages
-                                    ? context.l10n.imageOptions(
+                                videoOptions.isNotEmpty
+                                    ? context.l10n.videoOptions(
                                         videoOptions.length,
                                       )
-                                    : context.l10n.videoOptions(
-                                        videoOptions.length,
+                                    : context.l10n.imageOptions(
+                                        imageOptions.length,
                                       ),
                                 style: TextStyle(
                                   fontSize: 13,
@@ -428,54 +452,15 @@ class _VideoResultCardState extends State<VideoResultCard> {
                   ),
 
                 // 4. Quality Selector List
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        hasOnlyImages && _selectedTab == 0
-                            ? context.l10n.selectImages
-                            : context.l10n.selectDownloadQuality,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                if (currentOptions.isNotEmpty) ...[
+                  Text(
+                    context.l10n.selectDownloadQuality,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
                     ),
-                    if (hasOnlyImages && _selectedTab == 0)
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            if (_selectedImageIds.length ==
-                                videoOptions.length) {
-                              _selectedImageIds.clear();
-                            } else {
-                              _selectedImageIds
-                                ..clear()
-                                ..addAll(
-                                  videoOptions.map((option) => option.id),
-                                );
-                            }
-                          });
-                        },
-                        child: Text(
-                          _selectedImageIds.length == videoOptions.length
-                              ? context.l10n.deselectAll
-                              : context.l10n.selectAll,
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (hasOnlyImages && _selectedTab == 0)
-                  OutlinedButton.icon(
-                    onPressed: () => _openImagePicker(videoOptions),
-                    icon: const Icon(Icons.photo_library_outlined),
-                    label: Text(
-                      '${context.l10n.selectImages} '
-                      '(${_selectedImageIds.length}/${videoOptions.length})',
-                    ),
-                  )
-                else
+                  ),
+                  const SizedBox(height: 8),
                   ...currentOptions.map((opt) {
                     final isSelected = widget.selectedQuality?.id == opt.id;
                     return Padding(
@@ -567,6 +552,52 @@ class _VideoResultCardState extends State<VideoResultCard> {
                       ),
                     );
                   }),
+                ],
+                if (imageOptions.isNotEmpty && _selectedTab == 0) ...[
+                  if (currentOptions.isNotEmpty) const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          context.l10n.imageOptions(imageOptions.length),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            if (_selectedImageIds.length ==
+                                imageOptions.length) {
+                              _selectedImageIds.clear();
+                            } else {
+                              _selectedImageIds
+                                ..clear()
+                                ..addAll(
+                                  imageOptions.map((option) => option.id),
+                                );
+                            }
+                          });
+                        },
+                        child: Text(
+                          _selectedImageIds.length == imageOptions.length
+                              ? context.l10n.deselectAll
+                              : context.l10n.selectAll,
+                        ),
+                      ),
+                    ],
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _openImagePicker(imageOptions),
+                    icon: const Icon(Icons.photo_library_outlined),
+                    label: Text(
+                      '${context.l10n.selectImages} '
+                      '(${_selectedImageIds.length}/${imageOptions.length})',
+                    ),
+                  ),
+                ],
 
                 const SizedBox(height: 12),
 
@@ -595,20 +626,14 @@ class _VideoResultCardState extends State<VideoResultCard> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: hasOnlyImages && _selectedTab == 0
-                            ? (selectedImages.isNotEmpty
-                                  ? () => widget.onDownload(selectedImages)
-                                  : null)
-                            : (widget.selectedQuality != null
-                                  ? () => widget.onDownload([
-                                      widget.selectedQuality!,
-                                    ])
-                                  : null),
+                        onPressed: selectedDownloads.isEmpty
+                            ? null
+                            : () => widget.onDownload(selectedDownloads),
                         icon: const Icon(Icons.file_download_rounded, size: 20),
                         label: Text(
-                          hasOnlyImages && _selectedTab == 0
+                          selectedDownloads.length > 1
                               ? context.l10n.downloadSelected(
-                                  selectedImages.length,
+                                  selectedDownloads.length,
                                 )
                               : context.l10n.downloadNow,
                           style: const TextStyle(

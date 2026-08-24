@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/http_helper.dart';
+import '../../core/utils/external_service_policy.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/text_unescape.dart';
 import '../../core/utils/url_helper.dart';
@@ -84,6 +85,7 @@ class InstagramExtractor extends BaseVideoExtractor {
     AppLocalizations l10n, {
     VideoMetadata? fallback,
   }) async {
+    if (!ExternalServicePolicy.allowExternalServices) return fallback;
     try {
       var expiry = _snapInstaExpiry;
       var token = _snapInstaToken;
@@ -94,8 +96,9 @@ class InstagramExtractor extends BaseVideoExtractor {
           expirySeconds > DateTime.now().millisecondsSinceEpoch ~/ 1000 + 30 &&
           token != null;
       if (!cacheValid) {
-        final landing = await ExtractorHttp.get(
+        final landing = await ExtractorHttp.getWithRetry(
           'https://snap-insta.to/vi',
+          service: 'SnapInsta',
           userAgent: AppConstants.defaultUserAgent,
         );
         if (landing.statusCode != 200) return null;
@@ -112,8 +115,9 @@ class InstagramExtractor extends BaseVideoExtractor {
       }
       if (expiry == null || token == null) return null;
 
-      final response = await ExtractorHttp.post(
+      final response = await ExtractorHttp.postWithRetry(
         'https://snap-insta.to/api/ajaxSearch',
+        service: 'SnapInsta',
         userAgent: AppConstants.defaultUserAgent,
         headers: const {
           'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -137,21 +141,46 @@ class InstagramExtractor extends BaseVideoExtractor {
 
       final downloadUrls = <String>[];
       final previewUrls = <String>[];
+      final mediaKinds = <MediaKind>[];
+      final sourcePath = Uri.tryParse(url)?.path.toLowerCase() ?? '';
+      final sourceIsVideo =
+          sourcePath.contains('/reel/') ||
+          sourcePath.contains('/reels/') ||
+          sourcePath.contains('/tv/');
       for (final match in RegExp(
         r'<li[^>]*>([\s\S]*?)</li>',
         caseSensitive: false,
       ).allMatches(resultHtml)) {
         final item = match.group(1) ?? '';
         final preview = _firstGroup(item, [
+          RegExp(r'<img[^>]+data-src="([^"]+)"', caseSensitive: false),
           RegExp(r'<img[^>]+src="([^"]+)"', caseSensitive: false),
         ]);
-        final download = _firstGroup(item, [
-          RegExp(r'<option[^>]+value="([^"]+)"', caseSensitive: false),
-          RegExp(
-            r'<a[^>]+href="(https://dl\.snapcdn\.app/get\?[^\"]+)"',
-            caseSensitive: false,
-          ),
-        ]);
+        final itemLooksVideo = RegExp(
+          r'icon-dlvideo|<video|(?:type|media)[-_ ]?video|download[-_ ]?video',
+          caseSensitive: false,
+        ).hasMatch(item);
+        final videoDownload = itemLooksVideo
+            ? _firstGroup(item, [
+                RegExp(
+                  r'<a[^>]*title="[^"]*video"[^>]*href="(https://dl\.snapcdn\.app/get\?[^"]+)"[^>]*>',
+                  caseSensitive: false,
+                ),
+                RegExp(
+                  r'<a[^>]+href="(https://dl\.snapcdn\.app/get\?[^"]+)"[^>]*>[\s\S]*?(?:Tải|Download)[^<]*video',
+                  caseSensitive: false,
+                ),
+              ])
+            : null;
+        final download =
+            videoDownload ??
+            _firstGroup(item, [
+              RegExp(r'<option[^>]+value="([^"]+)"', caseSensitive: false),
+              RegExp(
+                r'<a[^>]+href="(https://dl\.snapcdn\.app/get\?[^"]+)"',
+                caseSensitive: false,
+              ),
+            ]);
         if (download == null || preview == null) continue;
 
         final cleanDownload = decodeHtmlEntities(download);
@@ -167,6 +196,9 @@ class InstagramExtractor extends BaseVideoExtractor {
         }
         downloadUrls.add(cleanDownload);
         previewUrls.add(cleanPreview);
+        mediaKinds.add(
+          sourceIsVideo || itemLooksVideo ? MediaKind.video : MediaKind.image,
+        );
       }
       if (downloadUrls.isEmpty) return null;
 
@@ -182,13 +214,22 @@ class InstagramExtractor extends BaseVideoExtractor {
         qualities: [
           for (var index = 0; index < downloadUrls.length; index++)
             VideoQualityOption(
-              id: 'ig_image_${index + 1}_$shortcode',
-              label: l10n.imageLabel(index + 1),
-              quality: l10n.imageLabel(index + 1),
-              format: 'jpg',
+              id: mediaKinds[index] == MediaKind.video
+                  ? 'ig_video_${index + 1}_$shortcode'
+                  : 'ig_image_${index + 1}_$shortcode',
+              mediaId: mediaKinds[index] == MediaKind.video
+                  ? 'ig_video_${index + 1}_$shortcode'
+                  : 'ig_image_${index + 1}_$shortcode',
+              label: mediaKinds[index] == MediaKind.video
+                  ? l10n.originalMp4
+                  : l10n.imageLabel(index + 1),
+              quality: mediaKinds[index] == MediaKind.video
+                  ? 'Original'
+                  : l10n.imageLabel(index + 1),
+              format: mediaKinds[index] == MediaKind.video ? 'mp4' : 'jpg',
               downloadUrl: downloadUrls[index],
               thumbnailUrl: previewUrls[index],
-              kind: MediaKind.image,
+              kind: mediaKinds[index],
             ),
         ],
         viewCount: fallback?.viewCount,
@@ -220,8 +261,8 @@ class InstagramExtractor extends BaseVideoExtractor {
     }
 
     final videoUrl = _firstGroup(html, [
-      RegExp(r'"video_url":"([^"]+)"'),
-      RegExp(r'"video_versions":\[\{[^}]*"url":"([^"]+)"'),
+      RegExp(r'"video_url"\s*:\s*"([^"]+)"'),
+      RegExp(r'"video_versions"\s*:\s*\[\{[^}]*"url"\s*:\s*"([^"]+)"'),
       RegExp(r'<meta[^>]+property="og:video"[^>]+content="([^"]+)"'),
     ]);
     if (videoUrl == null) {
@@ -250,6 +291,7 @@ class InstagramExtractor extends BaseVideoExtractor {
       shortcode: shortcode,
       originalUrl: url,
       videoUrl: videoUrl,
+      imageUrls: _extractImageUrls(html, includeFallback: false),
       thumbnail: _firstGroup(html, [
         RegExp(r'"display_url":"([^"]+)"'),
         RegExp(r'"thumbnail_src":"([^"]+)"'),
@@ -294,7 +336,7 @@ class InstagramExtractor extends BaseVideoExtractor {
 
     final videoUrl = _firstGroup(html, [
       RegExp(r'<meta[^>]+property="og:video"[^>]+content="([^"]+)"'),
-      RegExp(r'"video_url":"([^"]+)"'),
+      RegExp(r'"video_url"\s*:\s*"([^"]+)"'),
     ]);
     if (videoUrl == null) {
       final imageUrls = _extractImageUrls(html);
@@ -316,6 +358,7 @@ class InstagramExtractor extends BaseVideoExtractor {
       shortcode: shortcode,
       originalUrl: url,
       videoUrl: videoUrl,
+      imageUrls: _extractImageUrls(html, includeFallback: false),
       thumbnail: _firstGroup(html, [
         RegExp(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"'),
       ]),
@@ -334,6 +377,7 @@ class InstagramExtractor extends BaseVideoExtractor {
     required String shortcode,
     required String originalUrl,
     required String videoUrl,
+    List<String> imageUrls = const [],
     required String? thumbnail,
     required String? author,
     required String? caption,
@@ -366,11 +410,24 @@ class InstagramExtractor extends BaseVideoExtractor {
       qualities: QualityHelper.sortedByQuality([
         VideoQualityOption(
           id: 'ig_$shortcode',
+          mediaId: 'ig_video_$shortcode',
           label: l10n.originalMp4,
           quality: 'Original',
           format: 'mp4',
           downloadUrl: decodeHtmlEntities(decodeJsonEscapes(videoUrl)),
         ),
+        for (var index = 0; index < imageUrls.length; index++)
+          VideoQualityOption(
+            id: 'ig_image_${index + 1}_$shortcode',
+            mediaId: 'ig_image_${index + 1}_$shortcode',
+            label: l10n.imageLabel(index + 1),
+            quality: 'Original',
+            format: _imageFormat(imageUrls[index]),
+            downloadUrl: decodeHtmlEntities(
+              decodeJsonEscapes(imageUrls[index]),
+            ),
+            kind: MediaKind.image,
+          ),
       ]),
       viewCount: viewCount,
       likeCount: likeCount,
@@ -409,6 +466,7 @@ class InstagramExtractor extends BaseVideoExtractor {
         for (var index = 0; index < decodedUrls.length; index++)
           VideoQualityOption(
             id: 'ig_image_${index + 1}_$shortcode',
+            mediaId: 'ig_image_${index + 1}_$shortcode',
             label: l10n.imageLabel(index + 1),
             quality: l10n.imageLabel(index + 1),
             format: _imageFormat(decodedUrls[index]),
@@ -419,7 +477,7 @@ class InstagramExtractor extends BaseVideoExtractor {
     );
   }
 
-  List<String> _extractImageUrls(String html) {
+  List<String> _extractImageUrls(String html, {bool includeFallback = true}) {
     final urls = <String>[];
 
     void addUrl(dynamic value) {
@@ -490,12 +548,12 @@ class InstagramExtractor extends BaseVideoExtractor {
       }
     }
 
-    if (urls.isEmpty) {
+    if (includeFallback && urls.isEmpty) {
       for (final match in RegExp(r'"display_url":"([^"]+)"').allMatches(html)) {
         addUrl(match.group(1));
       }
     }
-    if (urls.isEmpty) {
+    if (includeFallback && urls.isEmpty) {
       addUrl(
         RegExp(
           r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"',

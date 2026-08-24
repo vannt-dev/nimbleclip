@@ -8,6 +8,7 @@ import '../../core/utils/platform_file.dart';
 import '../../l10n/l10n.dart';
 import '../../models/download_task.dart';
 import '../../providers/download_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../player/video_player_screen.dart';
 import 'widgets/active_download_card.dart';
 import 'widgets/completed_download_card.dart';
@@ -39,6 +40,13 @@ class _DownloadsScreenState extends State<DownloadsScreen>
 
   Future<void> _openMedia(BuildContext context, DownloadTask task) async {
     final provider = context.read<DownloadProvider>();
+    if (task.galleryUri != null &&
+        (task.filePath == null ||
+            !PlatformFileHelper.fileExists(task.filePath!))) {
+      final result = await provider.openFile(task);
+      if (context.mounted) _showFileActionResult(context, result);
+      return;
+    }
     if (!await provider.ensureLocalFileAvailable(task)) {
       if (context.mounted) {
         _showFileActionResult(context, FileActionResult.fileMissing);
@@ -132,13 +140,19 @@ class _DownloadsScreenState extends State<DownloadsScreen>
   /// completed list.
   Widget _activeCard(BuildContext context, DownloadTask task) {
     final provider = context.read<DownloadProvider>();
+    final settings = context.read<SettingsProvider>();
     return ActiveDownloadCard(
       task: task,
       onCancel: () => provider.cancelTask(task.id),
       onPause: kIsWeb ? null : () => provider.pauseTask(task.id),
       onResume: kIsWeb
           ? null
-          : () => provider.resumeTask(task, l10n: context.l10n),
+          : () => provider.resumeTask(
+              task,
+              l10n: context.l10n,
+              autoSaveToGallery: settings.autoSaveGallery,
+              removeCacheAfterGallery: settings.removeCacheAfterGallery,
+            ),
     );
   }
 
@@ -303,6 +317,10 @@ class _DownloadsScreenState extends State<DownloadsScreen>
           onRetry: () => context.read<DownloadProvider>().retryTask(
             task,
             l10n: context.l10n,
+            autoSaveToGallery: context.read<SettingsProvider>().autoSaveGallery,
+            removeCacheAfterGallery: context
+                .read<SettingsProvider>()
+                .removeCacheAfterGallery,
           ),
         );
       },
@@ -356,6 +374,12 @@ class _DownloadsScreenState extends State<DownloadsScreen>
             onRetry: () => context.read<DownloadProvider>().retryTask(
               task,
               l10n: context.l10n,
+              autoSaveToGallery: context
+                  .read<SettingsProvider>()
+                  .autoSaveGallery,
+              removeCacheAfterGallery: context
+                  .read<SettingsProvider>()
+                  .removeCacheAfterGallery,
             ),
           );
         }

@@ -25,9 +25,22 @@ class GenericExtractor extends BaseVideoExtractor {
     '.aac': 'aac',
     '.wav': 'wav',
     '.ogg': 'ogg',
+    '.jpg': 'jpg',
+    '.jpeg': 'jpg',
+    '.png': 'png',
+    '.gif': 'gif',
+    '.webp': 'webp',
+    '.avif': 'avif',
   };
 
   static const Set<String> _audioFormats = {'mp3', 'm4a', 'aac', 'wav', 'ogg'};
+  static const Set<String> _imageFormats = {
+    'jpg',
+    'png',
+    'gif',
+    'webp',
+    'avif',
+  };
 
   @override
   VideoPlatform get platform => VideoPlatform.generic;
@@ -86,10 +99,13 @@ class GenericExtractor extends BaseVideoExtractor {
   ) {
     final contentType = (response.headers['content-type'] ?? '').toLowerCase();
     if (!contentType.startsWith('video/') &&
-        !contentType.startsWith('audio/')) {
+        !contentType.startsWith('audio/') &&
+        !contentType.startsWith('image/')) {
       return null;
     }
     final isAudio = contentType.startsWith('audio/');
+    final isImage = contentType.startsWith('image/');
+    final format = _formatFromContentType(contentType, isAudio, isImage);
     return VideoMetadata(
       id: id,
       originalUrl: cleanUrl,
@@ -101,12 +117,20 @@ class GenericExtractor extends BaseVideoExtractor {
       qualities: [
         VideoQualityOption(
           id: 'gen_$id',
-          label: isAudio ? l10n.originalAudio : l10n.originalVideo,
+          label: isImage
+              ? l10n.imageLabel(1)
+              : isAudio
+              ? l10n.originalAudio
+              : l10n.originalVideo,
           quality: 'Original',
-          format: isAudio ? 'mp3' : 'mp4',
+          format: format,
           downloadUrl: cleanUrl,
           sizeBytes: int.tryParse(response.headers['content-length'] ?? ''),
-          kind: isAudio ? MediaKind.audio : MediaKind.video,
+          kind: isImage
+              ? MediaKind.image
+              : isAudio
+              ? MediaKind.audio
+              : MediaKind.video,
         ),
       ],
     );
@@ -128,6 +152,7 @@ class GenericExtractor extends BaseVideoExtractor {
     AppLocalizations l10n,
   ) {
     final isAudio = _audioFormats.contains(format);
+    final isImage = _imageFormats.contains(format);
     return VideoMetadata(
       id: id,
       originalUrl: url,
@@ -139,11 +164,19 @@ class GenericExtractor extends BaseVideoExtractor {
       qualities: [
         VideoQualityOption(
           id: 'gen_$id',
-          label: isAudio ? l10n.originalAudio : l10n.originalVideo,
+          label: isImage
+              ? l10n.imageLabel(1)
+              : isAudio
+              ? l10n.originalAudio
+              : l10n.originalVideo,
           quality: 'Original',
           format: format,
           downloadUrl: url,
-          kind: isAudio ? MediaKind.audio : MediaKind.video,
+          kind: isImage
+              ? MediaKind.image
+              : isAudio
+              ? MediaKind.audio
+              : MediaKind.video,
         ),
       ],
     );
@@ -159,13 +192,14 @@ class GenericExtractor extends BaseVideoExtractor {
     final videoUrl =
         _meta(html, ['og:video:secure_url', 'og:video:url', 'og:video']) ??
         _meta(html, ['twitter:player:stream']);
-    if (videoUrl == null) {
+    final image = _meta(html, ['og:image']);
+    if (videoUrl == null && image == null) {
       throw ExtractionException(l10n.genericNoVideo);
     }
 
     // Open Graph URLs are often protocol-relative or site-relative.
-    final resolved = uri.resolve(videoUrl).toString();
-    final image = _meta(html, ['og:image']);
+    final resolved = videoUrl == null ? null : uri.resolve(videoUrl).toString();
+    final resolvedImage = image == null ? null : uri.resolve(image).toString();
     final height = _meta(html, ['og:video:height']);
 
     return VideoMetadata(
@@ -174,19 +208,31 @@ class GenericExtractor extends BaseVideoExtractor {
       title: _meta(html, ['og:title']) ?? _title(html) ?? 'Web Video',
       description: _meta(html, ['og:description']),
       author: _meta(html, ['og:site_name']) ?? uri.host,
-      coverUrl: image == null ? '' : uri.resolve(image).toString(),
+      coverUrl: resolvedImage ?? '',
       duration: _durationFrom(
         _meta(html, ['og:video:duration', 'video:duration']),
       ),
       platform: VideoPlatform.generic,
       qualities: QualityHelper.sortedByQuality([
-        VideoQualityOption(
-          id: 'gen_og_$id',
-          label: l10n.embeddedVideo,
-          quality: height != null ? '${height}p' : 'Original',
-          format: 'mp4',
-          downloadUrl: resolved,
-        ),
+        if (resolved != null)
+          VideoQualityOption(
+            id: 'gen_og_$id',
+            label: l10n.embeddedVideo,
+            quality: height != null ? '${height}p' : 'Original',
+            format: 'mp4',
+            downloadUrl: resolved,
+          ),
+        // On an image-only page og:image is the post media. On a video page it
+        // is merely the poster and must not be downloaded as a second asset.
+        if (resolved == null && resolvedImage != null)
+          VideoQualityOption(
+            id: 'gen_image_$id',
+            label: l10n.imageLabel(1),
+            quality: 'Original',
+            format: _imageFormat(resolvedImage),
+            downloadUrl: resolvedImage,
+            kind: MediaKind.image,
+          ),
       ]),
     );
   }
@@ -230,5 +276,26 @@ class GenericExtractor extends BaseVideoExtractor {
   Duration? _durationFrom(String? raw) {
     final seconds = int.tryParse(raw ?? '');
     return seconds != null && seconds > 0 ? Duration(seconds: seconds) : null;
+  }
+
+  String _formatFromContentType(
+    String contentType,
+    bool isAudio,
+    bool isImage,
+  ) {
+    final subtype = contentType.split(';').first.split('/').last;
+    if (isImage) return subtype == 'jpeg' ? 'jpg' : subtype;
+    if (isAudio) return subtype == 'mpeg' ? 'mp3' : subtype;
+    return subtype == 'quicktime' ? 'mov' : subtype;
+  }
+
+  String _imageFormat(String url) {
+    final path = Uri.tryParse(url)?.path.toLowerCase() ?? '';
+    for (final entry in _mediaExtensions.entries) {
+      if (_imageFormats.contains(entry.value) && path.endsWith(entry.key)) {
+        return entry.value;
+      }
+    }
+    return 'jpg';
   }
 }

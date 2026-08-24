@@ -1,0 +1,6 @@
+{
+  "status": "ok",
+  "p": "instagram",
+  "v": "v1",
+  "data": "<ul class=\"download-box\"><li><div class=\"download-items\"><img src=\"https://i.snapcdn.app/photo?token=video-preview\"><span class=\"format-icon\"><i class=\"icon icon-dlvideo\"></i></span><a title=\"Download image\" href=\"https://dl.snapcdn.app/get?token=cover-download\">Download image</a><a title=\"Download video\" href=\"https://dl.snapcdn.app/get?token=video-download\">Download video</a></div></li></ul>"
+}

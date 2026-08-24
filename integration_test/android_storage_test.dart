@@ -293,6 +293,11 @@ void main() {
         isTrue,
         reason: 'the MediaStore receipt could not be verified',
       );
+      expect(
+        await PlatformFileHelper.galleryFileUri(task.filePath!, isImage: false),
+        startsWith('content://media/'),
+        reason: 'the Gallery copy did not expose a durable MediaStore URI',
+      );
 
       await File(task.filePath!).delete();
     });

@@ -299,13 +299,13 @@ abstract class AppLocalizations {
   /// No description provided for @downloadSelected.
   ///
   /// In en, this message translates to:
-  /// **'Download selected ({count})'**
+  /// **'Download ({count})'**
   String downloadSelected(int count);
 
   /// No description provided for @batchDownloadStarted.
   ///
   /// In en, this message translates to:
-  /// **'Downloading {count} selected images.'**
+  /// **'Downloading {count} selected media files.'**
   String batchDownloadStarted(int count);
 
   /// No description provided for @preview.
@@ -752,6 +752,42 @@ abstract class AppLocalizations {
   /// **'Add media to your gallery after each download'**
   String get autoSaveGalleryDescription;
 
+  /// No description provided for @removeCacheAfterGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove local copy after saving'**
+  String get removeCacheAfterGallery;
+
+  /// No description provided for @removeCacheAfterGalleryDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Avoid duplicate storage; the Gallery copy stays available'**
+  String get removeCacheAfterGalleryDescription;
+
+  /// No description provided for @allowExternalServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow external extraction services'**
+  String get allowExternalServices;
+
+  /// No description provided for @allowExternalServicesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Required for TikTok, X, and some Facebook or Instagram posts. The public post URL may be sent to these services.'**
+  String get allowExternalServicesDescription;
+
+  /// No description provided for @concurrentDownloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Simultaneous downloads'**
+  String get concurrentDownloads;
+
+  /// No description provided for @concurrentDownloadsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'More downloads can be faster but use more bandwidth and battery'**
+  String get concurrentDownloadsDescription;
+
   /// No description provided for @autoDetectClipboard.
   ///
   /// In en, this message translates to:
@@ -1019,7 +1055,7 @@ abstract class AppLocalizations {
   /// No description provided for @facebookNoVideo.
   ///
   /// In en, this message translates to:
-  /// **'Could not extract a Facebook video. Make sure it is public; private and closed-group videos require a login.'**
+  /// **'Could not extract media from this Facebook post. Make sure it is public; private posts and closed groups require a login.'**
   String get facebookNoVideo;
 
   /// No description provided for @highQuality720.
@@ -1045,6 +1081,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This link could not be analyzed.'**
   String get unableToAnalyze;
+
+  /// No description provided for @externalServicesDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'External extraction services are disabled in Settings. Enable them to download this post.'**
+  String get externalServicesDisabled;
 }
 
 class _AppLocalizationsDelegate

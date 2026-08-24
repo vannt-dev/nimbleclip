@@ -38,6 +38,7 @@ class DownloadTask extends ChangeNotifier {
   int receivedBytes;
   double downloadSpeed; // bytes per second
   String? filePath;
+  String? galleryUri;
   String? errorMessage;
   DateTime createdAt;
   DateTime? completedAt;
@@ -66,6 +67,7 @@ class DownloadTask extends ChangeNotifier {
     this.receivedBytes = 0,
     this.downloadSpeed = 0.0,
     this.filePath,
+    this.galleryUri,
     this.errorMessage,
     DateTime? createdAt,
     this.completedAt,
@@ -146,6 +148,8 @@ class DownloadTask extends ChangeNotifier {
       headers: headers ?? this.headers,
       status: DownloadStatus.queued,
       createdAt: createdAt,
+      galleryUri: galleryUri,
+      isSavedToGallery: isSavedToGallery,
     );
   }
 
@@ -168,6 +172,7 @@ class DownloadTask extends ChangeNotifier {
     'totalBytes': totalBytes,
     'receivedBytes': receivedBytes,
     'filePath': filePath,
+    'galleryUri': galleryUri,
     'errorMessage': errorMessage,
     'createdAt': createdAt.toIso8601String(),
     'completedAt': completedAt?.toIso8601String(),
@@ -209,6 +214,7 @@ class DownloadTask extends ChangeNotifier {
     totalBytes: json['totalBytes'] as int? ?? 0,
     receivedBytes: json['receivedBytes'] as int? ?? 0,
     filePath: json['filePath'] as String?,
+    galleryUri: json['galleryUri'] as String?,
     errorMessage: json['errorMessage'] as String?,
     createdAt: json['createdAt'] != null
         ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
