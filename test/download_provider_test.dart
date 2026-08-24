@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nimble_clip/l10n/generated/app_localizations.dart';
 import 'package:nimble_clip/models/download_task.dart';
+import 'package:nimble_clip/models/download_options.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/providers/download_provider.dart';
@@ -164,7 +165,7 @@ void main() {
         metadata: _metadata(5),
         qualities: _metadata(5).qualities,
         l10n: l10n,
-        autoSaveToGallery: false,
+        options: const DownloadOptions(autoSaveToGallery: false),
       );
       await _flush();
 
@@ -198,7 +199,7 @@ void main() {
       metadata: metadata,
       qualities: metadata.qualities,
       l10n: l10n,
-      autoSaveToGallery: false,
+      options: const DownloadOptions(autoSaveToGallery: false),
     );
     downloads.finish(tasks.single.id);
     await _flush();
@@ -220,7 +221,7 @@ void main() {
       metadata: metadata,
       qualities: metadata.qualities,
       l10n: l10n,
-      autoSaveToGallery: false,
+      options: const DownloadOptions(autoSaveToGallery: false),
     );
     expect(storage.historySaveCount, 1);
 
@@ -243,7 +244,7 @@ void main() {
       metadata: metadata,
       qualities: metadata.qualities,
       l10n: l10n,
-      autoSaveToGallery: false,
+      options: const DownloadOptions(autoSaveToGallery: false),
     );
 
     expect(await provider.clearDownloadedFiles(), isFalse);
@@ -265,13 +266,13 @@ void main() {
         metadata: metadata,
         qualities: metadata.qualities,
         l10n: l10n,
-        autoSaveToGallery: false,
+        options: const DownloadOptions(autoSaveToGallery: false),
       );
       final duplicate = await provider.startNewDownloads(
         metadata: metadata,
         qualities: metadata.qualities,
         l10n: l10n,
-        autoSaveToGallery: false,
+        options: const DownloadOptions(autoSaveToGallery: false),
       );
 
       expect(first, hasLength(1));

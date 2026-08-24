@@ -1,6 +1,7 @@
 import 'package:http/http.dart' as http;
 
 import '../../core/utils/http_helper.dart';
+import '../../core/utils/media_format_helper.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/text_unescape.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -215,7 +216,7 @@ class GenericExtractor extends BaseVideoExtractor {
       platform: VideoPlatform.generic,
       qualities: QualityHelper.sortedByQuality([
         if (resolved != null)
-          VideoQualityOption(
+          VideoQualityOption.video(
             id: 'gen_og_$id',
             label: l10n.embeddedVideo,
             quality: height != null ? '${height}p' : 'Original',
@@ -225,13 +226,12 @@ class GenericExtractor extends BaseVideoExtractor {
         // On an image-only page og:image is the post media. On a video page it
         // is merely the poster and must not be downloaded as a second asset.
         if (resolved == null && resolvedImage != null)
-          VideoQualityOption(
+          VideoQualityOption.image(
             id: 'gen_image_$id',
             label: l10n.imageLabel(1),
             quality: 'Original',
-            format: _imageFormat(resolvedImage),
+            format: MediaFormatHelper.inferImageFormat(resolvedImage),
             downloadUrl: resolvedImage,
-            kind: MediaKind.image,
           ),
       ]),
     );
@@ -287,15 +287,5 @@ class GenericExtractor extends BaseVideoExtractor {
     if (isImage) return subtype == 'jpeg' ? 'jpg' : subtype;
     if (isAudio) return subtype == 'mpeg' ? 'mp3' : subtype;
     return subtype == 'quicktime' ? 'mov' : subtype;
-  }
-
-  String _imageFormat(String url) {
-    final path = Uri.tryParse(url)?.path.toLowerCase() ?? '';
-    for (final entry in _mediaExtensions.entries) {
-      if (_imageFormats.contains(entry.value) && path.endsWith(entry.key)) {
-        return entry.value;
-      }
-    }
-    return 'jpg';
   }
 }

@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/app_constants.dart';
 import '../core/utils/external_service_policy.dart';
 import '../services/storage_service.dart';
+import '../models/download_options.dart';
 
 class SettingsProvider extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
@@ -24,6 +25,10 @@ class SettingsProvider extends ChangeNotifier {
   bool get allowExternalServices => _allowExternalServices;
   bool get removeCacheAfterGallery => _removeCacheAfterGallery;
   int get maxConcurrentDownloads => _maxConcurrentDownloads;
+  DownloadOptions get downloadOptions => DownloadOptions(
+    autoSaveToGallery: autoSaveGallery,
+    removeCacheAfterGallery: removeCacheAfterGallery,
+  );
   late final Future<void> initialized;
 
   SettingsProvider() {

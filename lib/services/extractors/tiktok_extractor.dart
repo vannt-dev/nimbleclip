@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/http_helper.dart';
+import '../../core/utils/media_format_helper.dart';
 import '../../core/utils/external_service_policy.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -68,14 +69,13 @@ class TikTokExtractor extends BaseVideoExtractor {
       final imageUrl = images[index]?.toString() ?? '';
       if (imageUrl.isEmpty) continue;
       qualities.add(
-        VideoQualityOption(
+        VideoQualityOption.image(
           id: 'tt_image_${index + 1}_$id',
           mediaId: 'tt_image_${index + 1}_$id',
           label: l10n.imageLabel(index + 1),
           quality: l10n.imageLabel(index + 1),
-          format: _imageFormat(imageUrl),
+          format: MediaFormatHelper.inferImageFormat(imageUrl),
           downloadUrl: _absolute(imageUrl),
-          kind: MediaKind.image,
         ),
       );
     }
@@ -83,7 +83,7 @@ class TikTokExtractor extends BaseVideoExtractor {
     final hdPlay = data['hdplay']?.toString();
     if (images.isEmpty && hdPlay != null && hdPlay.isNotEmpty) {
       qualities.add(
-        VideoQualityOption(
+        VideoQualityOption.video(
           id: 'tt_hd_$id',
           mediaId: 'tt_video_$id',
           label: 'HD 1080p (${l10n.noWatermark})',
@@ -98,7 +98,7 @@ class TikTokExtractor extends BaseVideoExtractor {
     final play = data['play']?.toString();
     if (images.isEmpty && play != null && play.isNotEmpty) {
       qualities.add(
-        VideoQualityOption(
+        VideoQualityOption.video(
           id: 'tt_sd_$id',
           mediaId: 'tt_video_$id',
           label: '720p (${l10n.noWatermark})',
@@ -116,7 +116,7 @@ class TikTokExtractor extends BaseVideoExtractor {
         wmPlay != null &&
         wmPlay.isNotEmpty) {
       qualities.add(
-        VideoQualityOption(
+        VideoQualityOption.video(
           id: 'tt_wm_$id',
           mediaId: 'tt_video_$id',
           label: '720p (${l10n.withWatermark})',
@@ -133,13 +133,12 @@ class TikTokExtractor extends BaseVideoExtractor {
       final musicInfo = data['music_info'] as Map<String, dynamic>? ?? {};
       final musicTitle = musicInfo['title']?.toString() ?? l10n.originalSound;
       qualities.add(
-        VideoQualityOption(
+        VideoQualityOption.audio(
           id: 'tt_audio_$id',
           label: l10n.audioMp3Label(musicTitle),
           quality: 'Audio MP3',
           format: 'mp3',
           downloadUrl: _absolute(music),
-          kind: MediaKind.audio,
         ),
       );
     }
@@ -173,12 +172,5 @@ class TikTokExtractor extends BaseVideoExtractor {
       commentCount: (data['comment_count'] as num?)?.toInt(),
       shareCount: (data['share_count'] as num?)?.toInt(),
     );
-  }
-
-  String _imageFormat(String url) {
-    final path = Uri.tryParse(url)?.path.toLowerCase() ?? '';
-    if (path.endsWith('.png')) return 'png';
-    if (path.endsWith('.webp')) return 'webp';
-    return 'jpg';
   }
 }

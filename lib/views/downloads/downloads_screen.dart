@@ -150,8 +150,7 @@ class _DownloadsScreenState extends State<DownloadsScreen>
           : () => provider.resumeTask(
               task,
               l10n: context.l10n,
-              autoSaveToGallery: settings.autoSaveGallery,
-              removeCacheAfterGallery: settings.removeCacheAfterGallery,
+              options: settings.downloadOptions,
             ),
     );
   }
@@ -317,10 +316,7 @@ class _DownloadsScreenState extends State<DownloadsScreen>
           onRetry: () => context.read<DownloadProvider>().retryTask(
             task,
             l10n: context.l10n,
-            autoSaveToGallery: context.read<SettingsProvider>().autoSaveGallery,
-            removeCacheAfterGallery: context
-                .read<SettingsProvider>()
-                .removeCacheAfterGallery,
+            options: context.read<SettingsProvider>().downloadOptions,
           ),
         );
       },
@@ -374,12 +370,7 @@ class _DownloadsScreenState extends State<DownloadsScreen>
             onRetry: () => context.read<DownloadProvider>().retryTask(
               task,
               l10n: context.l10n,
-              autoSaveToGallery: context
-                  .read<SettingsProvider>()
-                  .autoSaveGallery,
-              removeCacheAfterGallery: context
-                  .read<SettingsProvider>()
-                  .removeCacheAfterGallery,
+              options: context.read<SettingsProvider>().downloadOptions,
             ),
           );
         }

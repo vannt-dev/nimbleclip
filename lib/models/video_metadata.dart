@@ -30,6 +30,42 @@ class VideoQualityOption {
     this.mediaId,
   });
 
+  const VideoQualityOption.image({
+    required this.id,
+    required this.label,
+    required this.format,
+    required this.downloadUrl,
+    this.quality = 'Original',
+    this.thumbnailUrl,
+    this.sizeBytes,
+    this.headers,
+    this.mediaId,
+  }) : kind = MediaKind.image;
+
+  const VideoQualityOption.video({
+    required this.id,
+    required this.label,
+    required this.quality,
+    required this.format,
+    required this.downloadUrl,
+    this.thumbnailUrl,
+    this.sizeBytes,
+    this.headers,
+    this.mediaId,
+  }) : kind = MediaKind.video;
+
+  const VideoQualityOption.audio({
+    required this.id,
+    required this.label,
+    required this.quality,
+    required this.format,
+    required this.downloadUrl,
+    this.thumbnailUrl,
+    this.sizeBytes,
+    this.headers,
+    this.mediaId,
+  }) : kind = MediaKind.audio;
+
   bool get isAudioOnly => kind == MediaKind.audio;
   bool get isImage => kind == MediaKind.image;
 
@@ -103,14 +139,17 @@ class VideoMetadata {
     this.shareCount,
   });
 
-  /// Highest video option, or the first audio option when the item has no
-  /// video. Extractors hand back their qualities already sorted best-first.
+  /// Highest video option, then an image, then audio. Extractors hand back
+  /// their qualities already sorted best-first.
   VideoQualityOption? get bestQuality {
     if (qualities.isEmpty) return null;
     for (final quality in qualities) {
-      if (!quality.isAudioOnly) return quality;
+      if (!quality.isAudioOnly && !quality.isImage) return quality;
     }
-    return qualities.first;
+    for (final quality in qualities) {
+      if (quality.isImage) return quality;
+    }
+    return qualities.firstOrNull;
   }
 
   VideoQualityOption? get audioQuality {

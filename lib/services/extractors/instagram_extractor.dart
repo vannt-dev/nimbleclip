@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/http_helper.dart';
+import '../../core/utils/media_format_helper.dart';
+import '../../core/utils/media_url_helper.dart';
 import '../../core/utils/external_service_policy.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/text_unescape.dart';
@@ -387,7 +389,7 @@ class InstagramExtractor extends BaseVideoExtractor {
   }) {
     final cleanCaption = caption == null || caption.trim().isEmpty
         ? null
-        : decodeHtmlEntities(decodeJsonEscapes(caption)).trim();
+        : MediaUrlHelper.decode(caption).trim();
     final username = author == null || author.isEmpty
         ? 'Instagram'
         : decodeJsonEscapes(author);
@@ -400,9 +402,7 @@ class InstagramExtractor extends BaseVideoExtractor {
           : 'Instagram Video ($shortcode)',
       description: cleanCaption,
       author: username,
-      coverUrl: thumbnail == null
-          ? ''
-          : decodeHtmlEntities(decodeJsonEscapes(thumbnail)),
+      coverUrl: thumbnail == null ? '' : MediaUrlHelper.decode(thumbnail),
       duration: durationSeconds != null && durationSeconds > 0
           ? Duration(seconds: durationSeconds)
           : null,
@@ -414,19 +414,16 @@ class InstagramExtractor extends BaseVideoExtractor {
           label: l10n.originalMp4,
           quality: 'Original',
           format: 'mp4',
-          downloadUrl: decodeHtmlEntities(decodeJsonEscapes(videoUrl)),
+          downloadUrl: MediaUrlHelper.decode(videoUrl),
         ),
         for (var index = 0; index < imageUrls.length; index++)
-          VideoQualityOption(
+          VideoQualityOption.image(
             id: 'ig_image_${index + 1}_$shortcode',
             mediaId: 'ig_image_${index + 1}_$shortcode',
             label: l10n.imageLabel(index + 1),
             quality: 'Original',
-            format: _imageFormat(imageUrls[index]),
-            downloadUrl: decodeHtmlEntities(
-              decodeJsonEscapes(imageUrls[index]),
-            ),
-            kind: MediaKind.image,
+            format: MediaFormatHelper.inferImageFormat(imageUrls[index]),
+            downloadUrl: MediaUrlHelper.decode(imageUrls[index]),
           ),
       ]),
       viewCount: viewCount,
@@ -444,13 +441,11 @@ class InstagramExtractor extends BaseVideoExtractor {
   }) {
     final cleanCaption = caption == null || caption.trim().isEmpty
         ? null
-        : decodeHtmlEntities(decodeJsonEscapes(caption)).trim();
+        : MediaUrlHelper.decode(caption).trim();
     final username = author == null || author.isEmpty
         ? 'Instagram'
         : decodeJsonEscapes(author);
-    final decodedUrls = imageUrls
-        .map((url) => decodeHtmlEntities(decodeJsonEscapes(url)))
-        .toList();
+    final decodedUrls = imageUrls.map(MediaUrlHelper.decode).toList();
 
     return VideoMetadata(
       id: shortcode,
@@ -464,14 +459,13 @@ class InstagramExtractor extends BaseVideoExtractor {
       platform: VideoPlatform.instagram,
       qualities: [
         for (var index = 0; index < decodedUrls.length; index++)
-          VideoQualityOption(
+          VideoQualityOption.image(
             id: 'ig_image_${index + 1}_$shortcode',
             mediaId: 'ig_image_${index + 1}_$shortcode',
             label: l10n.imageLabel(index + 1),
             quality: l10n.imageLabel(index + 1),
-            format: _imageFormat(decodedUrls[index]),
+            format: MediaFormatHelper.inferImageFormat(decodedUrls[index]),
             downloadUrl: decodedUrls[index],
-            kind: MediaKind.image,
           ),
       ],
     );
@@ -562,13 +556,6 @@ class InstagramExtractor extends BaseVideoExtractor {
       );
     }
     return urls;
-  }
-
-  String _imageFormat(String url) {
-    final path = Uri.tryParse(url)?.path.toLowerCase() ?? '';
-    if (path.endsWith('.png')) return 'png';
-    if (path.endsWith('.webp')) return 'webp';
-    return 'jpg';
   }
 
   String? _firstGroup(String html, List<RegExp> patterns) {

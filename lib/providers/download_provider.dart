@@ -7,6 +7,7 @@ import '../core/utils/platform_file.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../core/utils/quality_helper.dart';
 import '../models/download_task.dart';
+import '../models/download_options.dart';
 import '../models/video_metadata.dart';
 import '../services/download_service.dart';
 import '../services/extractors/registry.dart';
@@ -109,15 +110,13 @@ class DownloadProvider extends ChangeNotifier {
     required VideoMetadata metadata,
     required VideoQualityOption quality,
     required AppLocalizations l10n,
-    bool autoSaveToGallery = true,
-    bool removeCacheAfterGallery = false,
+    DownloadOptions options = const DownloadOptions(),
   }) async {
     final tasks = await startNewDownloads(
       metadata: metadata,
       qualities: [quality],
       l10n: l10n,
-      autoSaveToGallery: autoSaveToGallery,
-      removeCacheAfterGallery: removeCacheAfterGallery,
+      options: options,
     );
     return tasks.first;
   }
@@ -199,8 +198,7 @@ class DownloadProvider extends ChangeNotifier {
     required VideoMetadata metadata,
     required List<VideoQualityOption> qualities,
     required AppLocalizations l10n,
-    bool autoSaveToGallery = true,
-    bool removeCacheAfterGallery = false,
+    DownloadOptions options = const DownloadOptions(),
   }) async {
     // Do not let the asynchronous history restore clear a task that the user
     // starts immediately after launch.
@@ -246,14 +244,7 @@ class DownloadProvider extends ChangeNotifier {
     await _saveHistory();
 
     for (final task in tasks) {
-      _queue.add(
-        _QueuedDownload(
-          task: task,
-          l10n: l10n,
-          autoSaveToGallery: autoSaveToGallery,
-          removeCacheAfterGallery: removeCacheAfterGallery,
-        ),
-      );
+      _queue.add(_QueuedDownload(task: task, l10n: l10n, options: options));
     }
     _drainQueue();
     return tasks;
@@ -271,8 +262,7 @@ class DownloadProvider extends ChangeNotifier {
         _executeDownload(
           queued.task,
           l10n: queued.l10n,
-          autoSaveToGallery: queued.autoSaveToGallery,
-          removeCacheAfterGallery: queued.removeCacheAfterGallery,
+          options: queued.options,
         ).whenComplete(() {
           _runningDownloads--;
           _drainQueue();
@@ -284,13 +274,12 @@ class DownloadProvider extends ChangeNotifier {
   Future<void> _executeDownload(
     DownloadTask task, {
     required AppLocalizations l10n,
-    bool autoSaveToGallery = true,
-    bool removeCacheAfterGallery = false,
+    DownloadOptions options = const DownloadOptions(),
   }) async {
     await _downloadService.startDownload(
       task: task,
       l10n: l10n,
-      autoSaveToGallery: autoSaveToGallery,
+      autoSaveToGallery: options.autoSaveToGallery,
       onProgress: (changedTask, _, _, _, _) =>
           changedTask.notifyProgressChanged(),
       onComplete: (_, _) {
@@ -312,7 +301,7 @@ class DownloadProvider extends ChangeNotifier {
       // Only remove the app-local copy when Android returned a durable
       // MediaStore URI. This keeps Open/Share functional and avoids data loss
       // on platforms where Gallery cannot be addressed directly.
-      if (removeCacheAfterGallery && task.galleryUri != null) {
+      if (options.removeCacheAfterGallery && task.galleryUri != null) {
         await PlatformFileHelper.deleteFile(localPath);
         task.filePath = null;
       }
@@ -350,21 +339,13 @@ class DownloadProvider extends ChangeNotifier {
   Future<void> resumeTask(
     DownloadTask task, {
     required AppLocalizations l10n,
-    bool autoSaveToGallery = true,
-    bool removeCacheAfterGallery = false,
+    DownloadOptions options = const DownloadOptions(),
   }) async {
     if (task.status != DownloadStatus.paused) return;
     task.status = DownloadStatus.queued;
     task.errorMessage = null;
     notifyListeners();
-    _queue.add(
-      _QueuedDownload(
-        task: task,
-        l10n: l10n,
-        autoSaveToGallery: autoSaveToGallery,
-        removeCacheAfterGallery: removeCacheAfterGallery,
-      ),
-    );
+    _queue.add(_QueuedDownload(task: task, l10n: l10n, options: options));
     _drainQueue();
     await _saveHistory();
   }
@@ -377,8 +358,7 @@ class DownloadProvider extends ChangeNotifier {
   /// if that fails.
   Future<void> retryTask(
     DownloadTask task, {
-    bool autoSaveToGallery = true,
-    bool removeCacheAfterGallery = false,
+    DownloadOptions options = const DownloadOptions(),
     required AppLocalizations l10n,
   }) async {
     task.status = DownloadStatus.queued;
@@ -405,26 +385,14 @@ class DownloadProvider extends ChangeNotifier {
       }
       notifyListeners();
       _queue.add(
-        _QueuedDownload(
-          task: refreshed,
-          l10n: l10n,
-          autoSaveToGallery: autoSaveToGallery,
-          removeCacheAfterGallery: removeCacheAfterGallery,
-        ),
+        _QueuedDownload(task: refreshed, l10n: l10n, options: options),
       );
       _drainQueue();
       await _saveHistory();
       return;
     }
 
-    _queue.add(
-      _QueuedDownload(
-        task: task,
-        l10n: l10n,
-        autoSaveToGallery: autoSaveToGallery,
-        removeCacheAfterGallery: removeCacheAfterGallery,
-      ),
-    );
+    _queue.add(_QueuedDownload(task: task, l10n: l10n, options: options));
     _drainQueue();
     await _saveHistory();
   }
@@ -615,12 +583,10 @@ class _QueuedDownload {
   const _QueuedDownload({
     required this.task,
     required this.l10n,
-    required this.autoSaveToGallery,
-    required this.removeCacheAfterGallery,
+    required this.options,
   });
 
   final DownloadTask task;
   final AppLocalizations l10n;
-  final bool autoSaveToGallery;
-  final bool removeCacheAfterGallery;
+  final DownloadOptions options;
 }

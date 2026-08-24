@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/http_helper.dart';
+import '../../core/utils/media_format_helper.dart';
+import '../../core/utils/media_url_helper.dart';
 import '../../core/utils/external_service_policy.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/text_unescape.dart';
@@ -37,8 +39,8 @@ class FacebookExtractor extends BaseVideoExtractor {
     for (final pattern in patterns) {
       final value = pattern.firstMatch(html)?.group(1);
       if (value != null && value.isNotEmpty) {
-        final decoded = decodeJsonEscapes(value);
-        if (decoded.startsWith('http')) return decoded;
+        final decoded = MediaUrlHelper.decode(value);
+        if (MediaUrlHelper.isHttp(decoded)) return decoded;
       }
     }
     return null;
@@ -176,14 +178,13 @@ class FacebookExtractor extends BaseVideoExtractor {
           .toList();
       final images = <VideoQualityOption>[
         for (var index = 0; index < fallbackImages.length; index++)
-          VideoQualityOption(
+          VideoQualityOption.image(
             id: 'fb_image_${index + 1}_${metadata.id}',
             mediaId: 'fb_image_${index + 1}_${metadata.id}',
             label: l10n.imageLabel(index + 1),
             quality: 'Original',
-            format: _imageFormat(fallbackImages[index]),
+            format: MediaFormatHelper.inferImageFormat(fallbackImages[index]),
             downloadUrl: fallbackImages[index],
-            kind: MediaKind.image,
           ),
       ];
 
@@ -266,7 +267,7 @@ class FacebookExtractor extends BaseVideoExtractor {
         _videoId(html) ?? DateTime.now().millisecondsSinceEpoch.toString();
     final qualities = <VideoQualityOption>[
       if (hdUrl != null)
-        VideoQualityOption(
+        VideoQualityOption.video(
           id: 'fb_hd_$id',
           mediaId: 'fb_video_$id',
           label: l10n.highQuality720,
@@ -275,7 +276,7 @@ class FacebookExtractor extends BaseVideoExtractor {
           downloadUrl: hdUrl,
         ),
       if (sdUrl != null && sdUrl != hdUrl)
-        VideoQualityOption(
+        VideoQualityOption.video(
           id: 'fb_sd_$id',
           mediaId: 'fb_video_$id',
           label: l10n.standardQuality480,
@@ -284,14 +285,13 @@ class FacebookExtractor extends BaseVideoExtractor {
           downloadUrl: sdUrl,
         ),
       for (var index = 0; index < photoUrls.length; index++)
-        VideoQualityOption(
+        VideoQualityOption.image(
           id: 'fb_image_${index + 1}_$id',
           mediaId: 'fb_image_${index + 1}_$id',
           label: l10n.imageLabel(index + 1),
           quality: 'Original',
-          format: _imageFormat(photoUrls[index]),
+          format: MediaFormatHelper.inferImageFormat(photoUrls[index]),
           downloadUrl: photoUrls[index],
-          kind: MediaKind.image,
         ),
     ];
 
@@ -351,7 +351,7 @@ class FacebookExtractor extends BaseVideoExtractor {
         RegExp(
           r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"',
         ).firstMatch(html)?.group(1);
-    return raw == null ? null : decodeHtmlEntities(decodeJsonEscapes(raw));
+    return raw == null ? null : MediaUrlHelper.decode(raw);
   }
 
   Duration? _duration(String html) {
@@ -369,15 +369,6 @@ class FacebookExtractor extends BaseVideoExtractor {
     return value != null && value > 0 ? Duration(seconds: value) : null;
   }
 
-  String _imageFormat(String url) {
-    final path = Uri.tryParse(url)?.path.toLowerCase() ?? '';
-    if (path.endsWith('.png')) return 'png';
-    if (path.endsWith('.gif')) return 'gif';
-    if (path.endsWith('.webp')) return 'webp';
-    if (path.endsWith('.avif')) return 'avif';
-    return 'jpg';
-  }
-
   /// Extracts post photos from Facebook's public Relay payload. Multi-photo
   /// posts are represented by `all_subattachments`; single photo pages expose
   /// a `Photo` node. Restricting collection to those structures avoids pulling
@@ -392,7 +383,7 @@ class FacebookExtractor extends BaseVideoExtractor {
       void findImages(dynamic node, {bool insideImageField = false}) {
         if (node is Map<String, dynamic>) {
           final uri = node['uri']?.toString() ?? node['url']?.toString();
-          if (insideImageField && uri != null && uri.startsWith('http')) {
+          if (insideImageField && uri != null && MediaUrlHelper.isHttp(uri)) {
             final width = (node['width'] as num?)?.toInt() ?? 0;
             final height = (node['height'] as num?)?.toInt() ?? 0;
             candidates.add((url: decodeJsonEscapes(uri), area: width * height));

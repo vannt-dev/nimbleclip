@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../../core/utils/http_helper.dart';
+import '../../core/utils/media_format_helper.dart';
 import '../../core/utils/external_service_policy.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/url_helper.dart';
@@ -103,7 +104,7 @@ class TwitterExtractor extends BaseVideoExtractor {
             ? '${fromPath.group(2)}p'
             : _qualityFromBitrate(kbps);
         qualities.add(
-          VideoQualityOption(
+          VideoQualityOption.video(
             id: 'x_${tweetId}_${videoIndex}_$variantIndex',
             mediaId: 'x_video_${tweetId}_$videoIndex',
             label: '$quality ($kbps kbps)',
@@ -121,7 +122,7 @@ class TwitterExtractor extends BaseVideoExtractor {
           directUrl != null &&
           directUrl.isNotEmpty) {
         qualities.add(
-          VideoQualityOption(
+          VideoQualityOption.video(
             id: 'x_${tweetId}_${videoIndex}_default',
             mediaId: 'x_video_${tweetId}_$videoIndex',
             label: l10n.originalMp4,
@@ -139,14 +140,16 @@ class TwitterExtractor extends BaseVideoExtractor {
       final photoUrl = photo['url']?.toString();
       if (photoUrl == null || photoUrl.isEmpty) continue;
       qualities.add(
-        VideoQualityOption(
+        VideoQualityOption.image(
           id: 'x_image_${tweetId}_$photoIndex',
           mediaId: 'x_image_${tweetId}_$photoIndex',
           label: l10n.imageLabel(photoIndex + 1),
           quality: 'Original',
-          format: _imageFormat(photoUrl, photo['format']?.toString()),
+          format: MediaFormatHelper.inferImageFormat(
+            photoUrl,
+            declaredFormat: photo['format']?.toString(),
+          ),
           downloadUrl: photoUrl,
-          kind: MediaKind.image,
         ),
       );
     }
@@ -224,15 +227,15 @@ class TwitterExtractor extends BaseVideoExtractor {
           VideoQualityOption(
             id: 'vx_${tweetId}_$index',
             mediaId: 'vx_media_${tweetId}_$index',
-            label: _isImageUrl(mediaUrls[index])
+            label: MediaFormatHelper.isImageUrl(mediaUrls[index])
                 ? l10n.imageLabel(index + 1)
                 : l10n.originalMp4,
             quality: 'Original',
-            format: _isImageUrl(mediaUrls[index])
-                ? _imageFormat(mediaUrls[index], null)
+            format: MediaFormatHelper.isImageUrl(mediaUrls[index])
+                ? MediaFormatHelper.inferImageFormat(mediaUrls[index])
                 : 'mp4',
             downloadUrl: mediaUrls[index],
-            kind: _isImageUrl(mediaUrls[index])
+            kind: MediaFormatHelper.isImageUrl(mediaUrls[index])
                 ? MediaKind.image
                 : MediaKind.video,
           ),
@@ -248,22 +251,5 @@ class TwitterExtractor extends BaseVideoExtractor {
     if (kbps > 800) return '720p';
     if (kbps > 400) return '480p';
     return '360p';
-  }
-
-  bool _isImageUrl(String url) => RegExp(
-    r'\.(?:jpe?g|png|gif|webp|avif)(?:$|[?#])',
-    caseSensitive: false,
-  ).hasMatch(url);
-
-  String _imageFormat(String url, String? declared) {
-    final normalized = declared?.toLowerCase();
-    if (normalized == 'jpeg') return 'jpg';
-    if (normalized != null &&
-        const {'jpg', 'png', 'gif', 'webp', 'avif'}.contains(normalized)) {
-      return normalized;
-    }
-    final match = RegExp(r'\.([a-zA-Z0-9]+)(?:$|[?#])').firstMatch(url);
-    final extension = match?.group(1)?.toLowerCase();
-    return extension == 'jpeg' ? 'jpg' : extension ?? 'jpg';
   }
 }
