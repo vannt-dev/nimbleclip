@@ -252,7 +252,7 @@ class _DownloadsScreenState extends State<DownloadsScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildTaskList(context, all, isAll: true),
+          _buildTaskList(context, all),
           _buildActiveList(context, active),
           _buildCompletedList(context, completed),
         ],
@@ -289,45 +289,12 @@ class _DownloadsScreenState extends State<DownloadsScreen>
       padding: const EdgeInsets.all(16),
       itemCount: tasks.length,
       itemBuilder: (context, index) {
-        final task = tasks[index];
-        return CompletedDownloadCard(
-          task: task,
-          onPlay: () => unawaited(_openMedia(context, task)),
-          onSaveGallery: () async {
-            final saved = await context
-                .read<DownloadProvider>()
-                .saveToGalleryManually(task);
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    saved
-                        ? context.l10n.savedToGallery
-                        : context.l10n.gallerySaveFailed,
-                  ),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            }
-          },
-          onShare: () => unawaited(_shareMedia(context, task)),
-          onOpenExternal: () => unawaited(_openExternal(context, task)),
-          onDelete: () => _confirmDelete(context, task),
-          onRetry: () => context.read<DownloadProvider>().retryTask(
-            task,
-            l10n: context.l10n,
-            options: context.read<SettingsProvider>().downloadOptions,
-          ),
-        );
+        return _completedCard(context, tasks[index]);
       },
     );
   }
 
-  Widget _buildTaskList(
-    BuildContext context,
-    List<DownloadTask> tasks, {
-    bool isAll = false,
-  }) {
+  Widget _buildTaskList(BuildContext context, List<DownloadTask> tasks) {
     if (tasks.isEmpty) {
       return _buildEmptyState(
         icon: Icons.video_library_outlined,
@@ -344,37 +311,40 @@ class _DownloadsScreenState extends State<DownloadsScreen>
         if (task.isActive || task.status == DownloadStatus.paused) {
           return _activeCard(context, task);
         } else {
-          return CompletedDownloadCard(
-            task: task,
-            onPlay: () => unawaited(_openMedia(context, task)),
-            onSaveGallery: () async {
-              final saved = await context
-                  .read<DownloadProvider>()
-                  .saveToGalleryManually(task);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      saved
-                          ? context.l10n.savedToGallery
-                          : context.l10n.gallerySaveFailedShort,
-                    ),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              }
-            },
-            onShare: () => unawaited(_shareMedia(context, task)),
-            onOpenExternal: () => unawaited(_openExternal(context, task)),
-            onDelete: () => _confirmDelete(context, task),
-            onRetry: () => context.read<DownloadProvider>().retryTask(
-              task,
-              l10n: context.l10n,
-              options: context.read<SettingsProvider>().downloadOptions,
-            ),
-          );
+          return _completedCard(context, task);
         }
       },
+    );
+  }
+
+  Widget _completedCard(BuildContext context, DownloadTask task) {
+    return CompletedDownloadCard(
+      task: task,
+      onPlay: () => unawaited(_openMedia(context, task)),
+      onSaveGallery: () async {
+        final saved = await context
+            .read<DownloadProvider>()
+            .saveToGalleryManually(task);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              saved
+                  ? context.l10n.savedToGallery
+                  : context.l10n.gallerySaveFailed,
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      },
+      onShare: () => unawaited(_shareMedia(context, task)),
+      onOpenExternal: () => unawaited(_openExternal(context, task)),
+      onDelete: () => _confirmDelete(context, task),
+      onRetry: () => context.read<DownloadProvider>().retryTask(
+        task,
+        l10n: context.l10n,
+        options: context.read<SettingsProvider>().downloadOptions,
+      ),
     );
   }
 

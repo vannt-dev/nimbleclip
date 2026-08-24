@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/media_selection_helper.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/video_metadata.dart';
 import '../image_picker_screen.dart';
@@ -88,29 +89,11 @@ class _VideoResultCardState extends State<VideoResultCard> {
     final imageOptions = _imageOptions;
     final audioOptions = meta.qualities.where((q) => q.isAudioOnly).toList();
     final currentOptions = _selectedTab == 0 ? videoOptions : audioOptions;
-    final selectedImages = imageOptions
-        .where(
-          (option) => option.isImage && _selectedImageIds.contains(option.id),
-        )
-        .toList();
-    final selectedDownloads = <VideoQualityOption>[];
-    final selectedQuality = widget.selectedQuality;
-    if (selectedQuality?.isAudioOnly == true) {
-      selectedDownloads.add(selectedQuality!);
-    } else {
-      final videoGroups = <String, List<VideoQualityOption>>{};
-      for (final option in videoOptions) {
-        (videoGroups[option.mediaId ?? 'primary-video'] ??= []).add(option);
-      }
-      for (final group in videoGroups.values) {
-        selectedDownloads.add(
-          group.any((option) => option.id == selectedQuality?.id)
-              ? selectedQuality!
-              : group.first,
-        );
-      }
-      selectedDownloads.addAll(selectedImages);
-    }
+    final selectedDownloads = MediaSelectionHelper.downloads(
+      options: meta.qualities,
+      selectedQuality: widget.selectedQuality,
+      selectedImageIds: _selectedImageIds,
+    );
     final previewUrl = widget.selectedQuality?.isImage == true
         ? widget.selectedQuality!.downloadUrl
         : meta.coverUrl;

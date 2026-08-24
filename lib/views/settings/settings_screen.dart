@@ -39,25 +39,31 @@ class SettingsScreen extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _LocaleRadioTile(
+                _SelectionTile<Locale?>(
                   title: l10n.languageSystem,
+                  icon: Icons.language_rounded,
                   value: null,
                   groupValue: settings.locale,
                   onChanged: settings.setLocale,
+                  equals: _sameLocale,
                 ),
                 const Divider(height: 1),
-                _LocaleRadioTile(
+                _SelectionTile<Locale?>(
                   title: l10n.languageEnglish,
+                  icon: Icons.translate_rounded,
                   value: const Locale('en'),
                   groupValue: settings.locale,
                   onChanged: settings.setLocale,
+                  equals: _sameLocale,
                 ),
                 const Divider(height: 1),
-                _LocaleRadioTile(
+                _SelectionTile<Locale?>(
                   title: l10n.languageVietnamese,
+                  icon: Icons.translate_rounded,
                   value: const Locale('vi'),
                   groupValue: settings.locale,
                   onChanged: settings.setLocale,
+                  equals: _sameLocale,
                 ),
               ],
             ),
@@ -77,28 +83,28 @@ class SettingsScreen extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _ThemeRadioTile(
+                _SelectionTile<ThemeMode>(
                   title: l10n.themeDark,
                   icon: Icons.dark_mode_rounded,
                   value: ThemeMode.dark,
                   groupValue: settings.themeMode,
-                  onChanged: (val) => settings.setThemeMode(val!),
+                  onChanged: settings.setThemeMode,
                 ),
                 const Divider(height: 1),
-                _ThemeRadioTile(
+                _SelectionTile<ThemeMode>(
                   title: l10n.themeLight,
                   icon: Icons.light_mode_rounded,
                   value: ThemeMode.light,
                   groupValue: settings.themeMode,
-                  onChanged: (val) => settings.setThemeMode(val!),
+                  onChanged: settings.setThemeMode,
                 ),
                 const Divider(height: 1),
-                _ThemeRadioTile(
+                _SelectionTile<ThemeMode>(
                   title: l10n.themeSystem,
                   icon: Icons.brightness_auto_rounded,
                   value: ThemeMode.system,
                   groupValue: settings.themeMode,
-                  onChanged: (val) => settings.setThemeMode(val!),
+                  onChanged: settings.setThemeMode,
                 ),
               ],
             ),
@@ -119,49 +125,49 @@ class SettingsScreen extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _QualityRadioTile(
+                _SelectionTile<String>(
                   title: l10n.qualityHighestTitle,
                   subtitle: l10n.qualityHighestDescription,
                   icon: Icons.hd_rounded,
                   value: 'Highest',
                   groupValue: settings.preferredQuality,
-                  onChanged: (val) => settings.setPreferredQuality(val!),
+                  onChanged: settings.setPreferredQuality,
                 ),
                 const Divider(height: 1),
-                _QualityRadioTile(
+                _SelectionTile<String>(
                   title: l10n.quality720Title,
                   subtitle: l10n.quality720Description,
                   icon: Icons.high_quality_rounded,
                   value: '720p',
                   groupValue: settings.preferredQuality,
-                  onChanged: (val) => settings.setPreferredQuality(val!),
+                  onChanged: settings.setPreferredQuality,
                 ),
                 const Divider(height: 1),
-                _QualityRadioTile(
+                _SelectionTile<String>(
                   title: l10n.quality480Title,
                   subtitle: l10n.quality480Description,
                   icon: Icons.sd_rounded,
                   value: '480p',
                   groupValue: settings.preferredQuality,
-                  onChanged: (val) => settings.setPreferredQuality(val!),
+                  onChanged: settings.setPreferredQuality,
                 ),
                 const Divider(height: 1),
-                _QualityRadioTile(
+                _SelectionTile<String>(
                   title: l10n.quality360Title,
                   subtitle: l10n.quality360Description,
                   icon: Icons.data_saver_on_rounded,
                   value: '360p',
                   groupValue: settings.preferredQuality,
-                  onChanged: (val) => settings.setPreferredQuality(val!),
+                  onChanged: settings.setPreferredQuality,
                 ),
                 const Divider(height: 1),
-                _QualityRadioTile(
+                _SelectionTile<String>(
                   title: l10n.qualityAudioTitle,
                   subtitle: l10n.qualityAudioDescription,
                   icon: Icons.music_note_rounded,
                   value: 'Audio',
                   groupValue: settings.preferredQuality,
-                  onChanged: (val) => settings.setPreferredQuality(val!),
+                  onChanged: settings.setPreferredQuality,
                 ),
               ],
             ),
@@ -419,24 +425,31 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _ThemeRadioTile extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final ThemeMode value;
-  final ThemeMode groupValue;
-  final ValueChanged<ThemeMode?> onChanged;
+bool _sameLocale(Locale? left, Locale? right) =>
+    left?.languageCode == right?.languageCode;
 
-  const _ThemeRadioTile({
+class _SelectionTile<T> extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final IconData icon;
+  final T value;
+  final T groupValue;
+  final ValueChanged<T> onChanged;
+  final bool Function(T left, T right)? equals;
+
+  const _SelectionTile({
     required this.title,
     required this.icon,
     required this.value,
     required this.groupValue,
     required this.onChanged,
+    this.subtitle,
+    this.equals,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isSelected = value == groupValue;
+    final isSelected = equals?.call(value, groupValue) ?? value == groupValue;
     return ListTile(
       leading: Icon(icon, color: isSelected ? AppColors.primary : null),
       title: Text(
@@ -446,80 +459,9 @@ class _ThemeRadioTile extends StatelessWidget {
           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
         ),
       ),
-      trailing: isSelected
-          ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
-          : const Icon(Icons.circle_outlined, color: Colors.grey, size: 20),
-      onTap: () => onChanged(value),
-    );
-  }
-}
-
-class _LocaleRadioTile extends StatelessWidget {
-  final String title;
-  final Locale? value;
-  final Locale? groupValue;
-  final ValueChanged<Locale?> onChanged;
-
-  const _LocaleRadioTile({
-    required this.title,
-    required this.value,
-    required this.groupValue,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isSelected = value?.languageCode == groupValue?.languageCode;
-    return ListTile(
-      leading: Icon(
-        value == null ? Icons.language_rounded : Icons.translate_rounded,
-        color: isSelected ? AppColors.primary : null,
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-        ),
-      ),
-      trailing: isSelected
-          ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
-          : const Icon(Icons.circle_outlined, color: Colors.grey, size: 20),
-      onTap: () => onChanged(value),
-    );
-  }
-}
-
-class _QualityRadioTile extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final String value;
-  final String groupValue;
-  final ValueChanged<String?> onChanged;
-
-  const _QualityRadioTile({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.value,
-    required this.groupValue,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isSelected = value == groupValue;
-    return ListTile(
-      leading: Icon(icon, color: isSelected ? AppColors.primary : null),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-        ),
-      ),
-      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+      subtitle: subtitle == null
+          ? null
+          : Text(subtitle!, style: const TextStyle(fontSize: 12)),
       trailing: isSelected
           ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
           : const Icon(Icons.circle_outlined, color: Colors.grey, size: 20),

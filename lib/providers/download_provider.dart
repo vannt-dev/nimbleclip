@@ -122,21 +122,6 @@ class DownloadProvider extends ChangeNotifier {
     return _persistenceTail;
   }
 
-  Future<DownloadTask> startNewDownload({
-    required VideoMetadata metadata,
-    required VideoQualityOption quality,
-    required AppLocalizations l10n,
-    DownloadOptions options = const DownloadOptions(),
-  }) async {
-    final tasks = await startNewDownloads(
-      metadata: metadata,
-      qualities: [quality],
-      l10n: l10n,
-      options: options,
-    );
-    return tasks.first;
-  }
-
   /// Finds selected media that already has a completed local or Gallery copy.
   /// The source option id is stable across re-analysis; older history entries
   /// fall back to quality and media kind when that id was not persisted.
