@@ -36,6 +36,16 @@ abstract interface class DownloadGateway {
   bool isRunning(String taskId);
 }
 
+/// Optional capability implemented by native gateways whose operating-system
+/// workers and task database survive the Flutter process.
+abstract interface class RecoverableDownloadGateway {
+  Future<void> recoverDownloads({
+    required Iterable<DownloadTask> tasks,
+    required void Function(DownloadTask task) onChanged,
+    required void Function(DownloadTask task) onTerminal,
+  });
+}
+
 class DownloadService implements DownloadGateway {
   DownloadService({
     Dio? dio,

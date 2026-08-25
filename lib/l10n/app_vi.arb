@@ -36,6 +36,7 @@
   "downloadSelected": "Tải xuống ({count})",
   "batchDownloadStarted": "Đang tải {count} file nội dung đã chọn.",
   "batchResults": "Liên kết đã phân tích ({count})",
+  "batchLimitReached": "Chỉ {count} liên kết đầu tiên được phân tích.",
   "queueAll": "Thêm tất cả vào hàng đợi ({count})",
   "recentLinks": "Liên kết gần đây",
   "copyDiagnostics": "Sao chép chẩn đoán",

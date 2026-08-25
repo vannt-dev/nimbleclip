@@ -146,6 +146,11 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String batchLimitReached(int count) {
+    return 'Chỉ $count liên kết đầu tiên được phân tích.';
+  }
+
+  @override
   String queueAll(int count) {
     return 'Thêm tất cả vào hàng đợi ($count)';
   }

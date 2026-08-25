@@ -159,6 +159,9 @@ class _UrlInputCardState extends State<UrlInputCard> {
           TextField(
             controller: widget.controller,
             focusNode: widget.focusNode,
+            keyboardType: TextInputType.url,
+            autofillHints: const [AutofillHints.url],
+            enableSuggestions: false,
             textInputAction: TextInputAction.go,
             minLines: 1,
             maxLines: 4,

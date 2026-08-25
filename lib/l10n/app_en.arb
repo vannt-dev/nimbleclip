@@ -45,6 +45,8 @@
   "@batchDownloadStarted": {"placeholders": {"count": {"type": "int"}}},
   "batchResults": "Analyzed links ({count})",
   "@batchResults": {"placeholders": {"count": {"type": "int"}}},
+  "batchLimitReached": "Only the first {count} links will be analyzed.",
+  "@batchLimitReached": {"placeholders": {"count": {"type": "int"}}},
   "queueAll": "Queue all ({count})",
   "@queueAll": {"placeholders": {"count": {"type": "int"}}},
   "recentLinks": "Recent links",

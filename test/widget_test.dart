@@ -28,6 +28,36 @@ class _FixtureExtractorRegistry extends ExtractorRegistry {
       metadata;
 }
 
+class _ConcurrentFixtureRegistry extends ExtractorRegistry {
+  int active = 0;
+  int maximumActive = 0;
+
+  @override
+  Future<VideoMetadata> extract(String rawUrl, AppLocalizations l10n) async {
+    active++;
+    if (active > maximumActive) maximumActive = active;
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+    active--;
+    return VideoMetadata(
+      id: rawUrl,
+      originalUrl: rawUrl,
+      title: rawUrl,
+      author: 'Fixture',
+      coverUrl: '',
+      platform: VideoPlatform.generic,
+      qualities: [
+        VideoQualityOption.video(
+          id: rawUrl,
+          label: 'HD',
+          quality: '720p',
+          format: 'mp4',
+          downloadUrl: '$rawUrl/video.mp4',
+        ),
+      ],
+    );
+  }
+}
+
 void main() {
   final l10n = lookupAppLocalizations(const Locale('en'));
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -117,6 +147,25 @@ void main() {
       expect(provider.selectedQuality, isNull);
       expect(provider.errorMessage, isNull);
       expect(provider.currentUrl, '');
+    });
+
+    test('batch analysis is capped and uses bounded concurrency', () async {
+      final registry = _ConcurrentFixtureRegistry();
+      final provider = VideoExtractorProvider(extractorRegistry: registry);
+      final urls = List.generate(
+        25,
+        (index) => 'https://example.com/post/$index',
+      );
+
+      final results = await provider.analyzeUrls(urls, l10n: l10n);
+
+      expect(results, hasLength(VideoExtractorProvider.maximumBatchUrls));
+      expect(
+        registry.maximumActive,
+        lessThanOrEqualTo(VideoExtractorProvider.maximumParallelAnalyses),
+      );
+      expect(results.first.url, urls.first);
+      expect(results.last.url, urls[19]);
     });
   });
 

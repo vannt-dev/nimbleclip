@@ -22,12 +22,10 @@ class AnalysisHistoryProvider extends ChangeNotifier {
 
   Future<void> add(VideoMetadata metadata) async {
     await _ready;
-    _entries.removeWhere(
-      (entry) => entry.metadata.originalUrl == metadata.originalUrl,
-    );
+    _entries.removeWhere((entry) => entry.originalUrl == metadata.originalUrl);
     _entries.insert(
       0,
-      AnalysisHistoryEntry(metadata: metadata, analyzedAt: DateTime.now()),
+      AnalysisHistoryEntry.fromMetadata(metadata, analyzedAt: DateTime.now()),
     );
     if (_entries.length > _maximumEntries) {
       _entries.removeRange(_maximumEntries, _entries.length);
@@ -38,7 +36,7 @@ class AnalysisHistoryProvider extends ChangeNotifier {
 
   Future<void> remove(String originalUrl) async {
     await _ready;
-    _entries.removeWhere((entry) => entry.metadata.originalUrl == originalUrl);
+    _entries.removeWhere((entry) => entry.originalUrl == originalUrl);
     await _save();
     notifyListeners();
   }
@@ -63,6 +61,9 @@ class AnalysisHistoryProvider extends ChangeNotifier {
             AnalysisHistoryEntry.fromJson,
           ),
         );
+      // Rewrite legacy entries immediately so temporary signed CDN URLs do
+      // not remain in local preferences until the next analysis.
+      await _save();
     } catch (_) {
       await prefs.remove(_storageKey);
     }

@@ -6,7 +6,6 @@ const fsp = require('fs/promises');
 const path = require('path');
 const dns = require('dns/promises');
 const net = require('net');
-const vm = require('vm');
 const { Readable, Transform } = require('stream');
 const { pipeline } = require('stream/promises');
 
@@ -241,53 +240,125 @@ function balancedBlock(source, openingBrace) {
   return null;
 }
 
-/** Extracts only YouTube's signature transform function and its helper object.
- * The snippets execute in an empty, time-limited VM context rather than in the
- * server global scope.
+function classifyTransformMethod(body) {
+  if (/\.reverse\(/.test(body)) return 'reverse';
+  if (/\.splice\(0,/.test(body)) return 'splice';
+  if (/\.slice\(/.test(body)) return 'slice';
+  if (/\[0\].*%.*\.length/.test(body)) return 'swap';
+  return null;
+}
+
+function parseHelperMethods(playerSource, helperName) {
+  const escaped = helperName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = new RegExp(`(?:var\\s+)?${escaped}=\\{`).exec(playerSource);
+  if (!match) throw new Error(`YouTube helper ${helperName} was not found`);
+  const opening = playerSource.indexOf('{', match.index);
+  const objectBody = balancedBlock(playerSource, opening);
+  if (!objectBody) throw new Error(`YouTube helper ${helperName} was truncated`);
+
+  const methods = new Map();
+  const pattern = /([\w$]+):function\([^)]*\)\{/g;
+  let method;
+  while ((method = pattern.exec(objectBody)) !== null) {
+    const methodOpening = objectBody.indexOf('{', method.index);
+    const body = balancedBlock(objectBody, methodOpening);
+    const operation = body && classifyTransformMethod(body);
+    if (operation) methods.set(method[1], operation);
+  }
+  return methods;
+}
+
+function compileTransform(playerSource, match, notFoundMessage) {
+  if (!match) throw new Error(notFoundMessage);
+  const argumentName = match[2];
+  const brace = playerSource.indexOf('{', match.index);
+  const body = balancedBlock(playerSource, brace);
+  if (!body) throw new Error('YouTube transform function was truncated');
+
+  const helperCache = new Map();
+  const operations = [];
+  for (const statement of body.slice(1, -1).split(';')) {
+    const helperCall = /([\w$]+)\.([\w$]+)\([^,]+(?:,([^\)]+))?\)/.exec(statement);
+    if (helperCall && helperCall[1] !== argumentName) {
+      const helperName = helperCall[1];
+      const methods = helperCache.get(helperName) ||
+        parseHelperMethods(playerSource, helperName);
+      helperCache.set(helperName, methods);
+      const type = methods.get(helperCall[2]);
+      if (!type) throw new Error(`Unsupported YouTube transform ${helperCall[2]}`);
+      const value = helperCall[3] == null ? 0 : Number.parseInt(helperCall[3], 10);
+      if (!Number.isFinite(value)) throw new Error('Invalid YouTube transform argument');
+      operations.push({ type, value });
+      continue;
+    }
+    if (new RegExp(`${argumentName}\\.reverse\\(\\)`).test(statement)) {
+      operations.push({ type: 'reverse', value: 0 });
+    }
+  }
+  if (operations.length === 0) throw new Error('YouTube transform has no supported operations');
+
+  return (input) => {
+    let value = [...String(input)];
+    for (const operation of operations) {
+      const index = value.length === 0 ? 0 : operation.value % value.length;
+      switch (operation.type) {
+        case 'reverse':
+          value.reverse();
+          break;
+        case 'splice':
+          value.splice(0, operation.value);
+          break;
+        case 'slice':
+          value = value.slice(operation.value);
+          break;
+        case 'swap': {
+          const first = value[0];
+          value[0] = value[index];
+          value[index] = first;
+          break;
+        }
+      }
+    }
+    return value.join('');
+  };
+}
+
+/** Converts YouTube's small permutation program into a fixed opcode list.
+ * No player JavaScript is evaluated by the server.
  */
 function createYouTubeSignatureDecipher(playerSource) {
   const patterns = [
     /([\w$]+)=function\((\w+)\)\{\2=\2\.split\(""\)/,
     /function\s+([\w$]+)\((\w+)\)\{\2=\2\.split\(""\)/,
   ];
-  let match;
+  let transformMatch = null;
   for (const pattern of patterns) {
-    match = pattern.exec(playerSource);
-    if (match) break;
+    transformMatch = pattern.exec(playerSource);
+    if (transformMatch) break;
   }
-  if (!match) throw new Error('YouTube signature function was not found');
-
-  const functionName = match[1];
-  const argumentName = match[2];
-  const brace = playerSource.indexOf('{', match.index);
-  const body = balancedBlock(playerSource, brace);
-  if (!body) throw new Error('YouTube signature function was truncated');
-
-  const helpers = [...body.matchAll(/([\w$]+)\.[\w$]+\(/g)]
-    .map((entry) => entry[1])
-    .filter((name) => name !== argumentName);
-  const declarations = [];
-  for (const helper of new Set(helpers)) {
-    const escaped = helper.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const helperMatch = new RegExp(`(?:var\\s+)?${escaped}=\\{`).exec(playerSource);
-    if (!helperMatch) continue;
-    const helperBrace = playerSource.indexOf('{', helperMatch.index);
-    const helperBody = balancedBlock(playerSource, helperBrace);
-    if (helperBody) declarations.push(`var ${helper}=${helperBody};`);
-  }
-
-  const functionExpression = match[0].startsWith('function')
-    ? `function ${functionName}(${argumentName})${body}`
-    : `var ${functionName}=function(${argumentName})${body};`;
-  const script = new vm.Script(
-    `${declarations.join('')} ${functionExpression} result=${functionName}(input);`,
+  return compileTransform(
+    playerSource,
+    transformMatch,
+    'YouTube signature function was not found',
   );
-  return (signature) => {
-    const sandbox = { input: signature, result: null };
-    script.runInNewContext(sandbox, { timeout: 50 });
-    if (typeof sandbox.result !== 'string') throw new Error('Invalid decipher result');
-    return sandbox.result;
-  };
+}
+
+function createYouTubeNDecipher(playerSource) {
+  const nameMatch = /\.get\("n"\)\)&&\([^=]+=([\w$]+)\([^\)]+\)/.exec(playerSource) ||
+    /\bn&&\(n=([\w$]+)\(n\)\)/.exec(playerSource);
+  if (!nameMatch) return null;
+  const escaped = nameMatch[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const patterns = [
+    new RegExp(`(${escaped})=function\\((\\w+)\\)\\{\\2=\\2\\.split\\(""\\)`),
+    new RegExp(`function\\s+(${escaped})\\((\\w+)\\)\\{\\2=\\2\\.split\\(""\\)`),
+  ];
+  let transformMatch = null;
+  for (const pattern of patterns) {
+    transformMatch = pattern.exec(playerSource);
+    if (transformMatch) break;
+  }
+  if (!transformMatch) return null;
+  return compileTransform(playerSource, transformMatch, 'YouTube n function was not found');
 }
 
 async function handleYouTubeDecipher(req, res) {
@@ -314,13 +385,17 @@ async function handleYouTubeDecipher(req, res) {
     headers: { 'User-Agent': DEFAULT_USER_AGENT, Accept: 'application/javascript' },
   });
   if (!upstream.ok) throw new Error(`YouTube player returned ${upstream.status}`);
-  const decipher = createYouTubeSignatureDecipher(await upstream.text());
+  const playerSource = await upstream.text();
+  const decipher = createYouTubeSignatureDecipher(playerSource);
+  const decipherN = createYouTubeNDecipher(playerSource);
   const urls = ciphers.map((cipher) => {
     const fields = new URLSearchParams(String(cipher));
     const mediaUrl = new URL(fields.get('url'));
     const signature = fields.get('s');
     if (!signature) throw new Error('Cipher has no signature');
     mediaUrl.searchParams.set(fields.get('sp') || 'signature', decipher(signature));
+    const throttling = mediaUrl.searchParams.get('n');
+    if (throttling && decipherN) mediaUrl.searchParams.set('n', decipherN(throttling));
     return mediaUrl.toString();
   });
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -617,4 +692,5 @@ module.exports = {
   readRequestBody,
   allowedMethods,
   createYouTubeSignatureDecipher,
+  createYouTubeNDecipher,
 };

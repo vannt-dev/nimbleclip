@@ -113,10 +113,32 @@ jobs:
           # PID ownership, and traps inside one shell process.
           script: sh tool/run_android_integration_ci.sh
 
+  ios:
+    name: iOS build and Share Extension
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Build iOS without signing
+        run: flutter build ios --debug --no-codesign
+      - name: Verify embedded Share Extension and App Group
+        run: |
+          test -d "build/ios/iphoneos/Runner.app/PlugIns/Share Extension.appex"
+          plutil -lint ios/Runner/Runner.entitlements
+          plutil -lint "ios/Share Extension/ShareExtension.entitlements"
+          grep -q 'group.com.vannt.nimbleclip' ios/Runner/Runner.entitlements
+          grep -q 'group.com.vannt.nimbleclip' "ios/Share Extension/ShareExtension.entitlements"
+
   release-candidate:
     name: Detect version release
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [commit-messages, flutter-quality, node, android]
+    needs: [commit-messages, flutter-quality, node, android, ios]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:

@@ -91,6 +91,29 @@ class DownloadProvider extends ChangeNotifier {
 
   Future<void> _loadHistory() async {
     final loaded = await _historyRepository.loadHistory();
+    _tasks
+      ..clear()
+      ..addAll(loaded);
+
+    if (_downloadService is RecoverableDownloadGateway) {
+      final recoverable = _downloadService as RecoverableDownloadGateway;
+      final interrupted = loaded.where(
+        (task) =>
+            task.status == DownloadStatus.failed && task.errorMessage == null,
+      );
+      await recoverable.recoverDownloads(
+        tasks: interrupted,
+        onChanged: (_) => notifyListeners(),
+        onTerminal: (task) {
+          notifyListeners();
+          unawaited(
+            _saveHistory(
+              receipt: task.status == DownloadStatus.completed ? task : null,
+            ),
+          );
+        },
+      );
+    }
     for (final task in loaded) {
       // fromJson already demotes interrupted downloads to `failed`; give them a
       // message so the UI explains why they need a retry.
@@ -98,9 +121,6 @@ class DownloadProvider extends ChangeNotifier {
         task.errorMessage = 'download_interrupted';
       }
     }
-    _tasks
-      ..clear()
-      ..addAll(loaded);
     await _historyRepository.saveDownloadReceipts(
       loaded.where((task) => task.status == DownloadStatus.completed),
     );

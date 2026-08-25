@@ -314,6 +314,12 @@ abstract class AppLocalizations {
   /// **'Analyzed links ({count})'**
   String batchResults(int count);
 
+  /// No description provided for @batchLimitReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the first {count} links will be analyzed.'**
+  String batchLimitReached(int count);
+
   /// No description provided for @queueAll.
   ///
   /// In en, this message translates to:

@@ -8,6 +8,7 @@ const {
   consumeProxyQuota,
   allowedMethods,
   createYouTubeSignatureDecipher,
+  createYouTubeNDecipher,
   isBlockedAddress,
   readRequestBody,
   resolveStaticPath,
@@ -25,6 +26,13 @@ test('YouTube signature helper executes only the extracted transform', () => {
   const player = 'var AB={rv:function(a){a.reverse()},sw:function(a,b){var c=a[0];a[0]=a[b%a.length];a[b]=c}};XY=function(a){a=a.split("");AB.sw(a,2);AB.rv(a);return a.join("")};';
   const decipher = createYouTubeSignatureDecipher(player);
   assert.equal(decipher('abcdef'), 'fedabc');
+});
+
+test('YouTube transforms are parsed as opcodes without evaluating player code', () => {
+  const player = 'globalThis.compromised=true;var OP={rv:function(a){a.reverse()},cut:function(a,b){a.splice(0,b)}};NT=function(a){a=a.split("");OP.cut(a,1);OP.rv(a);return a.join("")};x.get("n"))&&(b=NT(b));';
+  const decipher = createYouTubeNDecipher(player);
+  assert.equal(decipher('abcdef'), 'fedcb');
+  assert.equal(globalThis.compromised, undefined);
 });
 
 test('SSRF guard blocks private and link-local addresses', () => {

@@ -252,7 +252,7 @@ environment variables:
 | --- | --- |
 | `GET/POST/HEAD /cors-proxy?url=<url>` | Proxies an HTTP request and forwards range headers for media seeking. Add `filename=<name>` to return a download response. |
 | `GET /resolve?url=<url>` | Resolves redirects for shortened links such as `t.co`, `fb.watch`, and `vm.tiktok.com`. |
-| `POST /youtube-decipher` | Deciphers YouTube `signatureCipher` stream URLs for the Web extractor in a time-limited VM. |
+| `POST /youtube-decipher` | Deciphers YouTube `signatureCipher` and throttling parameters for the Web extractor using a restricted transform parser. |
 
 The proxy only accepts HTTP and HTTPS destinations on ports 80 and 443. It
 validates every redirect and rejects loopback, private, link-local, and other
@@ -260,8 +260,8 @@ non-public destination addresses to reduce SSRF risk. Static files are served
 only from `build/web`. Every route also enforces an explicit HTTP method
 allowlist; unsupported methods return `405 Method Not Allowed`.
 
-The YouTube Web fallback extracts only the signature transform and executes it
-in an isolated, time-limited VM context. YouTube can still reject private,
+The YouTube Web fallback parses only supported array transform operations and
+never evaluates the remote player JavaScript. YouTube can still reject private,
 age-restricted, DRM-protected, or region-restricted content.
 
 ## Build artifacts

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
@@ -109,6 +110,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       FocusScope.of(context).unfocus();
       final preferred = context.read<SettingsProvider>().preferredQuality;
       final extractor = context.read<VideoExtractorProvider>();
+      if (urls.length > VideoExtractorProvider.maximumBatchUrls) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context.l10n.batchLimitReached(
+                VideoExtractorProvider.maximumBatchUrls,
+              ),
+            ),
+          ),
+        );
+      }
       if (urls.length == 1) {
         final ok = await extractor.analyzeUrl(
           urls.single,
@@ -155,10 +167,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _copyDiagnostics(VideoExtractorProvider extractor) async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    final duration = extractor.lastAnalysisDuration;
+    final analyzedAt = extractor.lastAnalyzedAt;
     await Clipboard.setData(
       ClipboardData(
-        text:
-            '${extractor.diagnosticCode}\nURL: ${extractor.currentUrl}\nStrategies: ${extractor.attemptedStrategies.join(', ')}',
+        text: [
+          'Code: ${extractor.diagnosticCode}',
+          'URL: ${extractor.currentUrl}',
+          'Platform: ${UrlHelper.detectPlatform(extractor.currentUrl).name}',
+          'Strategies: ${extractor.attemptedStrategies.join(', ')}',
+          if (duration != null) 'Duration: ${duration.inMilliseconds}ms',
+          if (analyzedAt != null)
+            'Analyzed at: ${analyzedAt.toIso8601String()}',
+          'App: ${packageInfo.version}+${packageInfo.buildNumber}',
+        ].join('\n'),
       ),
     );
     if (!mounted) return;
@@ -282,7 +305,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _onStartBatchDownload() async {
     final results = context.read<VideoExtractorProvider>().batchResults.where(
-      (result) => result.metadata?.bestQuality != null,
+      (result) => result.metadata != null && result.selectedQuality != null,
     );
     final downloads = context.read<DownloadProvider>();
     final settings = context.read<SettingsProvider>();
@@ -290,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     var queued = 0;
     for (final result in results) {
       final metadata = result.metadata!;
-      final quality = metadata.bestQuality!;
+      final quality = result.selectedQuality!;
       final existing = await downloads.findExistingDownloads(
         metadata: metadata,
         qualities: [quality],
@@ -314,6 +337,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+
+  Future<void> _retryBatchResult(String url) async {
+    final extractor = context.read<VideoExtractorProvider>();
+    await extractor.retryBatchResult(
+      url,
+      preferredQuality: context.read<SettingsProvider>().preferredQuality,
+      l10n: context.l10n,
+    );
+    if (!mounted) return;
+    final result = extractor.batchResults
+        .where((entry) => entry.url == url)
+        .firstOrNull;
+    if (result?.metadata != null) {
+      await context.read<AnalysisHistoryProvider>().add(result!.metadata!);
+    }
   }
 
   void _onPreviewMedia() {
@@ -473,50 +512,56 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
                 // 4. Extraction Error Message
                 if (extractor.errorMessage != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withAlpha(25),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.error.withAlpha(80)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(
-                              Icons.error_outline_rounded,
-                              color: AppColors.error,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                extractor.errorMessage!,
-                                style: const TextStyle(
-                                  color: AppColors.error,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
+                  Semantics(
+                    liveRegion: true,
+                    container: true,
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withAlpha(25),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: AppColors.error.withAlpha(80),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.error_outline_rounded,
+                                color: AppColors.error,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  extractor.errorMessage!,
+                                  style: const TextStyle(
+                                    color: AppColors.error,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
+                              ),
+                            ],
+                          ),
+                          if (extractor.diagnosticCode != null) ...[
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                onPressed: () =>
+                                    unawaited(_copyDiagnostics(extractor)),
+                                icon: const Icon(Icons.copy_rounded, size: 16),
+                                label: Text(context.l10n.copyDiagnostics),
                               ),
                             ),
                           ],
-                        ),
-                        if (extractor.diagnosticCode != null) ...[
-                          const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton.icon(
-                              onPressed: () =>
-                                  unawaited(_copyDiagnostics(extractor)),
-                              icon: const Icon(Icons.copy_rounded, size: 16),
-                              label: Text(context.l10n.copyDiagnostics),
-                            ),
-                          ),
                         ],
-                      ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -582,6 +627,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
             ),
             const SizedBox(height: 8),
+            if (context.watch<VideoExtractorProvider>().isAnalyzing)
+              Semantics(
+                liveRegion: true,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: context
+                        .read<VideoExtractorProvider>()
+                        .cancelBatchAnalysis,
+                    icon: const Icon(Icons.stop_circle_outlined),
+                    label: Text(context.l10n.cancel),
+                  ),
+                ),
+              ),
             for (final result in results)
               ListTile(
                 dense: true,
@@ -595,12 +654,43 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                subtitle: result.error == null
-                    ? null
-                    : Text(
+                subtitle: result.error != null
+                    ? Text(
                         result.error!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
+                      )
+                    : result.metadata!.qualities.length > 1
+                    ? DropdownButton<VideoQualityOption>(
+                        value: result.selectedQuality,
+                        isExpanded: true,
+                        items: [
+                          for (final quality in result.metadata!.qualities)
+                            DropdownMenuItem(
+                              value: quality,
+                              child: Text(
+                                quality.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                        onChanged: (quality) {
+                          if (quality != null) {
+                            context
+                                .read<VideoExtractorProvider>()
+                                .selectBatchQuality(result.url, quality);
+                          }
+                        },
+                      )
+                    : Text(result.selectedQuality?.label ?? ''),
+                trailing: result.isSuccess
+                    ? null
+                    : IconButton(
+                        tooltip: context.l10n.retry,
+                        onPressed: () =>
+                            unawaited(_retryBatchResult(result.url)),
+                        icon: const Icon(Icons.refresh_rounded),
                       ),
               ),
             FilledButton.icon(
@@ -645,20 +735,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             for (final entry in entries.take(5))
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(entry.metadata.platform.icon),
+                leading: Icon(entry.platform.icon),
                 title: Text(
-                  entry.metadata.title,
+                  entry.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 subtitle: Text(
-                  entry.metadata.originalUrl,
+                  entry.originalUrl,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 trailing: const Icon(Icons.replay_rounded),
                 onTap: () {
-                  _urlController.text = entry.metadata.originalUrl;
+                  _urlController.text = entry.originalUrl;
                   unawaited(_onAnalyze());
                 },
               ),

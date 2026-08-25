@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:background_downloader/background_downloader.dart' as bg;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show Locale;
 
 import '../core/constants/app_constants.dart';
 import '../core/utils/media_file_validator.dart';
@@ -22,10 +23,12 @@ DownloadGateway createDefaultDownloadService() {
 
 /// Mobile download gateway backed by Android DownloadWorker and iOS
 /// URLSession. Transfers therefore keep running while Flutter is suspended.
-class BackgroundDownloadService implements DownloadGateway {
+class BackgroundDownloadService
+    implements DownloadGateway, RecoverableDownloadGateway {
   BackgroundDownloadService({
     StorageService? storageService,
     this.validator = const MediaFileValidator(),
+    this.requestNotificationPermission = true,
   }) : _storage = storageService ?? StorageService() {
     _updates = bg.FileDownloader().updates.listen(_onUpdate);
     bg.FileDownloader().configureNotificationForGroup(
@@ -49,16 +52,95 @@ class BackgroundDownloadService implements DownloadGateway {
       progressBar: true,
       tapOpensFile: true,
     );
-    unawaited(bg.FileDownloader().start());
   }
 
   final StorageService _storage;
   final MediaFileValidator validator;
+  final bool requestNotificationPermission;
   late final StreamSubscription<bg.TaskUpdate> _updates;
   final Map<String, bg.DownloadTask> _nativeTasks = {};
   final Map<String, _BackgroundContext> _contexts = {};
   final Set<String> _running = {};
   final Set<String> _finishing = {};
+  Future<void>? _startFuture;
+
+  Future<void> _ensureStarted() =>
+      _startFuture ??= bg.FileDownloader().start(autoCleanDatabase: true);
+
+  @override
+  Future<void> recoverDownloads({
+    required Iterable<DownloadTask> tasks,
+    required void Function(DownloadTask task) onChanged,
+    required void Function(DownloadTask task) onTerminal,
+  }) async {
+    await bg.FileDownloader().ready;
+    final records = await bg.FileDownloader().database.allRecords();
+    final recordsById = {for (final record in records) record.taskId: record};
+
+    for (final task in tasks) {
+      final record = recordsById[task.id];
+      final nativeTask = record?.task;
+      if (record == null || nativeTask is! bg.DownloadTask) continue;
+      _nativeTasks[task.id] = nativeTask;
+      task
+        ..filePath = await nativeTask.filePath()
+        ..progress = record.progress.clamp(0.0, 1.0)
+        ..totalBytes = record.expectedFileSize > 0
+            ? record.expectedFileSize
+            : task.totalBytes
+        ..receivedBytes = record.expectedFileSize > 0
+            ? (record.expectedFileSize * task.progress).round()
+            : task.receivedBytes
+        ..errorMessage = null;
+
+      if (record.status == bg.TaskStatus.paused) {
+        task.status = DownloadStatus.paused;
+        onChanged(task);
+        continue;
+      }
+      if (record.status == bg.TaskStatus.failed ||
+          record.status == bg.TaskStatus.notFound ||
+          record.status == bg.TaskStatus.canceled) {
+        continue;
+      }
+
+      _contexts[task.id] = _BackgroundContext(
+        task: task,
+        l10n: lookupAppLocalizations(const Locale('en')),
+        onProgress: (changed, _, _, _, _) {
+          changed.notifyProgressChanged();
+          onChanged(changed);
+        },
+        onComplete: (changed, _) => onTerminal(changed),
+        onError: (changed, _) => onTerminal(changed),
+        autoSaveToGallery: false,
+        completer: Completer<void>(),
+      );
+      task.status = record.status == bg.TaskStatus.complete
+          ? DownloadStatus.downloading
+          : record.status == bg.TaskStatus.enqueued
+          ? DownloadStatus.queued
+          : DownloadStatus.downloading;
+      if (task.status == DownloadStatus.downloading) _running.add(task.id);
+      onChanged(task);
+    }
+
+    // Contexts must be registered before start(), because it immediately
+    // replays status updates collected while Flutter was not running.
+    await _ensureStarted();
+
+    for (final task in tasks) {
+      final record = recordsById[task.id];
+      if (record?.status == bg.TaskStatus.complete &&
+          _contexts.containsKey(task.id) &&
+          _finishing.add(task.id)) {
+        await _complete(
+          task.id,
+          bg.TaskStatusUpdate(record!.task, bg.TaskStatus.complete),
+        );
+      }
+    }
+  }
 
   String buildFileName(DownloadTask task, {String? extension}) {
     final compactId = task.id.replaceAll(RegExp('[^a-zA-Z0-9]'), '');
@@ -82,6 +164,7 @@ class BackgroundDownloadService implements DownloadGateway {
     required AppLocalizations l10n,
     bool autoSaveToGallery = true,
   }) async {
+    await _ensureStarted();
     final completer = Completer<void>();
     _contexts[task.id] = _BackgroundContext(
       task: task,
@@ -117,7 +200,8 @@ class BackgroundDownloadService implements DownloadGateway {
       final status = await bg.FileDownloader().permissions.status(
         bg.PermissionType.notifications,
       );
-      if (status != bg.PermissionStatus.granted) {
+      if (requestNotificationPermission &&
+          status != bg.PermissionStatus.granted) {
         await bg.FileDownloader().permissions.request(
           bg.PermissionType.notifications,
         );

@@ -8,6 +8,7 @@ import 'package:nimble_clip/l10n/generated/app_localizations.dart';
 import 'package:nimble_clip/models/download_task.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/services/download_service.dart';
+import 'package:nimble_clip/services/background_download_service.dart';
 import 'package:video_player/video_player.dart';
 
 /// On-device checks for the Android storage and download paths.
@@ -92,6 +93,31 @@ void main() {
   });
 
   group('download over cleartext to the dev host', () {
+    test('native background worker completes a real media transfer', () async {
+      final backgroundService = BackgroundDownloadService(
+        requestNotificationPermission: false,
+      );
+      final task = fixtureTask(id: 'aaaaaa00-back', title: 'Background worker');
+      String? failure;
+
+      await backgroundService.startDownload(
+        task: task,
+        l10n: l10n,
+        autoSaveToGallery: false,
+        onProgress: (_, _, _, _, _) {},
+        onComplete: (_, _) {},
+        onError: (_, error) => failure = error,
+      );
+
+      expect(failure, isNull, reason: 'background worker reported: $failure');
+      expect(task.status, DownloadStatus.completed);
+      final file = File(task.filePath!);
+      expect(await file.length(), fixtureSize);
+      expect(String.fromCharCodes(await file.openRead(4, 8).first), 'ftyp');
+      await file.delete();
+      backgroundService.dispose();
+    });
+
     test('completes and writes the whole file', () async {
       // Also proves network_security_config still allows 10.0.2.2 now that the
       // blanket usesCleartextTraffic flag is gone.

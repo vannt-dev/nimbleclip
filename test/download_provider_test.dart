@@ -56,6 +56,28 @@ class _ControlledDownloadService implements DownloadGateway {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class _RecoveringDownloadService extends _ControlledDownloadService
+    implements RecoverableDownloadGateway {
+  final List<String> recovered = [];
+
+  @override
+  Future<void> recoverDownloads({
+    required Iterable<DownloadTask> tasks,
+    required void Function(DownloadTask task) onChanged,
+    required void Function(DownloadTask task) onTerminal,
+  }) async {
+    for (final task in tasks) {
+      recovered.add(task.id);
+      task
+        ..status = DownloadStatus.completed
+        ..progress = 1
+        ..filePath = '/tmp/${task.id}.jpg'
+        ..completedAt = DateTime.now();
+      onTerminal(task);
+    }
+  }
+}
+
 class _MemoryStorageService
     implements StorageService, DownloadHistoryRepository, MediaFileActions {
   List<DownloadTask> history = [];
@@ -164,6 +186,39 @@ Future<void> _waitUntil(bool Function() condition) async {
 
 void main() {
   final l10n = lookupAppLocalizations(const Locale('en'));
+
+  test(
+    'restores an interrupted task from the native downloader database',
+    () async {
+      final downloads = _RecoveringDownloadService();
+      final storage = _MemoryStorageService();
+      storage.history = [
+        DownloadTask(
+          id: 'native-task',
+          videoId: 'video',
+          title: 'Recovered',
+          author: 'Author',
+          thumbnailUrl: '',
+          downloadUrl: 'https://cdn.example.com/recovered.jpg',
+          originalUrl: 'https://example.com/post',
+          platform: VideoPlatform.generic,
+          qualityLabel: 'Original',
+          format: 'jpg',
+          kind: MediaKind.image,
+          status: DownloadStatus.downloading,
+        ),
+      ];
+
+      final provider = _provider(downloads, storage);
+      await _waitUntil(() => provider.allTasks.isNotEmpty);
+      await _waitUntil(
+        () => provider.allTasks.single.status == DownloadStatus.completed,
+      );
+
+      expect(downloads.recovered, ['native-task']);
+      expect(provider.completedTasks.single.filePath, '/tmp/native-task.jpg');
+    },
+  );
 
   test(
     'queue caps concurrency globally and skips a cancelled queued task',

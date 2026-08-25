@@ -148,6 +148,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String batchLimitReached(int count) {
+    return 'Only the first $count links will be analyzed.';
+  }
+
+  @override
   String queueAll(int count) {
     return 'Queue all ($count)';
   }
