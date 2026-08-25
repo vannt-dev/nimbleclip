@@ -13,7 +13,12 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "NimbleClipSharedIntent")
+    guard let registrar = engineBridge.pluginRegistry.registrar(
+      forPlugin: "NimbleClipSharedIntent"
+    ) else {
+      assertionFailure("Unable to create the shared-intent plugin registrar")
+      return
+    }
     sharedTextChannel = FlutterMethodChannel(
       name: "com.vannt.nimbleclip/shared_intent",
       binaryMessenger: registrar.messenger()
