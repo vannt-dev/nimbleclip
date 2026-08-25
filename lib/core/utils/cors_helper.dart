@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 class CorsHelper {
   static const String proxyPath = '/cors-proxy';
   static const String resolvePath = '/resolve';
+  static const String youtubeDecipherPath = '/youtube-decipher';
 
   /// Header the proxy reads as the upstream `User-Agent`. Browsers refuse to let
   /// scripts set `User-Agent` directly, so the value is smuggled through a

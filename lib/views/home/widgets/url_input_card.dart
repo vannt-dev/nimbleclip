@@ -160,6 +160,8 @@ class _UrlInputCardState extends State<UrlInputCard> {
             controller: widget.controller,
             focusNode: widget.focusNode,
             textInputAction: TextInputAction.go,
+            minLines: 1,
+            maxLines: 4,
             onSubmitted: (_) => widget.onAnalyze(),
             style: const TextStyle(fontSize: 14),
             decoration: InputDecoration(

@@ -6,6 +6,19 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- Added Android/iOS share receivers, multi-link analysis and batch queueing,
+  and a persistent recent-analysis list.
+- Added true mobile background transfers using Android DownloadWorker and iOS
+  URLSession, including notifications, retries, pause, resume, and media-byte
+  validation before completion.
+- Added scheduled live extractor health checks with automatic GitHub issue
+  reporting and copyable Facebook/YouTube extraction diagnostics.
+- Added a server-side, sandboxed YouTube `signatureCipher` fallback for Web.
+- Hardened the Android emulator launcher with early-exit diagnostics and an
+  automatic cold-boot retry.
+- Added pull-to-refresh on Home to clear the previous result, return to the URL
+  input, and start another analysis.
+
 ## [1.2.0] - 2026-08-24
 
 - Added complete image, video, and mixed-media extraction for public Facebook,

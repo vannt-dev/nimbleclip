@@ -18,6 +18,9 @@ management, local playback, and gallery export.
 ## Features
 
 - Detects supported links pasted from the clipboard.
+- Accepts links shared directly from other apps on Android and iOS.
+- Analyzes multiple pasted/shared links in one pass, queues their best media
+  options together, and keeps the latest 20 analyzed links locally.
 - Extracts available video, audio, and image options before downloading.
 - Shows carousel thumbnails in a lazy full-screen picker, with preview,
   select-all, and multi-image download for supported Facebook, Instagram,
@@ -30,8 +33,9 @@ management, local playback, and gallery export.
   completed file again.
 - Tracks progress, transfer speed, and downloaded file size per task without
   rebuilding the entire download list.
-- Pauses and resumes native downloads when the source server supports HTTP
-  range requests.
+- Runs mobile downloads through Android DownloadWorker and iOS URLSession with
+  progress notifications, retry, pause, and resume while the app is in the
+  background.
 - Refreshes expired media URLs before retrying a failed download.
 - Uses compact, filesystem-safe, platform-prefixed UUID filenames such as
   `facebook_<uuid>` and `x_<uuid>`, and validates downloaded media from its
@@ -248,6 +252,7 @@ environment variables:
 | --- | --- |
 | `GET/POST/HEAD /cors-proxy?url=<url>` | Proxies an HTTP request and forwards range headers for media seeking. Add `filename=<name>` to return a download response. |
 | `GET /resolve?url=<url>` | Resolves redirects for shortened links such as `t.co`, `fb.watch`, and `vm.tiktok.com`. |
+| `POST /youtube-decipher` | Deciphers YouTube `signatureCipher` stream URLs for the Web extractor in a time-limited VM. |
 
 The proxy only accepts HTTP and HTTPS destinations on ports 80 and 443. It
 validates every redirect and rejects loopback, private, link-local, and other
@@ -255,9 +260,9 @@ non-public destination addresses to reduce SSRF risk. Static files are served
 only from `build/web`. Every route also enforces an explicit HTTP method
 allowlist; unsupported methods return `405 Method Not Allowed`.
 
-Some YouTube streams use `signatureCipher`, which requires YouTube's JavaScript
-signature transformation and is not currently handled by the Web extractor.
-Use a native build when a stream is unavailable in the browser.
+The YouTube Web fallback extracts only the signature transform and executes it
+in an isolated, time-limited VM context. YouTube can still reject private,
+age-restricted, DRM-protected, or region-restricted content.
 
 ## Build artifacts
 

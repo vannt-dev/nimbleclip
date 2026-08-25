@@ -7,6 +7,8 @@ import 'core/theme/app_theme.dart';
 import 'providers/download_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/video_extractor_provider.dart';
+import 'providers/analysis_history_provider.dart';
+import 'providers/shared_intent_provider.dart';
 import 'core/utils/external_service_policy.dart';
 import 'services/extractors/registry.dart';
 import 'l10n/generated/app_localizations.dart';
@@ -34,6 +36,8 @@ class NimbleClipApp extends StatelessWidget {
             extractionPolicy: context.read<ExtractionPolicy>(),
           ),
         ),
+        ChangeNotifierProvider(create: (_) => AnalysisHistoryProvider()),
+        ChangeNotifierProvider(create: (_) => SharedIntentProvider()),
         ChangeNotifierProvider(
           create: (context) => VideoExtractorProvider(
             extractorRegistry: context.read<ExtractorRegistry>(),

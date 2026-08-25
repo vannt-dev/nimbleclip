@@ -100,6 +100,21 @@ void main() {
     });
   });
 
+  group('UrlHelper.extractUrls', () {
+    test('extracts, cleans and de-duplicates multiple shared links', () {
+      expect(
+        UrlHelper.extractUrls(
+          'Một https://youtu.be/abcdefghijk. Hai https://facebook.com/reel/123! Lặp https://youtu.be/abcdefghijk',
+        ),
+        ['https://youtu.be/abcdefghijk', 'https://facebook.com/reel/123'],
+      );
+    });
+
+    test('ignores invalid text and non-http schemes', () {
+      expect(UrlHelper.extractUrls('hello ftp://example.com/a.mp4'), isEmpty);
+    });
+  });
+
   group('UrlHelper.isValidVideoUrl', () {
     test('accepts http and https with a host', () {
       expect(UrlHelper.isValidVideoUrl('https://example.com/a.mp4'), isTrue);
@@ -138,6 +153,21 @@ void main() {
       );
       expect(
         UrlHelper.isShortLink('https://www.facebook.com/reel/123456'),
+        isFalse,
+      );
+      for (final path in [
+        '/share/r/ReelToken/',
+        '/share/v/VideoToken',
+        '/share/p/PostToken/?mibextid=test',
+      ]) {
+        expect(
+          UrlHelper.isShortLink('https://web.facebook.com$path'),
+          isTrue,
+          reason: path,
+        );
+      }
+      expect(
+        UrlHelper.isShortLink('https://example.com/share/r/ReelToken/'),
         isFalse,
       );
     });

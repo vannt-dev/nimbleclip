@@ -1,0 +1,74 @@
+name: Live extractor health
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: live-extractors
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Check public extractor fixtures
+        id: smoke
+        continue-on-error: true
+        run: flutter test test/live_extractor_smoke_test.dart --dart-define=RUN_LIVE_EXTRACTOR_TESTS=true
+      - name: Open or update health issue
+        if: steps.smoke.outcome == 'failure'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const title = 'Live extractor health check is failing';
+            const {data} = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'extractor-health'
+            });
+            const body = `Scheduled public extractor checks failed.\n\nRun: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            if (data.length) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: data[0].number,
+                body
+              });
+            } else {
+              try {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: 'extractor-health',
+                  color: 'd73a4a',
+                  description: 'Automated live extractor health failures'
+                });
+              } catch (error) {
+                if (error.status !== 422) throw error;
+              }
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['extractor-health']
+              });
+            }
+      - name: Fail workflow when smoke tests fail
+        if: steps.smoke.outcome == 'failure'
+        run: exit 1

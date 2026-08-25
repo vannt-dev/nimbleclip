@@ -9,7 +9,14 @@ import '../../models/video_platform.dart';
 /// without unwrapping nested `Exception: Exception: ...` prefixes.
 class ExtractionException implements Exception {
   final String message;
-  const ExtractionException(this.message);
+  final String? diagnosticCode;
+  final List<String> attemptedStrategies;
+
+  const ExtractionException(
+    this.message, {
+    this.diagnosticCode,
+    this.attemptedStrategies = const [],
+  });
 
   @override
   String toString() => message;

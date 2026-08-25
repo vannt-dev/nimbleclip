@@ -11,6 +11,8 @@ import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/providers/download_provider.dart';
 import 'package:nimble_clip/providers/settings_provider.dart';
 import 'package:nimble_clip/providers/video_extractor_provider.dart';
+import 'package:nimble_clip/providers/analysis_history_provider.dart';
+import 'package:nimble_clip/providers/shared_intent_provider.dart';
 import 'package:nimble_clip/services/extractors/registry.dart';
 import 'package:nimble_clip/views/home/home_screen.dart';
 import 'package:nimble_clip/views/home/widgets/video_result_card.dart';
@@ -124,6 +126,8 @@ void main() {
         providers: [
           ChangeNotifierProvider(create: (_) => SettingsProvider()),
           ChangeNotifierProvider(create: (_) => VideoExtractorProvider()),
+          ChangeNotifierProvider(create: (_) => AnalysisHistoryProvider()),
+          ChangeNotifierProvider(create: (_) => SharedIntentProvider()),
           ChangeNotifierProvider(create: (_) => DownloadProvider()),
         ],
         child: MaterialApp(
@@ -169,6 +173,8 @@ void main() {
         providers: [
           ChangeNotifierProvider(create: (_) => SettingsProvider()),
           ChangeNotifierProvider.value(value: extractor),
+          ChangeNotifierProvider(create: (_) => AnalysisHistoryProvider()),
+          ChangeNotifierProvider(create: (_) => SharedIntentProvider()),
           ChangeNotifierProvider(create: (_) => DownloadProvider()),
         ],
         child: MaterialApp(

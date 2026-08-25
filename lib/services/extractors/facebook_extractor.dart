@@ -110,12 +110,20 @@ class FacebookExtractor extends BaseVideoExtractor {
 
     if (imageFallback != null) {
       if (_isKnownVideoLink(cleanUrl)) {
-        throw ExtractionException(l10n.facebookNoVideo);
+        throw ExtractionException(
+          l10n.facebookNoVideo,
+          diagnosticCode: 'facebook_video_not_exposed',
+          attemptedStrategies: const ['page', 'embed', 'mobile'],
+        );
       }
       return _withPostPhotoFallback(imageFallback!, cleanUrl, l10n);
     }
 
-    throw ExtractionException(l10n.facebookNoVideo);
+    throw ExtractionException(
+      l10n.facebookNoVideo,
+      diagnosticCode: 'facebook_no_public_media',
+      attemptedStrategies: const ['page', 'embed', 'mobile'],
+    );
   }
 
   bool _isKnownVideoLink(String url) {

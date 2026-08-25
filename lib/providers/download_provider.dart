@@ -10,6 +10,7 @@ import '../models/download_task.dart';
 import '../models/download_options.dart';
 import '../models/video_metadata.dart';
 import '../services/download_service.dart';
+import '../services/background_download_service.dart';
 import '../services/download_history_repository.dart';
 import '../services/async_work_queue.dart';
 import '../services/extractors/registry.dart';
@@ -23,7 +24,7 @@ class DownloadProvider extends ChangeNotifier {
     DownloadHistoryRepository? historyRepository,
     MediaFileActions? fileActions,
     ExtractorRegistry? extractorRegistry,
-  }) : _downloadService = downloadService ?? DownloadService(),
+  }) : _downloadService = downloadService ?? createDefaultDownloadService(),
        _storageService = storageService ?? StorageService(),
        _historyRepository =
            historyRepository ??

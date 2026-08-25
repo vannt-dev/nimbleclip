@@ -143,6 +143,25 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String batchResults(int count) {
+    return 'Analyzed links ($count)';
+  }
+
+  @override
+  String queueAll(int count) {
+    return 'Queue all ($count)';
+  }
+
+  @override
+  String get recentLinks => 'Recent links';
+
+  @override
+  String get copyDiagnostics => 'Copy diagnostics';
+
+  @override
+  String get diagnosticsCopied => 'Diagnostics copied';
+
+  @override
   String get preview => 'Preview';
 
   @override

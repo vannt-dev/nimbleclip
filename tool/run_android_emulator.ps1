@@ -61,22 +61,113 @@ function Get-AdbPath {
     return $null
 }
 
-$device = Get-ConnectedAndroidEmulator
-if ($null -eq $device) {
-    Write-Host "Starting Android emulator '$EmulatorId'..." -ForegroundColor Cyan
-    & flutter emulators --launch $EmulatorId
-    if ($LASTEXITCODE -ne 0) {
-        throw "Unable to launch emulator '$EmulatorId'."
-    }
+function Get-AndroidSdkPath {
+    $propertiesPath = Join-Path $projectRoot 'android\local.properties'
+    if (-not (Test-Path -LiteralPath $propertiesPath)) { return $null }
+    $sdkLine = Get-Content -LiteralPath $propertiesPath |
+        Where-Object { $_ -match '^sdk\.dir=' } |
+        Select-Object -First 1
+    if ([string]::IsNullOrWhiteSpace($sdkLine)) { return $null }
+    return (($sdkLine -replace '^sdk\.dir=', '') -replace '\\:', ':') -replace '\\\\', '\'
+}
 
-    $deadline = (Get-Date).AddSeconds($BootTimeoutSeconds)
+function Get-AvdProcess {
+    $escapedId = [Regex]::Escape($EmulatorId)
+    return Get-CimInstance Win32_Process -Filter "Name = 'qemu-system-x86_64.exe'" `
+        -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -match "-avd\s+`"?$escapedId(?:`"|\s|$)" } |
+        Select-Object -First 1
+}
+
+function Stop-SelectedAvd {
+    $avdProcess = Get-AvdProcess
+    if ($null -eq $avdProcess) { return }
+    Write-Host "Stopping unresponsive AVD '$EmulatorId' (PID $($avdProcess.ProcessId))..." `
+        -ForegroundColor DarkGray
+    Stop-Process -Id $avdProcess.ProcessId -Force -ErrorAction SilentlyContinue
+    $deadline = (Get-Date).AddSeconds(10)
+    while ($null -ne (Get-AvdProcess) -and (Get-Date) -lt $deadline) {
+        Start-Sleep -Milliseconds 250
+    }
+}
+
+function Wait-ForAndroidEmulator {
+    param([int]$TimeoutSeconds, [System.Diagnostics.Process]$Process)
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     do {
         Start-Sleep -Seconds 2
-        $device = Get-ConnectedAndroidEmulator
-    } while ($null -eq $device -and (Get-Date) -lt $deadline)
+        $connected = Get-ConnectedAndroidEmulator
+        if ($null -ne $connected) { return $connected }
+        # emulator.exe can hand off to qemu-system and exit successfully, so
+        # its lifetime alone does not mean the AVD failed to start.
+        if ($null -ne $Process -and $Process.HasExited -and $null -eq (Get-AvdProcess)) {
+            return $null
+        }
+    } while ((Get-Date) -lt $deadline)
+    return $null
+}
+
+function Start-AndroidEmulatorProcess {
+    param([switch]$ColdBoot)
+    $sdkPath = Get-AndroidSdkPath
+    $emulatorPath = if ($null -eq $sdkPath) { $null } else { Join-Path $sdkPath 'emulator\emulator.exe' }
+    if ($null -eq $emulatorPath -or -not (Test-Path -LiteralPath $emulatorPath)) {
+        & flutter emulators --launch $EmulatorId
+        if ($LASTEXITCODE -ne 0) { throw "Unable to launch emulator '$EmulatorId'." }
+        return $null
+    }
+
+    $arguments = @('-avd', $EmulatorId)
+    if ($ColdBoot) { $arguments += '-no-snapshot-load' }
+    $stderrPath = Join-Path ([System.IO.Path]::GetTempPath()) "nimbleclip-emulator-$PID.err"
+    $process = Start-Process -FilePath $emulatorPath -ArgumentList $arguments `
+        -PassThru -WindowStyle Hidden -RedirectStandardError $stderrPath
+    $process | Add-Member -NotePropertyName NimbleClipStderr -NotePropertyValue $stderrPath
+    return $process
+}
+
+function Write-EmulatorFailure {
+    param([System.Diagnostics.Process]$Process)
+    if ($null -eq $Process) { return }
+    if ($Process.HasExited) {
+        Write-Warning "Android emulator exited early with code $($Process.ExitCode)."
+    }
+    $stderrPath = $Process.NimbleClipStderr
+    if ($null -ne $stderrPath -and (Test-Path -LiteralPath $stderrPath)) {
+        $details = Get-Content -LiteralPath $stderrPath -Raw
+        if (-not [string]::IsNullOrWhiteSpace($details)) {
+            Write-Warning "Android emulator stderr:`n$details"
+        }
+    }
+}
+
+$device = Get-ConnectedAndroidEmulator
+if ($null -eq $device) {
+    $existingAvd = Get-AvdProcess
+    if ($null -ne $existingAvd) {
+        Write-Host "Waiting for the existing '$EmulatorId' process..." -ForegroundColor Cyan
+        $device = Wait-ForAndroidEmulator `
+            -TimeoutSeconds $BootTimeoutSeconds `
+            -Process $null
+        if ($null -eq $device) { Stop-SelectedAvd }
+    }
+}
+
+if ($null -eq $device) {
+    Write-Host "Starting Android emulator '$EmulatorId'..." -ForegroundColor Cyan
+    $emulatorProcess = Start-AndroidEmulatorProcess
+    $device = Wait-ForAndroidEmulator -TimeoutSeconds $BootTimeoutSeconds -Process $emulatorProcess
 
     if ($null -eq $device) {
-        throw "The emulator did not connect within $BootTimeoutSeconds seconds."
+        Write-EmulatorFailure -Process $emulatorProcess
+        Stop-SelectedAvd
+        Write-Host 'Retrying once with a cold boot...' -ForegroundColor Yellow
+        $emulatorProcess = Start-AndroidEmulatorProcess -ColdBoot
+        $device = Wait-ForAndroidEmulator -TimeoutSeconds $BootTimeoutSeconds -Process $emulatorProcess
+        if ($null -eq $device) {
+            Write-EmulatorFailure -Process $emulatorProcess
+            throw "The emulator did not connect after normal and cold-boot attempts."
+        }
     }
 }
 

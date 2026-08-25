@@ -141,6 +141,25 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String batchResults(int count) {
+    return 'Liên kết đã phân tích ($count)';
+  }
+
+  @override
+  String queueAll(int count) {
+    return 'Thêm tất cả vào hàng đợi ($count)';
+  }
+
+  @override
+  String get recentLinks => 'Liên kết gần đây';
+
+  @override
+  String get copyDiagnostics => 'Sao chép chẩn đoán';
+
+  @override
+  String get diagnosticsCopied => 'Đã sao chép thông tin chẩn đoán';
+
+  @override
   String get preview => 'Xem trước';
 
   @override

@@ -49,6 +49,7 @@ dependencies:
   http: ^1.6.0
   uuid: ^4.6.0
   package_info_plus: ^10.2.1
+  background_downloader: ^9.5.8
 
 dev_dependencies:
   flutter_test:

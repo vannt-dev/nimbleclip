@@ -6,6 +6,7 @@ const fsp = require('fs/promises');
 const path = require('path');
 const dns = require('dns/promises');
 const net = require('net');
+const vm = require('vm');
 const { Readable, Transform } = require('stream');
 const { pipeline } = require('stream/promises');
 
@@ -213,7 +214,117 @@ function allowedMethods(pathname) {
     return new Set(['GET', 'POST', 'HEAD', 'OPTIONS']);
   }
   if (pathname === '/resolve') return new Set(['GET', 'OPTIONS']);
+  if (pathname === '/youtube-decipher') return new Set(['POST', 'OPTIONS']);
   return new Set(['GET', 'HEAD', 'OPTIONS']);
+}
+
+function balancedBlock(source, openingBrace) {
+  let depth = 0;
+  let quote = null;
+  let escaped = false;
+  for (let index = openingBrace; index < source.length; index++) {
+    const char = source[index];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+    } else if (char === '{') {
+      depth += 1;
+    } else if (char === '}' && --depth === 0) {
+      return source.slice(openingBrace, index + 1);
+    }
+  }
+  return null;
+}
+
+/** Extracts only YouTube's signature transform function and its helper object.
+ * The snippets execute in an empty, time-limited VM context rather than in the
+ * server global scope.
+ */
+function createYouTubeSignatureDecipher(playerSource) {
+  const patterns = [
+    /([\w$]+)=function\((\w+)\)\{\2=\2\.split\(""\)/,
+    /function\s+([\w$]+)\((\w+)\)\{\2=\2\.split\(""\)/,
+  ];
+  let match;
+  for (const pattern of patterns) {
+    match = pattern.exec(playerSource);
+    if (match) break;
+  }
+  if (!match) throw new Error('YouTube signature function was not found');
+
+  const functionName = match[1];
+  const argumentName = match[2];
+  const brace = playerSource.indexOf('{', match.index);
+  const body = balancedBlock(playerSource, brace);
+  if (!body) throw new Error('YouTube signature function was truncated');
+
+  const helpers = [...body.matchAll(/([\w$]+)\.[\w$]+\(/g)]
+    .map((entry) => entry[1])
+    .filter((name) => name !== argumentName);
+  const declarations = [];
+  for (const helper of new Set(helpers)) {
+    const escaped = helper.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const helperMatch = new RegExp(`(?:var\\s+)?${escaped}=\\{`).exec(playerSource);
+    if (!helperMatch) continue;
+    const helperBrace = playerSource.indexOf('{', helperMatch.index);
+    const helperBody = balancedBlock(playerSource, helperBrace);
+    if (helperBody) declarations.push(`var ${helper}=${helperBody};`);
+  }
+
+  const functionExpression = match[0].startsWith('function')
+    ? `function ${functionName}(${argumentName})${body}`
+    : `var ${functionName}=function(${argumentName})${body};`;
+  const script = new vm.Script(
+    `${declarations.join('')} ${functionExpression} result=${functionName}(input);`,
+  );
+  return (signature) => {
+    const sandbox = { input: signature, result: null };
+    script.runInNewContext(sandbox, { timeout: 50 });
+    if (typeof sandbox.result !== 'string') throw new Error('Invalid decipher result');
+    return sandbox.result;
+  };
+}
+
+async function handleYouTubeDecipher(req, res) {
+  const rawBody = await readRequestBody(req);
+  let payload;
+  try {
+    payload = JSON.parse(rawBody ? rawBody.toString('utf8') : '{}');
+  } catch {
+    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+    return;
+  }
+  const playerUrl = String(payload.playerUrl || '');
+  const ciphers = Array.isArray(payload.ciphers) ? payload.ciphers : [];
+  if (!/^https:\/\/([\w-]+\.)?(youtube\.com|youtube-nocookie\.com)\//i.test(playerUrl) ||
+      ciphers.length === 0 || ciphers.length > 100) {
+    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ error: 'Invalid YouTube decipher request' }));
+    return;
+  }
+
+  const upstream = await safeFetch(playerUrl, {
+    method: 'GET',
+    headers: { 'User-Agent': DEFAULT_USER_AGENT, Accept: 'application/javascript' },
+  });
+  if (!upstream.ok) throw new Error(`YouTube player returned ${upstream.status}`);
+  const decipher = createYouTubeSignatureDecipher(await upstream.text());
+  const urls = ciphers.map((cipher) => {
+    const fields = new URLSearchParams(String(cipher));
+    const mediaUrl = new URL(fields.get('url'));
+    const signature = fields.get('s');
+    if (!signature) throw new Error('Cipher has no signature');
+    mediaUrl.searchParams.set(fields.get('sp') || 'signature', decipher(signature));
+    return mediaUrl.toString();
+  });
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify({ urls }));
 }
 
 async function handleProxy(req, res, requestUrl) {
@@ -457,7 +568,8 @@ const server = http.createServer(async (req, res) => {
 
   try {
     const isProxy = requestUrl.pathname === '/cors-proxy' ||
-      requestUrl.pathname === '/proxy' || requestUrl.pathname === '/resolve';
+      requestUrl.pathname === '/proxy' || requestUrl.pathname === '/resolve' ||
+      requestUrl.pathname === '/youtube-decipher';
     if (isProxy && !consumeProxyQuota(req)) {
       res.writeHead(429, {
         'Content-Type': 'application/json; charset=utf-8',
@@ -471,6 +583,8 @@ const server = http.createServer(async (req, res) => {
       await handleProxy(req, res, requestUrl);
     } else if (requestUrl.pathname === '/resolve') {
       await handleResolve(req, res, requestUrl);
+    } else if (requestUrl.pathname === '/youtube-decipher') {
+      await handleYouTubeDecipher(req, res);
     } else {
       await handleStatic(req, res, requestUrl);
     }
@@ -502,4 +616,5 @@ module.exports = {
   consumeProxyQuota,
   readRequestBody,
   allowedMethods,
+  createYouTubeSignatureDecipher,
 };

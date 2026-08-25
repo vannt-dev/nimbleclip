@@ -7,10 +7,38 @@ import android.provider.MediaStore
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.EventChannel
 
 class MainActivity : FlutterActivity() {
+    private var pendingSharedText: String? = null
+    private var sharedTextSink: EventChannel.EventSink? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        acceptSharedIntent(intent)
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.vannt.nimbleclip/shared_intent",
+        ).setMethodCallHandler { call, result ->
+            if (call.method == "consumeSharedText") {
+                result.success(pendingSharedText)
+                pendingSharedText = null
+            } else {
+                result.notImplemented()
+            }
+        }
+        EventChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.vannt.nimbleclip/shared_intent_events",
+        ).setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                sharedTextSink = events
+            }
+
+            override fun onCancel(arguments: Any?) {
+                sharedTextSink = null
+            }
+        })
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "com.vannt.nimbleclip/media_store",
@@ -64,6 +92,22 @@ class MainActivity : FlutterActivity() {
                 result.error("media_query_failed", error.message, null)
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        acceptSharedIntent(intent)
+    }
+
+    private fun acceptSharedIntent(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SEND || !intent.type.orEmpty().startsWith("text/")) {
+            return
+        }
+        val text = intent.getStringExtra(Intent.EXTRA_TEXT)?.trim()
+        if (text.isNullOrBlank()) return
+        pendingSharedText = text
+        sharedTextSink?.success(text)
     }
 
     private fun findMediaUri(fileName: String, isImage: Boolean): Uri? {

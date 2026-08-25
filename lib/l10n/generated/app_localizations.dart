@@ -308,6 +308,36 @@ abstract class AppLocalizations {
   /// **'Downloading {count} selected media files.'**
   String batchDownloadStarted(int count);
 
+  /// No description provided for @batchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyzed links ({count})'**
+  String batchResults(int count);
+
+  /// No description provided for @queueAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Queue all ({count})'**
+  String queueAll(int count);
+
+  /// No description provided for @recentLinks.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent links'**
+  String get recentLinks;
+
+  /// No description provided for @copyDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy diagnostics'**
+  String get copyDiagnostics;
+
+  /// No description provided for @diagnosticsCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics copied'**
+  String get diagnosticsCopied;
+
   /// No description provided for @preview.
   ///
   /// In en, this message translates to:

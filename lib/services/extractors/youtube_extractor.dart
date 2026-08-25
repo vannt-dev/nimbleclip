@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt_lib;
 
 import '../../core/utils/http_helper.dart';
+import '../../core/utils/cors_helper.dart';
 import '../../core/utils/json_scanner.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -150,6 +151,16 @@ class YouTubeExtractor extends BaseVideoExtractor {
     final streamingData = json['streamingData'] as Map<String, dynamic>?;
     final qualities = <VideoQualityOption>[];
     var hasCipheredStreams = false;
+    final allFormats = <Map<String, dynamic>>[
+      for (final entry in streamingData?['formats'] as List<dynamic>? ?? [])
+        entry as Map<String, dynamic>,
+      for (final entry
+          in streamingData?['adaptiveFormats'] as List<dynamic>? ?? [])
+        entry as Map<String, dynamic>,
+    ];
+    final deciphered = kIsWeb
+        ? await _decipherWebStreams(response.body, allFormats)
+        : const <String, String>{};
 
     /// `signatureCipher` streams need YouTube's player JS to be deciphered,
     /// which only the native path can do — note them so the error message can
@@ -157,7 +168,11 @@ class YouTubeExtractor extends BaseVideoExtractor {
     String? usableUrl(Map<String, dynamic> format) {
       final directUrl = format['url']?.toString();
       if (directUrl != null && directUrl.isNotEmpty) return directUrl;
-      if (format['signatureCipher'] != null) hasCipheredStreams = true;
+      final cipher = format['signatureCipher']?.toString();
+      if (cipher != null) {
+        hasCipheredStreams = true;
+        return deciphered[cipher];
+      }
       return null;
     }
 
@@ -221,6 +236,14 @@ class YouTubeExtractor extends BaseVideoExtractor {
         hasCipheredStreams
             ? l10n.youtubeCipherUnsupported
             : l10n.youtubeNoStreams,
+        diagnosticCode: hasCipheredStreams
+            ? 'youtube_signature_decipher_failed'
+            : 'youtube_no_streams',
+        attemptedStrategies: const [
+          'native-client',
+          'watch-page',
+          'web-decipher',
+        ],
       );
     }
 
@@ -236,6 +259,50 @@ class YouTubeExtractor extends BaseVideoExtractor {
       qualities: QualityHelper.sortedByQuality(qualities),
       viewCount: int.tryParse(details['viewCount']?.toString() ?? ''),
     );
+  }
+
+  Future<Map<String, String>> _decipherWebStreams(
+    String watchPage,
+    List<Map<String, dynamic>> formats,
+  ) async {
+    final ciphers = formats
+        .map((format) => format['signatureCipher']?.toString())
+        .whereType<String>()
+        .toSet()
+        .toList(growable: false);
+    if (ciphers.isEmpty) return const {};
+
+    final playerMatch = RegExp(
+      r'"(?:jsUrl|PLAYER_JS_URL)"\s*:\s*"([^"]+)"',
+    ).firstMatch(watchPage);
+    if (playerMatch == null) return const {};
+    try {
+      final relative = jsonDecode('"${playerMatch.group(1)!}"') as String;
+      final playerUrl = Uri.parse(
+        relative.startsWith('http')
+            ? relative
+            : 'https://www.youtube.com$relative',
+      ).toString();
+      final response = await http
+          .post(
+            Uri.parse(CorsHelper.youtubeDecipherPath),
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({'playerUrl': playerUrl, 'ciphers': ciphers}),
+          )
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return const {};
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      final urls = (payload['urls'] as List<dynamic>? ?? [])
+          .map((value) => value.toString())
+          .toList(growable: false);
+      if (urls.length != ciphers.length) return const {};
+      return {
+        for (var index = 0; index < ciphers.length; index++)
+          ciphers[index]: urls[index],
+      };
+    } catch (_) {
+      return const {};
+    }
   }
 
   Duration? _durationFrom(Object? lengthSeconds) {

@@ -29,6 +29,18 @@ class UrlHelper {
     return text.trim();
   }
 
+  static List<String> extractUrls(String text) {
+    final matches = RegExp(r'''https?://[^\s<>"']+''').allMatches(text);
+    final seen = <String>{};
+    return [
+      for (final match in matches)
+        if (seen.add(
+          (match.group(0) ?? '').replaceAll(RegExp(r'[.,;!)]+$'), ''),
+        ))
+          (match.group(0) ?? '').replaceAll(RegExp(r'[.,;!)]+$'), ''),
+    ].where(isValidVideoUrl).toList(growable: false);
+  }
+
   /// Host of [url], lowercased and without a `www.` prefix. Empty when the URL
   /// cannot be parsed.
   static String hostOf(String url) {
