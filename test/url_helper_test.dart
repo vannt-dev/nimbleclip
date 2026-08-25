@@ -119,9 +119,25 @@ void main() {
     test('flags links whose destination needs a redirect', () {
       expect(UrlHelper.isShortLink('https://t.co/abc'), isTrue);
       expect(UrlHelper.isShortLink('https://fb.watch/abc/'), isTrue);
+      expect(
+        UrlHelper.isShortLink('https://www.facebook.com/share/r/1DoJYK37gr/'),
+        isTrue,
+      );
+      expect(
+        UrlHelper.isShortLink('https://m.facebook.com/share/v/AbCd123'),
+        isTrue,
+      );
+      expect(
+        UrlHelper.isShortLink('https://facebook.com/share/p/Post123/?x=1'),
+        isTrue,
+      );
       expect(UrlHelper.isShortLink('https://vm.tiktok.com/ZM1/'), isTrue);
       expect(
         UrlHelper.isShortLink('https://www.tiktok.com/@u/video/1'),
+        isFalse,
+      );
+      expect(
+        UrlHelper.isShortLink('https://www.facebook.com/reel/123456'),
         isFalse,
       );
     });

@@ -84,6 +84,17 @@ class UrlHelper {
       'instagr.am',
       'ig.me',
     ];
-    return shortHosts.any((candidate) => hostMatches(host, candidate));
+    if (shortHosts.any((candidate) => hostMatches(host, candidate))) {
+      return true;
+    }
+
+    // Facebook's mobile Share action now commonly emits same-host redirect
+    // links instead of fb.watch links. The path carries only an opaque token,
+    // so it must be expanded before a video or post can be extracted.
+    if (hostMatches(host, 'facebook.com')) {
+      final path = Uri.tryParse(url.trim())?.path.toLowerCase() ?? '';
+      return RegExp(r'^/share/(?:r|v|p)/[^/]+/?$').hasMatch(path);
+    }
+    return false;
   }
 }

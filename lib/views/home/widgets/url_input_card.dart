@@ -7,6 +7,7 @@ import '../../../models/video_platform.dart';
 
 class UrlInputCard extends StatefulWidget {
   final TextEditingController controller;
+  final FocusNode? focusNode;
   final bool isAnalyzing;
   final VoidCallback onAnalyze;
   final VoidCallback onClear;
@@ -14,6 +15,7 @@ class UrlInputCard extends StatefulWidget {
   const UrlInputCard({
     super.key,
     required this.controller,
+    this.focusNode,
     required this.isAnalyzing,
     required this.onAnalyze,
     required this.onClear,
@@ -156,6 +158,7 @@ class _UrlInputCardState extends State<UrlInputCard> {
           const SizedBox(height: 14),
           TextField(
             controller: widget.controller,
+            focusNode: widget.focusNode,
             textInputAction: TextInputAction.go,
             onSubmitted: (_) => widget.onAnalyze(),
             style: const TextStyle(fontSize: 14),

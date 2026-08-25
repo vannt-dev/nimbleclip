@@ -28,6 +28,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final TextEditingController _urlController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final FocusNode _urlFocusNode = FocusNode();
 
   @override
   void initState() {
@@ -42,6 +44,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _urlController.dispose();
+    _scrollController.dispose();
+    _urlFocusNode.dispose();
     super.dispose();
   }
 
@@ -112,6 +116,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _onClear() {
     _urlController.clear();
     context.read<VideoExtractorProvider>().clear();
+  }
+
+  Future<void> _startNewDownload() async {
+    _onClear();
+
+    // Wait for the result card to leave the tree before calculating the new
+    // scroll extent, then return to the input and open the keyboard.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    if (_scrollController.hasClients) {
+      await _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    if (mounted) _urlFocusNode.requestFocus();
   }
 
   Future<void> _onStartDownload([List<VideoQualityOption>? qualities]) async {
@@ -278,12 +299,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () async {
-            if (_urlController.text.isNotEmpty) {
-              _onAnalyze();
-            }
-          },
+          onRefresh: _startNewDownload,
           child: SingleChildScrollView(
+            key: const ValueKey('home-scroll-view'),
+            controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
@@ -357,6 +376,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 // 3. URL Input Card
                 UrlInputCard(
                   controller: _urlController,
+                  focusNode: _urlFocusNode,
                   isAnalyzing: extractor.isAnalyzing,
                   onAnalyze: _onAnalyze,
                   onClear: _onClear,
@@ -407,6 +427,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     onPreview: _onPreviewMedia,
                   ),
                   const SizedBox(height: 24),
+                  OutlinedButton.icon(
+                    key: const ValueKey('home-new-download'),
+                    onPressed: () => unawaited(_startNewDownload()),
+                    icon: const Icon(Icons.add_link_rounded),
+                    label: Text(context.l10n.newDownload),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                 ],
 
                 // 6. How-to Guide Cards (Shown when no result)

@@ -201,9 +201,13 @@ class ExtractorHttp {
         return (resolved != null && resolved.isNotEmpty) ? resolved : url;
       }
 
-      final response = await _client
-          .get(Uri.parse(url), headers: buildHeaders())
-          .timeout(timeout);
+      // Keep redirect handling deterministic in extractor fixture tests while
+      // preserving package:http's automatic redirect behavior in production.
+      final uri = Uri.parse(url);
+      final override = getOverride;
+      final response = override != null
+          ? await override(uri, buildHeaders())
+          : await _client.get(uri, headers: buildHeaders()).timeout(timeout);
       return response.request?.url.toString() ?? url;
     } catch (_) {
       return url;

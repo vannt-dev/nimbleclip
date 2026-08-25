@@ -16,6 +16,16 @@ import 'package:nimble_clip/views/home/home_screen.dart';
 import 'package:nimble_clip/views/home/widgets/video_result_card.dart';
 import 'package:nimble_clip/views/downloads/widgets/completed_download_card.dart';
 
+class _FixtureExtractorRegistry extends ExtractorRegistry {
+  _FixtureExtractorRegistry(this.metadata);
+
+  final VideoMetadata metadata;
+
+  @override
+  Future<VideoMetadata> extract(String rawUrl, AppLocalizations l10n) async =>
+      metadata;
+}
+
 void main() {
   final l10n = lookupAppLocalizations(const Locale('en'));
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -128,6 +138,60 @@ void main() {
     expect(find.text('NimbleClip'), findsOneWidget);
     expect(find.text('Paste a video link'), findsOneWidget);
     expect(find.text('Analyze & Download'), findsOneWidget);
+  });
+
+  testWidgets('new download action clears the result and focuses the URL', (
+    WidgetTester tester,
+  ) async {
+    const quality = VideoQualityOption.video(
+      id: 'fixture-video',
+      label: 'HD',
+      quality: '720p',
+      format: 'mp4',
+      downloadUrl: 'https://example.com/video.mp4',
+    );
+    const metadata = VideoMetadata(
+      id: 'fixture',
+      originalUrl: 'https://example.com/post',
+      title: 'Fixture result',
+      author: 'Author',
+      coverUrl: '',
+      platform: VideoPlatform.generic,
+      qualities: [quality],
+    );
+    final extractor = VideoExtractorProvider(
+      extractorRegistry: _FixtureExtractorRegistry(metadata),
+    );
+    await extractor.analyzeUrl(metadata.originalUrl, l10n: l10n);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsProvider()),
+          ChangeNotifierProvider.value(value: extractor),
+          ChangeNotifierProvider(create: (_) => DownloadProvider()),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: HomeScreen(onNavigateDownloads: () {}),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final action = find.byKey(const ValueKey('home-new-download'));
+    await tester.ensureVisible(action);
+    await tester.tap(action);
+    await tester.pumpAndSettle();
+
+    expect(extractor.hasResult, isFalse);
+    expect(find.text('Fixture result'), findsNothing);
+    expect(find.text('Paste a video link'), findsOneWidget);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).focusNode?.hasFocus,
+      isTrue,
+    );
   });
 
   testWidgets('completed audio does not offer a fake gallery save action', (

@@ -113,6 +113,68 @@ void main() {
     expect(result.qualities, hasLength(2));
   });
 
+  test('Facebook resolves a share Reel before extracting its video', () async {
+    final requestedPaths = <String>[];
+    ExtractorHttp.getOverride = (uri, _) async {
+      requestedPaths.add(uri.path);
+      if (uri.path == '/share/r/1DoJYK37gr/') {
+        return http.Response(
+          '',
+          200,
+          request: http.Request(
+            'GET',
+            Uri.parse('https://www.facebook.com/reel/123456/'),
+          ),
+        );
+      }
+      return http.Response(fixture('facebook.html'), 200);
+    };
+
+    final result = await const FacebookExtractor().extract(
+      'https://www.facebook.com/share/r/1DoJYK37gr/',
+      l10n,
+    );
+
+    expect(requestedPaths, ['/share/r/1DoJYK37gr/', '/reel/123456/']);
+    expect(result.originalUrl, 'https://www.facebook.com/reel/123456/');
+    expect(result.qualities.every((option) => !option.isImage), isTrue);
+  });
+
+  test(
+    'Facebook reads an Open Graph video from a share landing page',
+    () async {
+      var shareRequests = 0;
+      ExtractorHttp.getOverride = (uri, _) async {
+        if (uri.path == '/share/r/ShareToken/') {
+          shareRequests++;
+          // The first request models a share URL whose redirect is opaque. The
+          // second is the landing page fetched by the extractor itself.
+          if (shareRequests == 1) return http.Response('', 200);
+          return http.Response('''
+          <html><head>
+            <meta content="/media/reel.mp4" property="og:video:url">
+            <meta property="og:image" content="https://cdn.example/poster.jpg">
+          </head></html>
+        ''', 200);
+        }
+        return http.Response('', 404);
+      };
+
+      final result = await const FacebookExtractor().extract(
+        'https://www.facebook.com/share/r/ShareToken/',
+        l10n,
+      );
+
+      expect(result.qualities, hasLength(1));
+      expect(shareRequests, 2);
+      expect(result.qualities.single.kind, MediaKind.video);
+      expect(
+        result.qualities.single.downloadUrl,
+        'https://www.facebook.com/media/reel.mp4',
+      );
+    },
+  );
+
   test(
     'Facebook keeps looking when the watch page only exposes a poster',
     () async {

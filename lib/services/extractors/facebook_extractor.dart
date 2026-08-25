@@ -109,10 +109,26 @@ class FacebookExtractor extends BaseVideoExtractor {
     }
 
     if (imageFallback != null) {
+      if (_isKnownVideoLink(cleanUrl)) {
+        throw ExtractionException(l10n.facebookNoVideo);
+      }
       return _withPostPhotoFallback(imageFallback!, cleanUrl, l10n);
     }
 
     throw ExtractionException(l10n.facebookNoVideo);
+  }
+
+  bool _isKnownVideoLink(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return false;
+    final path = uri.path.toLowerCase();
+    return path.startsWith('/share/r/') ||
+        path.startsWith('/share/v/') ||
+        path.startsWith('/reel/') ||
+        path.startsWith('/reels/') ||
+        path.contains('/videos/') ||
+        path == '/watch/' ||
+        path == '/watch';
   }
 
   /// Facebook's anonymous mobile document often exposes only the first Open
@@ -241,9 +257,16 @@ class FacebookExtractor extends BaseVideoExtractor {
 
     final hdUrl = _firstMatch(html, _hdPatterns);
     final sdUrl = _firstMatch(html, _sdPatterns);
+    final openGraphVideo = _pageParser.openGraphVideo(html);
+    final openGraphVideoUrl = openGraphVideo == null
+        ? null
+        : Uri.parse(pageUrl).resolve(openGraphVideo).toString();
     final thumbnailUrl = _thumbnail(html);
     final photoUrls = _pageParser.photoUrls(html);
-    if (photoUrls.isEmpty && hdUrl == null && sdUrl == null) {
+    if (photoUrls.isEmpty &&
+        hdUrl == null &&
+        sdUrl == null &&
+        openGraphVideoUrl == null) {
       if (thumbnailUrl == null) return null;
       photoUrls.add(thumbnailUrl);
     }
@@ -268,6 +291,15 @@ class FacebookExtractor extends BaseVideoExtractor {
           quality: 'SD 480p',
           format: 'mp4',
           downloadUrl: sdUrl,
+        ),
+      if (hdUrl == null && sdUrl == null && openGraphVideoUrl != null)
+        VideoQualityOption.video(
+          id: 'fb_original_$id',
+          mediaId: 'fb_video_$id',
+          label: l10n.originalVideo,
+          quality: 'Original',
+          format: 'mp4',
+          downloadUrl: openGraphVideoUrl,
         ),
       for (var index = 0; index < photoUrls.length; index++)
         VideoQualityOption.image(

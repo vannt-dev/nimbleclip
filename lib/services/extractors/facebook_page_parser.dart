@@ -17,6 +17,32 @@ class FacebookPageParser {
     return null;
   }
 
+  /// Reads the standard Open Graph video fields used by Facebook's lightweight
+  /// share landing pages. Attribute order varies between page variants.
+  String? openGraphVideo(String html) {
+    for (final key in const [
+      'og:video:secure_url',
+      'og:video:url',
+      'og:video',
+    ]) {
+      final escaped = RegExp.escape(key);
+      final match =
+          RegExp(
+            '<meta[^>]+(?:property|name)=["\']$escaped["\'][^>]*content=["\']([^"\']*)["\']',
+            caseSensitive: false,
+          ).firstMatch(html) ??
+          RegExp(
+            '<meta[^>]+content=["\']([^"\']*)["\'][^>]*(?:property|name)=["\']$escaped["\']',
+            caseSensitive: false,
+          ).firstMatch(html);
+      final value = match?.group(1);
+      if (value != null && value.isNotEmpty) {
+        return MediaUrlHelper.decode(value);
+      }
+    }
+    return null;
+  }
+
   String? videoId(String html) =>
       RegExp(r'"video_id"\s*:\s*"(\d+)"').firstMatch(html)?.group(1) ??
       RegExp(r'"videoId"\s*:\s*"(\d+)"').firstMatch(html)?.group(1);
