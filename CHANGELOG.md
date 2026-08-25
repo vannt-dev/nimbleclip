@@ -6,16 +6,22 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
-- Added Android/iOS share receivers, multi-link analysis and batch queueing,
-  and a persistent recent-analysis list.
-- Added true mobile background transfers using Android DownloadWorker and iOS
-  URLSession, including notifications, retries, pause, resume, and media-byte
-  validation before completion.
-- Added scheduled live extractor health checks with automatic GitHub issue
-  reporting and copyable Facebook/YouTube extraction diagnostics.
-- Added a server-side, sandboxed YouTube `signatureCipher` fallback for Web.
-- Hardened the Android emulator launcher with early-exit diagnostics and an
-  automatic cold-boot retry.
+No unreleased changes yet.
+
+## [1.3.0] - 2026-08-25
+
+- Added native mobile download recovery after app process termination, with
+  Android DownloadWorker and iOS URLSession state restored into app history.
+- Added bounded batch analysis (20 links, three concurrent extractors),
+  per-link quality selection, retry, cancellation, and richer diagnostics.
+- Added compact analysis history migration so expiring signed media URLs are
+  not retained in local preferences.
+- Hardened the Web YouTube fallback for `signatureCipher` and throttling `n`
+  transforms using a restricted parser that never evaluates remote JavaScript.
+- Added Android background-worker integration coverage and an iOS CI build that
+  verifies the embedded Share Extension and App Group entitlements.
+- Added URL autofill hints, live-region accessibility updates, and expanded
+  diagnostics with platform, duration, timestamp, and app version details.
 - Added pull-to-refresh on Home to clear the previous result, return to the URL
   input, and start another analysis.
 

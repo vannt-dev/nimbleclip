@@ -21,6 +21,8 @@ management, local playback, and gallery export.
 - Accepts links shared directly from other apps on Android and iOS.
 - Analyzes multiple pasted/shared links in one pass, queues their best media
   options together, and keeps the latest 20 analyzed links locally.
+- Limits batch analysis to 20 links with three concurrent extractors, while
+  allowing per-link quality selection, retry, and cancellation.
 - Extracts available video, audio, and image options before downloading.
 - Shows carousel thumbnails in a lazy full-screen picker, with preview,
   select-all, and multi-image download for supported Facebook, Instagram,
@@ -36,6 +38,8 @@ management, local playback, and gallery export.
 - Runs mobile downloads through Android DownloadWorker and iOS URLSession with
   progress notifications, retry, pause, and resume while the app is in the
   background.
+- Recovers queued and running native transfers after the app process is
+  terminated, then reconnects them to the in-app download history.
 - Refreshes expired media URLs before retrying a failed download.
 - Uses compact, filesystem-safe, platform-prefixed UUID filenames such as
   `facebook_<uuid>` and `x_<uuid>`, and validates downloaded media from its
@@ -52,6 +56,8 @@ management, local playback, and gallery export.
   missing handlers and operation failures, and reconciles history when a local
   file has been removed outside the app.
 - Persists download history and user preferences locally.
+- Stores analysis history without expiring signed media URLs and provides
+  copyable extraction diagnostics with timing and app-version context.
 - Lets users disable external extraction services. Some TikTok and X downloads,
   plus carousel fallbacks for Facebook and Instagram, require these services
   and may send the public post URL to them.
@@ -348,9 +354,10 @@ streams that do not support the default policy.
 The GitHub Actions workflow runs on every pull request and every push to
 `main`. It validates commit messages and formatting, performs Flutter static
 analysis and tests, builds an Android APK and release Web bundle, runs the Node
-server checks, and executes the Android storage/download integration suite on
-an API 34 emulator. A version-bump commit on `main` automatically starts the
-signed release workflow after every CI job succeeds, as documented in
+server checks, builds iOS with the Share Extension and App Group checks, and
+executes the Android storage/download integration suite on an API 34 emulator.
+A version-bump commit on `main` automatically starts the signed release
+workflow after every CI job succeeds, as documented in
 [RELEASING.md](RELEASING.md).
 
 ## Contributing
