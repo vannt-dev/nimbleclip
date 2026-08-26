@@ -49,6 +49,24 @@ void main() {
     test('resolves &amp; last so &amp;quot; does not become a quote', () {
       expect(decodeHtmlEntities('&amp;quot;'), '&quot;');
     });
+
+    test('decodes numeric entities in hex and decimal', () {
+      expect(decodeHtmlEntities('really&#x2026;rock'), 'really…rock');
+      expect(decodeHtmlEntities('really&#8230;rock'), 'really…rock');
+      expect(decodeHtmlEntities('&#X2026;'), '…');
+      expect(decodeHtmlEntities('it&#39;s'), "it's");
+    });
+
+    test('decodes a numeric entity above the basic plane', () {
+      expect(decodeHtmlEntities('&#128512;'), '\u{1F600}');
+    });
+
+    test('leaves a malformed numeric entity alone', () {
+      expect(decodeHtmlEntities('&#;'), '&#;');
+      expect(decodeHtmlEntities('&#xZZ;'), '&#xZZ;');
+      // A literal "&#39;" written as &amp;#39; must not become an apostrophe.
+      expect(decodeHtmlEntities('&amp;#39;'), '&#39;');
+    });
   });
 
   group('extractBalancedJson', () {

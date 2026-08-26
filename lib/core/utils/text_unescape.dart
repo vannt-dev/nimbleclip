@@ -54,17 +54,31 @@ String decodeJsonEscapes(String input) {
   return buffer.toString();
 }
 
-/// Decodes the handful of HTML entities that show up in `<title>` and `og:`
-/// meta tags. Full entity decoding is not worth a dependency here.
+final _numericEntity = RegExp(r'&#([xX][0-9a-fA-F]+|[0-9]+);');
+
+/// Decodes the handful of named HTML entities that show up in `<title>` and
+/// `og:` meta tags, plus every numeric entity. Full named-entity decoding is
+/// not worth a dependency here, but the numeric form has to be general:
+/// Instagram and Facebook titles routinely carry `&#x2026;` and `&#8230;`.
 String decodeHtmlEntities(String input) {
   if (!input.contains('&')) return input;
   return input
       .replaceAll('&quot;', '"')
-      .replaceAll('&#039;', "'")
-      .replaceAll('&#39;', "'")
       .replaceAll('&apos;', "'")
       .replaceAll('&lt;', '<')
       .replaceAll('&gt;', '>')
       .replaceAll('&nbsp;', ' ')
+      .replaceAllMapped(_numericEntity, (match) {
+        final token = match.group(1)!;
+        final isHex = token.startsWith('x') || token.startsWith('X');
+        final code = isHex
+            ? int.tryParse(token.substring(1), radix: 16)
+            : int.tryParse(token);
+        // Out-of-range or unparsable values stay as written rather than
+        // throwing from String.fromCharCode.
+        if (code == null || code < 0 || code > 0x10FFFF) return match.group(0)!;
+        return String.fromCharCode(code);
+      })
+      // Last, so that `&amp;#39;` decodes to the literal text `&#39;`.
       .replaceAll('&amp;', '&');
 }
