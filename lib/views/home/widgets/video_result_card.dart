@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/image_cache_size.dart';
 import '../../../core/utils/media_selection_helper.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/video_metadata.dart';
@@ -127,25 +128,31 @@ class _VideoResultCardState extends State<VideoResultCard> {
               children: [
                 AspectRatio(
                   aspectRatio: 16 / 9,
-                  child: CachedNetworkImage(
-                    imageUrl: previewUrl,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      color: isDark
-                          ? AppColors.darkCardElevated
-                          : Colors.grey[200],
-                      child: const Center(
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => CachedNetworkImage(
+                      imageUrl: previewUrl,
+                      fit: BoxFit.cover,
+                      memCacheWidth: imageCacheWidth(
+                        context,
+                        constraints.maxWidth,
                       ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      color: isDark
-                          ? AppColors.darkCardElevated
-                          : Colors.grey[200],
-                      child: Icon(
-                        meta.platform.icon,
-                        size: 48,
-                        color: meta.platform.brandColor,
+                      placeholder: (context, url) => Container(
+                        color: isDark
+                            ? AppColors.darkCardElevated
+                            : Colors.grey[200],
+                        child: const Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: isDark
+                            ? AppColors.darkCardElevated
+                            : Colors.grey[200],
+                        child: Icon(
+                          meta.platform.icon,
+                          size: 48,
+                          color: meta.platform.brandColor,
+                        ),
                       ),
                     ),
                   ),
@@ -281,6 +288,7 @@ class _VideoResultCardState extends State<VideoResultCard> {
                           width: 22,
                           height: 22,
                           fit: BoxFit.cover,
+                          memCacheWidth: imageCacheWidth(context, 22),
                           errorWidget: (context, url, error) =>
                               const Icon(Icons.person_rounded, size: 18),
                         ),

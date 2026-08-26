@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/image_cache_size.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/download_task.dart';
 
@@ -69,6 +70,7 @@ class CompletedDownloadCard extends StatelessWidget {
                             ? CachedNetworkImage(
                                 imageUrl: task.thumbnailUrl,
                                 fit: BoxFit.cover,
+                                memCacheWidth: imageCacheWidth(context, 72),
                                 errorWidget: (context, url, error) => Container(
                                   color: task.platform.brandColor.withAlpha(30),
                                   child: Icon(

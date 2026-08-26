@@ -17,6 +17,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 
 const PORT = Number(process.env.FIXTURE_PORT || 8097);
 const FIXTURE_DIR = path.join(__dirname, '.fixtures');
@@ -40,6 +41,55 @@ async function ensureFixture() {
   fs.writeFileSync(FIXTURE_FILE, bytes);
   console.log(`${bytes.length} bytes`);
 }
+
+/** One PNG chunk: length, type, payload, CRC32 over type+payload. */
+function pngChunk(type, payload) {
+  const header = Buffer.alloc(8);
+  header.writeUInt32BE(payload.length, 0);
+  header.write(type, 4, 'ascii');
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(Buffer.concat([header.subarray(4), payload])), 0);
+  return Buffer.concat([header, payload, crc]);
+}
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+// A deterministic opaque RGB PNG. The gradient keeps it from compressing down
+// to nothing, so the transfer stays representative of a real photo.
+function buildPng(width, height) {
+  const raw = Buffer.alloc(height * (1 + width * 3));
+  let offset = 0;
+  for (let y = 0; y < height; y++) {
+    raw[offset++] = 0; // filter: none
+    for (let x = 0; x < width; x++) {
+      raw[offset++] = (x * 7 + y * 3) & 0xff;
+      raw[offset++] = (x * 3 + y * 11) & 0xff;
+      raw[offset++] = (x ^ y) & 0xff;
+    }
+  }
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 2; // colour type: truecolour
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', zlib.deflateSync(raw)),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+const pngCache = new Map();
 
 function serve() {
   const size = fs.statSync(FIXTURE_FILE).size;
@@ -66,6 +116,21 @@ function serve() {
           'Content-Length': body.length,
         });
         return res.end(body);
+      }
+
+      if (req.url.startsWith('/large.png')) {
+        const cacheKey = '1080x1350';
+        let png = pngCache.get(cacheKey);
+        if (!png) {
+          png = buildPng(1080, 1350);
+          pngCache.set(cacheKey, png);
+        }
+        res.writeHead(200, {
+          'Content-Type': 'image/png',
+          'Content-Length': png.length,
+          'Cache-Control': 'no-store',
+        });
+        return res.end(png);
       }
 
       // `?norange` simulates a server that ignores Range, so the test can check

@@ -1,6 +1,7 @@
 import 'dart:io';
 
-import 'package:flutter/widgets.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:nimble_clip/core/utils/platform_file.dart';
@@ -69,6 +70,29 @@ void main() {
           'fixture server not reachable at $fixtureHost — '
           'start it with `node tool/fixture_server.js`',
     );
+  });
+
+  group('image decode memory', () {
+    testWidgets('thumbnail cache sizing reduces decoded image bytes', (
+      tester,
+    ) async {
+      final fullResolutionBytes = await _measureDecodedImageBytes(
+        tester,
+        cacheKey: 'full',
+      );
+      final thumbnailBytes = await _measureDecodedImageBytes(
+        tester,
+        cacheKey: 'thumbnail',
+        memCacheWidth: 216,
+      );
+
+      debugPrint(
+        'Image cache measurement: full=$fullResolutionBytes bytes, '
+        'thumbnail=$thumbnailBytes bytes',
+      );
+      expect(fullResolutionBytes, greaterThan(5000000));
+      expect(thumbnailBytes, lessThan(fullResolutionBytes ~/ 10));
+    });
   });
 
   group('scoped storage', () {
@@ -367,4 +391,45 @@ Future<List<int>> _fetchFixture() async {
   } finally {
     client.close();
   }
+}
+
+Future<int> _measureDecodedImageBytes(
+  WidgetTester tester, {
+  required String cacheKey,
+  int? memCacheWidth,
+}) async {
+  final cache = PaintingBinding.instance.imageCache;
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump();
+  cache
+    ..clear()
+    ..clearLiveImages();
+
+  var loaded = false;
+  await tester.pumpWidget(
+    MaterialApp(
+      home: Center(
+        child: SizedBox(
+          width: 72,
+          height: 72,
+          child: CachedNetworkImage(
+            imageUrl: '$fixtureHost/large.png?$cacheKey',
+            fit: BoxFit.cover,
+            memCacheWidth: memCacheWidth,
+            imageBuilder: (context, provider) {
+              loaded = true;
+              return Image(image: provider, fit: BoxFit.cover);
+            },
+          ),
+        ),
+      ),
+    ),
+  );
+
+  for (var attempt = 0; attempt < 100 && !loaded; attempt++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  expect(loaded, isTrue, reason: 'fixture image did not finish decoding');
+  await tester.pump();
+  return cache.currentSizeBytes;
 }
