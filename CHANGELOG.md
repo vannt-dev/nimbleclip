@@ -6,7 +6,23 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
-No unreleased changes yet.
+- Fixed a startup failure that replaced the whole app with an error screen
+  because the extraction policy, a change notifier, was registered as a plain
+  value provider.
+- Added a Direct Share target so NimbleClip appears in the top row of the
+  Android share sheet instead of only in the full application list.
+- Fixed the Android launcher activity declaring an empty task affinity, so
+  repeated shares stay in one NimbleClip task and instance.
+- Fixed the link field opening the keyboard in its password layout, which
+  happened because suggestions were disabled.
+- Changed the link field to a single line with one placeholder, so a long link
+  scrolls sideways instead of stretching the card downwards.
+- Fixed numeric HTML entities such as `&#x2026;` appearing verbatim in
+  extracted titles.
+- Fixed the download gateway never being released when the download provider is
+  disposed, which left the native update stream claimed for the process.
+- Added widget coverage for the downloads, settings, image picker, and player
+  screens.
 
 ## [1.3.0] - 2026-08-25
 

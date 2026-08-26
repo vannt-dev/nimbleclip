@@ -18,7 +18,9 @@ management, local playback, and gallery export.
 ## Features
 
 - Detects supported links pasted from the clipboard.
-- Accepts links shared directly from other apps on Android and iOS.
+- Accepts links shared directly from other apps on Android and iOS, and
+  registers an Android Direct Share target so it appears in the top row of the
+  share sheet.
 - Analyzes multiple pasted/shared links in one pass, queues their best media
   options together, and keeps the latest 20 analyzed links locally.
 - Limits batch analysis to 20 links with three concurrent extractors, while
@@ -287,6 +289,11 @@ flutter build windows
 flutter build macos
 flutter build linux
 ```
+
+Run `flutter clean` first if the Android integration suite ran in the same
+checkout. That suite leaves `integration_test` in the generated plugin
+registrant, and the release build then fails with `package
+dev.flutter.plugins.integration_test does not exist`.
 
 Release builds may require platform-specific signing configuration before they
 can be distributed through an app store.
