@@ -10,14 +10,16 @@ import '../../core/constants/app_constants.dart';
 import '../../core/utils/url_helper.dart';
 import '../../l10n/l10n.dart';
 import '../../models/video_metadata.dart';
-import '../../models/analysis_history_entry.dart';
 import '../../providers/download_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/video_extractor_provider.dart';
 import '../../providers/analysis_history_provider.dart';
 import '../../providers/shared_intent_provider.dart';
 import '../player/video_player_screen.dart';
+import 'widgets/batch_results_card.dart';
+import 'widgets/how_to_guide_card.dart';
 import 'widgets/platform_badges.dart';
+import 'widgets/recent_links_card.dart';
 import 'widgets/url_input_card.dart';
 import 'widgets/video_result_card.dart';
 
@@ -593,284 +595,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ],
 
                 if (extractor.batchResults.isNotEmpty) ...[
-                  _buildBatchResults(extractor.batchResults),
+                  BatchResultsCard(
+                    results: extractor.batchResults,
+                    onRetry: (url) => unawaited(_retryBatchResult(url)),
+                    onQueueAll: () => unawaited(_onStartBatchDownload()),
+                  ),
                   const SizedBox(height: 20),
                 ],
 
                 // 6. How-to Guide Cards (Shown when no result)
                 if (extractor.metadata == null && !extractor.isAnalyzing) ...[
-                  _buildHowToGuide(isDark),
+                  const HowToGuideCard(),
                   const SizedBox(height: 20),
                 ],
                 if (history.isNotEmpty) ...[
-                  _buildRecentLinks(history),
+                  RecentLinksCard(
+                    entries: history,
+                    onReplay: (url) {
+                      _urlController.text = url;
+                      unawaited(_onAnalyze());
+                    },
+                  ),
                   const SizedBox(height: 20),
                 ],
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildBatchResults(List<BatchAnalysisResult> results) {
-    final successes = results.where((result) => result.isSuccess).length;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              context.l10n.batchResults(results.length),
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            if (context.watch<VideoExtractorProvider>().isAnalyzing)
-              Semantics(
-                liveRegion: true,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: context
-                        .read<VideoExtractorProvider>()
-                        .cancelBatchAnalysis,
-                    icon: const Icon(Icons.stop_circle_outlined),
-                    label: Text(context.l10n.cancel),
-                  ),
-                ),
-              ),
-            for (final result in results)
-              ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  result.isSuccess ? Icons.check_circle : Icons.error_outline,
-                  color: result.isSuccess ? AppColors.success : AppColors.error,
-                ),
-                title: Text(
-                  result.metadata?.title ?? result.url,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: result.error != null
-                    ? Text(
-                        result.error!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      )
-                    : result.metadata!.qualities.length > 1
-                    ? DropdownButton<VideoQualityOption>(
-                        value: result.selectedQuality,
-                        isExpanded: true,
-                        items: [
-                          for (final quality in result.metadata!.qualities)
-                            DropdownMenuItem(
-                              value: quality,
-                              child: Text(
-                                quality.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                        ],
-                        onChanged: (quality) {
-                          if (quality != null) {
-                            context
-                                .read<VideoExtractorProvider>()
-                                .selectBatchQuality(result.url, quality);
-                          }
-                        },
-                      )
-                    : Text(result.selectedQuality?.label ?? ''),
-                trailing: result.isSuccess
-                    ? null
-                    : IconButton(
-                        tooltip: context.l10n.retry,
-                        onPressed: () =>
-                            unawaited(_retryBatchResult(result.url)),
-                        icon: const Icon(Icons.refresh_rounded),
-                      ),
-              ),
-            FilledButton.icon(
-              onPressed: successes == 0
-                  ? null
-                  : () => unawaited(_onStartBatchDownload()),
-              icon: const Icon(Icons.playlist_add_rounded),
-              label: Text(context.l10n.queueAll(successes)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecentLinks(List<AnalysisHistoryEntry> entries) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    context.l10n.recentLinks,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => unawaited(
-                    context.read<AnalysisHistoryProvider>().clear(),
-                  ),
-                  child: Text(context.l10n.clear),
-                ),
-              ],
-            ),
-            for (final entry in entries.take(5))
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(entry.platform.icon),
-                title: Text(
-                  entry.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Text(
-                  entry.originalUrl,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: const Icon(Icons.replay_rounded),
-                onTap: () {
-                  _urlController.text = entry.originalUrl;
-                  unawaited(_onAnalyze());
-                },
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHowToGuide(bool isDark) {
-    final l10n = context.l10n;
-    final steps = [
-      {
-        'num': '1',
-        'title': l10n.guideCopyTitle,
-        'desc': l10n.guideCopyDescription,
-        'icon': Icons.copy_rounded,
-      },
-      {
-        'num': '2',
-        'title': l10n.guidePasteTitle,
-        'desc': l10n.guidePasteDescription,
-        'icon': Icons.paste_rounded,
-      },
-      {
-        'num': '3',
-        'title': l10n.guideDownloadTitle,
-        'desc': l10n.guideDownloadDescription,
-        'icon': Icons.file_download_outlined,
-      },
-    ];
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.lightbulb_outline_rounded,
-                color: AppColors.warning,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                l10n.quickGuide,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: isDark
-                      ? AppColors.darkTextPrimary
-                      : AppColors.lightTextPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          ...steps.map((s) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withAlpha(30),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      s['num'] as String,
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          s['title'] as String,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: isDark
-                                ? AppColors.darkTextPrimary
-                                : AppColors.lightTextPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          s['desc'] as String,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark
-                                ? AppColors.darkTextSecondary
-                                : AppColors.lightTextSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
       ),
     );
   }
