@@ -25,11 +25,16 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:networkSecurityConfig="@xml/network_security_config">
+        <!-- The empty taskAffinity detached MainActivity from the application's
+             own task identity, so a share arriving while the app sat in the
+             background had no task to be matched against by affinity. Keeping
+             the default affinity and singleTask pins every share from
+             Facebook/Instagram/TikTok to one NimbleClip task and one instance,
+             which receives each new link through onNewIntent. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop"
-            android:taskAffinity=""
+            android:launchMode="singleTask"
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
