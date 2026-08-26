@@ -27,9 +27,14 @@ class NimbleClipApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ExtractionPolicy()),
-        ProxyProvider<ExtractionPolicy, ExtractorRegistry>(
-          update: (_, policy, _) =>
-              ExtractorRegistry(externalServiceAccess: policy),
+        // Built once: the registry holds the policy by reference and every
+        // extractor reads `allowExternalServices` at call time, so toggling the
+        // setting already takes effect. Rebuilding it per change would only
+        // discard six fresh extractors that nothing downstream ever reads.
+        Provider(
+          create: (context) => ExtractorRegistry(
+            externalServiceAccess: context.read<ExtractionPolicy>(),
+          ),
         ),
         ChangeNotifierProvider(
           create: (context) => SettingsProvider(

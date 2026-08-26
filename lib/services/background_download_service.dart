@@ -378,6 +378,7 @@ class BackgroundDownloadService
   @override
   bool isRunning(String taskId) => _running.contains(taskId);
 
+  @override
   void dispose() {
     unawaited(_updates.cancel());
   }

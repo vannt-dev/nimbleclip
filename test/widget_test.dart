@@ -14,6 +14,8 @@ import 'package:nimble_clip/providers/settings_provider.dart';
 import 'package:nimble_clip/providers/video_extractor_provider.dart';
 import 'package:nimble_clip/providers/analysis_history_provider.dart';
 import 'package:nimble_clip/providers/shared_intent_provider.dart';
+import 'package:nimble_clip/core/utils/external_service_policy.dart';
+import 'package:nimble_clip/services/extractors/facebook_extractor.dart';
 import 'package:nimble_clip/services/extractors/registry.dart';
 import 'package:nimble_clip/views/home/home_screen.dart';
 import 'package:nimble_clip/views/home/widgets/video_result_card.dart';
@@ -170,7 +172,10 @@ void main() {
     });
   });
 
-  testWidgets('the real app root builds its provider tree', (
+  // One test for the whole root on purpose: the native download gateway claims
+  // a process-wide single-subscription stream, so a second NimbleClipApp in the
+  // same test process cannot listen to it.
+  testWidgets('the real app root builds and keeps one extractor registry', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(const NimbleClipApp());
@@ -178,6 +183,20 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byType(MaterialApp), findsOneWidget);
+
+    final context = tester.element(find.byType(MaterialApp));
+    final policy = Provider.of<ExtractionPolicy>(context, listen: false);
+    final before = Provider.of<ExtractorRegistry>(context, listen: false);
+
+    policy.setAllowExternalServices(false);
+    await tester.pump();
+
+    final after = Provider.of<ExtractorRegistry>(context, listen: false);
+    expect(identical(before, after), isTrue);
+    // The shared policy object is what the extractors read, so the new value
+    // reaches them without the registry being rebuilt.
+    final facebook = before.extractors.whereType<FacebookExtractor>().single;
+    expect(facebook.externalServiceAccess.allowExternalServices, isFalse);
   });
 
   testWidgets('HomeScreen smoke test', (WidgetTester tester) async {

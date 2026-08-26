@@ -80,6 +80,7 @@ class DownloadProvider extends ChangeNotifier {
     for (final task in _tasks) {
       task.dispose();
     }
+    _downloadService.dispose();
     super.dispose();
   }
 

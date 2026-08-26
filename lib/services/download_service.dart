@@ -34,6 +34,12 @@ abstract interface class DownloadGateway {
   void cancelDownload(String taskId);
   bool pauseDownload(String taskId);
   bool isRunning(String taskId);
+
+  /// Releases whatever the gateway holds outside the Dart heap. The native
+  /// gateway listens to a single-subscription process-wide update stream, so a
+  /// gateway that is dropped without this leaves that stream claimed and the
+  /// next one built in the same process fails to listen at all.
+  void dispose();
 }
 
 /// Optional capability implemented by native gateways whose operating-system
@@ -440,6 +446,16 @@ class DownloadService implements DownloadGateway {
 
   @override
   bool isRunning(String taskId) => _cancelTokens.containsKey(taskId);
+
+  @override
+  void dispose() {
+    for (final token in _cancelTokens.values) {
+      token.cancel('Download gateway disposed');
+    }
+    _cancelTokens.clear();
+    _pausedTaskIds.clear();
+    _dio.close(force: true);
+  }
 
   String _describe(DioException e, AppLocalizations l10n) {
     switch (e.type) {
