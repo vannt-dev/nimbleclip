@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Declares NimbleClip as a Direct Share target. Android 10+ renders share
+    targets in the top row of the system share sheet, above the plain app list,
+    which is the only supported way to sit near the top: the ordering of the app
+    row itself comes from the user's own sharing history and has no API.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <share-target android:targetClass="com.vannt.nimbleclip.MainActivity">
+        <data android:mimeType="text/*" />
+        <category android:name="com.vannt.nimbleclip.category.SHARE_LINK" />
+    </share-target>
+</shortcuts>

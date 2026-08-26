@@ -58,6 +58,12 @@ android {
     }
 }
 
+dependencies {
+    // Backports Direct Share targets to Android 9 and below, where the platform
+    // has no share-target support of its own.
+    implementation("androidx.sharetarget:sharetarget:1.2.0")
+}
+
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
