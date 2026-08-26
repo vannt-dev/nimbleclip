@@ -26,7 +26,7 @@ class NimbleClipApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider(create: (_) => ExtractionPolicy()),
+        ChangeNotifierProvider(create: (_) => ExtractionPolicy()),
         ProxyProvider<ExtractionPolicy, ExtractorRegistry>(
           update: (_, policy, _) =>
               ExtractorRegistry(externalServiceAccess: policy),

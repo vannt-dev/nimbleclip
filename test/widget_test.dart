@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nimble_clip/l10n/generated/app_localizations.dart';
 import 'package:nimble_clip/core/utils/formatters.dart';
+import 'package:nimble_clip/main.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/models/download_task.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
@@ -167,6 +168,16 @@ void main() {
       expect(results.first.url, urls.first);
       expect(results.last.url, urls[19]);
     });
+  });
+
+  testWidgets('the real app root builds its provider tree', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const NimbleClipApp());
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(MaterialApp), findsOneWidget);
   });
 
   testWidgets('HomeScreen smoke test', (WidgetTester tester) async {
