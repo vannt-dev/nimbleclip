@@ -161,14 +161,17 @@ class _UrlInputCardState extends State<UrlInputCard> {
             focusNode: widget.focusNode,
             keyboardType: TextInputType.url,
             autofillHints: const [AutofillHints.url],
-            enableSuggestions: false,
+            // No `enableSuggestions: false` here: the Android engine pairs that
+            // with TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, so the IME opens in its
+            // password layout instead of the normal one.
             textInputAction: TextInputAction.go,
-            minLines: 1,
-            maxLines: 4,
+            // A long link scrolls sideways inside the field instead of growing
+            // the card downwards.
+            maxLines: 1,
             onSubmitted: (_) => widget.onAnalyze(),
             style: const TextStyle(fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'https://youtube.com/..., tiktok.com/..., fb.watch/...',
+              hintText: 'https://...',
               hintStyle: TextStyle(
                 color: isDark
                     ? AppColors.darkTextSecondary.withAlpha(120)
