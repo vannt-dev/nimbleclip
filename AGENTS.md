@@ -26,6 +26,13 @@ Useful verification overrides:
 .\tool\check_all.ps1 -DeviceId <device-id>
 ```
 
+Run `flutter clean` before building a local release APK if the Android suite ran
+first. That suite leaves `integration_test` in the generated plugin registrant
+and in the Gradle incremental state, and `flutter build apk --release` then
+fails with `package dev.flutter.plugins.integration_test does not exist`. Only
+local builds are affected: the release workflow builds from a fresh checkout and
+never runs the Android suite.
+
 For interactively opening or restarting the Android app, use the launcher:
 
 ```powershell
