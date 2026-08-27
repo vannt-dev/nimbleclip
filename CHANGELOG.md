@@ -23,6 +23,26 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   disposed, which left the native update stream claimed for the process.
 - Added widget coverage for the downloads, settings, image picker, and player
   screens.
+- Changed Facebook and Instagram image scanning to run on a background isolate
+  for large documents, so decoding and walking a post's inline JSON no longer
+  blocks the UI thread during analysis.
+- Changed HTML entity decoding to a single pass. It previously copied the whole
+  string seven times, which was measurable on the multi-megabyte inline scripts
+  the Facebook parser feeds it.
+- Changed download receipts to be held in memory instead of being re-read,
+  rebuilt and re-encoded from preferences after every completed download.
+- Changed download history persistence to hand over already-serialized records,
+  removing a full clone of every task on each save.
+- Changed extractor and helper regular expressions to compile once instead of
+  on every call; the Instagram carousel loop rebuilt seven of them per slide.
+- Changed the active download card to keep its thumbnail and title out of the
+  progress rebuild, which ran about ten times a second per transfer.
+- Added a decode-width cap to the full-screen image previews and lowered the
+  global image cache budget, bounding the memory a large post photo can use.
+- Added stable list keys to download entries so inserting a task no longer
+  reuses list elements for a different task.
+- Fixed the Home image preview not sending the extractor's request headers,
+  which broke previews for sources whose CDN requires a Referer.
 
 ## [1.3.0] - 2026-08-25
 
