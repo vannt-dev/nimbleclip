@@ -8,6 +8,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
+import 'extraction_failure.dart';
 
 /// Fallback for direct media links and pages that advertise a video through
 /// Open Graph tags. Registered last, so it only sees URLs no platform claimed.
@@ -81,7 +82,12 @@ class GenericExtractor extends BaseVideoExtractor {
         timeout: const Duration(seconds: 12),
       );
     } catch (e) {
-      throw ExtractionException(l10n.linkAccessFailed(e.toString()));
+      throw ExtractionException(
+        ExtractionFailure(
+          ExtractionFailureKind.linkAccessFailed,
+          detail: e.toString(),
+        ),
+      );
     }
 
     // The URL had no media extension but the server says it is media anyway.
@@ -195,7 +201,9 @@ class GenericExtractor extends BaseVideoExtractor {
         _meta(html, ['twitter:player:stream']);
     final image = _meta(html, ['og:image']);
     if (videoUrl == null && image == null) {
-      throw ExtractionException(l10n.genericNoVideo);
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.genericNoVideo),
+      );
     }
 
     // Open Graph URLs are often protocol-relative or site-relative.

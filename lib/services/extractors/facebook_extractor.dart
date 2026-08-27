@@ -9,6 +9,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
+import 'extraction_failure.dart';
 import 'facebook_fallback_client.dart';
 import 'facebook_page_parser.dart';
 
@@ -121,7 +122,7 @@ class FacebookExtractor extends BaseVideoExtractor {
     if (imageFallback != null) {
       if (_isKnownVideoLink(cleanUrl)) {
         throw ExtractionException(
-          l10n.facebookNoVideo,
+          const ExtractionFailure(ExtractionFailureKind.facebookNoVideo),
           diagnosticCode: 'facebook_video_not_exposed',
           attemptedStrategies: const ['page', 'embed', 'mobile'],
         );
@@ -130,7 +131,7 @@ class FacebookExtractor extends BaseVideoExtractor {
     }
 
     throw ExtractionException(
-      l10n.facebookNoVideo,
+      const ExtractionFailure(ExtractionFailureKind.facebookNoVideo),
       diagnosticCode: 'facebook_no_public_media',
       attemptedStrategies: const ['page', 'embed', 'mobile'],
     );
