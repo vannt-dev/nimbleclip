@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-27
+
 - Fixed a startup failure that replaced the whole app with an error screen
   because the extraction policy, a change notifier, was registered as a plain
   value provider.
