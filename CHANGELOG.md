@@ -33,6 +33,9 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   rebuilt and re-encoded from preferences after every completed download.
 - Changed download history persistence to hand over already-serialized records,
   removing a full clone of every task on each save.
+- Changed analysis history to be rewritten only when it holds legacy entries
+  that still need migrating, instead of re-encoding and writing preferences on
+  every app start.
 - Changed extractor and helper regular expressions to compile once instead of
   on every call; the Instagram carousel loop rebuilt seven of them per slide.
 - Changed the active download card to keep its thumbnail and title out of the

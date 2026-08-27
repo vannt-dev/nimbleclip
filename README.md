@@ -25,6 +25,8 @@ management, local playback, and gallery export.
   options together, and keeps the latest 20 analyzed links locally.
 - Limits batch analysis to 20 links with three concurrent extractors, while
   allowing per-link quality selection, retry, and cancellation.
+- Parses large posts on a background isolate, so the interface keeps responding
+  while a link whose page embeds megabytes of inline data is analyzed.
 - Extracts available video, audio, and image options before downloading.
 - Shows carousel thumbnails in a lazy full-screen picker, with preview,
   select-all, and multi-image download for supported Facebook, Instagram,
@@ -48,7 +50,9 @@ management, local playback, and gallery export.
   actual file signature. Native video downloads are also opened by the platform
   player once before they are marked complete, preventing an HTML error page or
   broken video from appearing as a successful download.
-- Previews remote media and plays downloaded files inside the app.
+- Previews remote media and plays downloaded files inside the app. Previews are
+  decoded at the size the screen can show, with headroom for zoom, so a
+  full-resolution post photo never has to fit in memory at its native size.
 - Saves completed videos and images to the device gallery on Android and iOS;
   audio remains available from NimbleClip's download directory.
 - Keeps the Android MediaStore URI after Gallery export so media can still be
@@ -305,12 +309,13 @@ lib/
 |-- core/
 |   |-- constants/       App-wide values and storage keys
 |   |-- theme/           Material themes and colors
-|   `-- utils/           URL, HTTP, parsing, quality, and file helpers
+|   `-- utils/           URL, HTTP, parsing, quality, image, and file helpers
 |-- models/              Video metadata and download task models
 |-- providers/           Application state and workflow coordination
 |-- services/
 |   |-- extractors/      Extractors, page parsers, fallback clients, registry
 |   |-- async_work_queue.dart
+|   |-- background_download_service.dart
 |   |-- download_history_repository.dart
 |   |-- download_service.dart
 |   |-- media_file_actions.dart
@@ -329,6 +334,10 @@ The extractor registry and external-service privacy policy are injected at the
 application boundary, so tests and providers do not depend on mutable global
 state. Extractors coordinate platform strategies while dedicated parsers and
 fallback clients handle response interpretation and third-party HTTP calls.
+Page scans that have to decode and walk a post's inline JSON move to a
+background isolate once the document is large enough to be worth the hand-off,
+and run inline below that threshold and on the Web, where the browser offers no
+second isolate.
 
 The download provider coordinates the workflow but delegates transfer work,
 global concurrency, persistent history, and platform file actions to separate
