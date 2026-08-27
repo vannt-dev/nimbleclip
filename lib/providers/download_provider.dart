@@ -27,8 +27,7 @@ class DownloadProvider extends ChangeNotifier {
   }) : _downloadService = downloadService ?? createDefaultDownloadService(),
        _storageService = storageService ?? StorageService(),
        _historyRepository =
-           historyRepository ??
-           const SharedPreferencesDownloadHistoryRepository(),
+           historyRepository ?? SharedPreferencesDownloadHistoryRepository(),
        _fileActions = fileActions ?? const PlatformMediaFileActions() {
     _extractorRegistry = extractorRegistry ?? ExtractorRegistry();
     _queue = AsyncWorkQueue<_QueuedDownload>(
@@ -72,6 +71,36 @@ class DownloadProvider extends ChangeNotifier {
             t.status == DownloadStatus.handedOff,
       )
       .toList();
+
+  /// Count of in-flight tasks without materialising a list.
+  ///
+  /// The navigation badge selector reads this on every notification; going
+  /// through `activeTasks.length` allocated a throwaway list each time just to
+  /// read its length.
+  int get activeTaskCount {
+    var count = 0;
+    for (final task in _tasks) {
+      if (task.isActive) count++;
+    }
+    return count;
+  }
+
+  /// True when any task is still queued, running or paused. Used to gate
+  /// destructive actions without building the three bucket lists.
+  bool get hasUnfinishedTasks {
+    for (final task in _tasks) {
+      if (task.isActive || task.status == DownloadStatus.paused) return true;
+    }
+    return false;
+  }
+
+  /// True when at least one task has reached a terminal state.
+  bool get hasFinishedTasks {
+    for (final task in _tasks) {
+      if (task.isDone) return true;
+    }
+    return false;
+  }
 
   @override
   void dispose() {
@@ -123,18 +152,21 @@ class DownloadProvider extends ChangeNotifier {
       }
     }
     await _historyRepository.saveDownloadReceipts(
-      loaded.where((task) => task.status == DownloadStatus.completed),
+      loaded
+          .where((task) => task.status == DownloadStatus.completed)
+          .map((task) => task.toJson()),
     );
     notifyListeners();
   }
 
   Future<void> _saveHistory({DownloadTask? receipt}) {
+    // `toJson` alone freezes the state; the previous `fromJson(toJson())` round
+    // trip rebuilt a whole ChangeNotifier per task purely to throw it away
+    // after serialization.
     final snapshot = _tasks
-        .map((task) => DownloadTask.fromJson(task.toJson()))
+        .map((task) => task.toJson())
         .toList(growable: false);
-    final receiptSnapshot = receipt == null
-        ? null
-        : DownloadTask.fromJson(receipt.toJson());
+    final receiptSnapshot = receipt?.toJson();
     _persistenceTail = _persistenceTail.then((_) async {
       if (receiptSnapshot != null) {
         await _historyRepository.saveDownloadReceipt(receiptSnapshot);
@@ -462,11 +494,7 @@ class DownloadProvider extends ChangeNotifier {
   /// action while any transfer is in flight.
   Future<bool> clearDownloadedFiles() async {
     await _historyReady;
-    if (_tasks.any(
-      (task) => task.isActive || task.status == DownloadStatus.paused,
-    )) {
-      return false;
-    }
+    if (hasUnfinishedTasks) return false;
     await _storageService.clearDownloads();
     final finished = _tasks.where((task) => task.isDone).toList();
     _tasks.removeWhere((task) => task.isDone);

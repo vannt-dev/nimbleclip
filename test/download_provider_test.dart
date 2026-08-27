@@ -80,52 +80,62 @@ class _RecoveringDownloadService extends _ControlledDownloadService
 
 class _MemoryStorageService
     implements StorageService, DownloadHistoryRepository, MediaFileActions {
-  List<DownloadTask> history = [];
-  List<DownloadTask> receipts = [];
+  List<Map<String, dynamic>> history = [];
+  List<Map<String, dynamic>> receipts = [];
   bool downloadsCleared = false;
   bool? galleryExistsResult;
   int historySaveCount = 0;
   int concurrentSaves = 0;
   int maxConcurrentSaves = 0;
 
-  @override
-  Future<List<DownloadTask>> loadHistory() async =>
-      history.map((task) => DownloadTask.fromJson(task.toJson())).toList();
+  /// Seeds the stored history from live tasks, the way a previous run would
+  /// have left it.
+  void seedHistory(Iterable<DownloadTask> tasks) {
+    history = tasks.map((task) => task.toJson()).toList();
+  }
+
+  void seedReceipts(Iterable<DownloadTask> tasks) {
+    receipts = tasks.map((task) => task.toJson()).toList();
+  }
 
   @override
-  Future<void> saveHistory(List<DownloadTask> tasks) async {
+  Future<List<DownloadTask>> loadHistory() async =>
+      history.map(DownloadTask.fromJson).toList();
+
+  @override
+  Future<void> saveHistory(List<Map<String, dynamic>> snapshots) async {
     historySaveCount++;
     concurrentSaves++;
     maxConcurrentSaves = concurrentSaves > maxConcurrentSaves
         ? concurrentSaves
         : maxConcurrentSaves;
     await Future<void>.delayed(const Duration(milliseconds: 1));
-    history = tasks
-        .map((task) => DownloadTask.fromJson(task.toJson()))
-        .toList();
+    history = snapshots.toList();
     concurrentSaves--;
   }
 
   @override
   Future<List<DownloadTask>> loadDownloadReceipts() async =>
-      receipts.map((task) => DownloadTask.fromJson(task.toJson())).toList();
+      receipts.map(DownloadTask.fromJson).toList();
 
   @override
-  Future<void> saveDownloadReceipt(DownloadTask task) async {
-    receipts.removeWhere((entry) => entry.id == task.id);
-    receipts.add(DownloadTask.fromJson(task.toJson()));
+  Future<void> saveDownloadReceipt(Map<String, dynamic> snapshot) async {
+    receipts.removeWhere((entry) => entry['id'] == snapshot['id']);
+    receipts.add(snapshot);
   }
 
   @override
-  Future<void> saveDownloadReceipts(Iterable<DownloadTask> tasks) async {
-    for (final task in tasks) {
-      await saveDownloadReceipt(task);
+  Future<void> saveDownloadReceipts(
+    Iterable<Map<String, dynamic>> snapshots,
+  ) async {
+    for (final snapshot in snapshots) {
+      await saveDownloadReceipt(snapshot);
     }
   }
 
   @override
   Future<void> removeDownloadReceipts(Set<String> ids) async {
-    receipts.removeWhere((entry) => ids.contains(entry.id));
+    receipts.removeWhere((entry) => ids.contains(entry['id']));
   }
 
   @override
@@ -192,7 +202,7 @@ void main() {
     () async {
       final downloads = _RecoveringDownloadService();
       final storage = _MemoryStorageService();
-      storage.history = [
+      storage.seedHistory([
         DownloadTask(
           id: 'native-task',
           videoId: 'video',
@@ -207,7 +217,7 @@ void main() {
           kind: MediaKind.image,
           status: DownloadStatus.downloading,
         ),
-      ];
+      ]);
 
       final provider = _provider(downloads, storage);
       await _waitUntil(() => provider.allTasks.isNotEmpty);
@@ -252,6 +262,59 @@ void main() {
       expect(storage.maxConcurrentSaves, 1);
     },
   );
+
+  test('history is persisted as a snapshot taken at save time', () async {
+    final downloads = _ControlledDownloadService();
+    final storage = _MemoryStorageService();
+    final provider = _provider(downloads, storage);
+    final metadata = _metadata(1);
+
+    final tasks = await provider.startNewDownloads(
+      metadata: metadata,
+      qualities: metadata.qualities,
+      l10n: l10n,
+      options: const DownloadOptions(autoSaveToGallery: false),
+    );
+    await _flush();
+    downloads.finish(tasks.single.id);
+    await _waitUntil(() => storage.history.single['status'] == 'completed');
+
+    // The repository writes asynchronously. Whatever the task becomes after the
+    // handover must not leak into the record that was handed over.
+    tasks.single.status = DownloadStatus.cancelled;
+    await _flush();
+
+    expect(storage.history.single['status'], 'completed');
+  });
+
+  test('activeTaskCount tracks queued and running tasks', () async {
+    final downloads = _ControlledDownloadService();
+    final storage = _MemoryStorageService();
+    final provider = _provider(downloads, storage);
+
+    expect(provider.activeTaskCount, 0);
+
+    final tasks = await provider.startNewDownloads(
+      metadata: _metadata(4),
+      qualities: _metadata(4).qualities,
+      l10n: l10n,
+      options: const DownloadOptions(autoSaveToGallery: false),
+    );
+    await _flush();
+
+    // Three running plus one still queued.
+    expect(provider.activeTaskCount, 4);
+
+    for (final id in downloads.started.toList()) {
+      downloads.finish(id);
+    }
+    await _waitUntil(() => downloads.started.contains(tasks[3].id));
+    downloads.finish(tasks[3].id);
+    await _flush();
+
+    expect(provider.activeTaskCount, 0);
+    expect(provider.activeTaskCount, provider.activeTasks.length);
+  });
 
   test('clear downloaded files also clears finished history', () async {
     final downloads = _ControlledDownloadService();
@@ -357,8 +420,8 @@ void main() {
         filePath: 'Z:/nimbleclip/definitely-missing.jpg',
       );
       final storage = _MemoryStorageService()
-        ..history = [missing]
-        ..receipts = [missing];
+        ..seedHistory([missing])
+        ..seedReceipts([missing]);
       final provider = _provider(_ControlledDownloadService(), storage);
       await _waitUntil(() => provider.allTasks.isNotEmpty);
       final restored = provider.allTasks.single;
@@ -389,7 +452,7 @@ void main() {
       status: DownloadStatus.completed,
       isSavedToGallery: true,
     );
-    final storage = _MemoryStorageService()..history = [existing];
+    final storage = _MemoryStorageService()..seedHistory([existing]);
     final provider = _provider(_ControlledDownloadService(), storage);
 
     final matches = await provider.findExistingDownloads(
@@ -421,7 +484,7 @@ void main() {
       isSavedToGallery: true,
     );
     final storage = _MemoryStorageService()
-      ..receipts = [receipt]
+      ..seedReceipts([receipt])
       ..galleryExistsResult = true;
     final provider = _provider(_ControlledDownloadService(), storage);
 
@@ -456,7 +519,7 @@ void main() {
         isSavedToGallery: true,
       );
       final storage = _MemoryStorageService()
-        ..receipts = [receipt]
+        ..seedReceipts([receipt])
         ..galleryExistsResult = false;
       final provider = _provider(_ControlledDownloadService(), storage);
 
