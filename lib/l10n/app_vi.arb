@@ -138,6 +138,7 @@
   "youtubeInvalidId": "Không tìm thấy Video ID YouTube hợp lệ trong liên kết.",
   "videoAndAudioLabel": "{quality} (Video + Âm thanh)",
   "audioM4aLabel": "Âm thanh M4A ({kbps} kbps)",
+  "videoBitrateLabel": "{quality} ({kbps} kbps)",
   "youtubeLoadFailed": "Không tải được trang YouTube: {error}",
   "youtubeNoPlayerData": "YouTube không trả về dữ liệu trình phát. Video có thể ở chế độ riêng tư hoặc bị giới hạn độ tuổi.",
   "youtubeInvalidData": "Dữ liệu YouTube không hợp lệ: {error}",

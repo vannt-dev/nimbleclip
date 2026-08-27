@@ -158,6 +158,8 @@
   "@videoAndAudioLabel": {"placeholders": {"quality": {"type": "String"}}},
   "audioM4aLabel": "M4A audio ({kbps} kbps)",
   "@audioM4aLabel": {"placeholders": {"kbps": {"type": "int"}}},
+  "videoBitrateLabel": "{quality} ({kbps} kbps)",
+  "@videoBitrateLabel": {"placeholders": {"quality": {"type": "String"}, "kbps": {"type": "int"}}},
   "youtubeLoadFailed": "Could not load the YouTube page: {error}",
   "@youtubeLoadFailed": {"placeholders": {"error": {"type": "String"}}},
   "youtubeNoPlayerData": "YouTube did not return player data. The video may be private or age-restricted.",
