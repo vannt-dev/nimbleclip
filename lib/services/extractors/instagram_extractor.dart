@@ -12,6 +12,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
+import 'extraction_failure.dart';
 import 'instagram_fallback_client.dart';
 import 'instagram_page_parser.dart';
 import 'parse_offloading.dart';
@@ -164,7 +165,9 @@ class InstagramExtractor extends BaseVideoExtractor {
     }
 
     if (shortcode == null) {
-      throw ExtractionException(l10n.instagramInvalidPost);
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.instagramInvalidPost),
+      );
     }
 
     final viaEmbed = await _fromEmbedPage(shortcode, cleanUrl, l10n);
@@ -180,7 +183,9 @@ class InstagramExtractor extends BaseVideoExtractor {
     final viaSnapInsta = await _fromSnapInsta(shortcode, cleanUrl, l10n);
     if (viaSnapInsta != null) return viaSnapInsta;
 
-    throw ExtractionException(l10n.instagramLoginRequired);
+    throw ExtractionException(
+      const ExtractionFailure(ExtractionFailureKind.instagramLoginRequired),
+    );
   }
 
   Future<VideoMetadata> _enrichImagePost(

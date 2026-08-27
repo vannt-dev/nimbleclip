@@ -9,6 +9,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
+import 'extraction_failure.dart';
 
 class TwitterExtractor extends BaseVideoExtractor {
   final ExternalServiceAccess externalServiceAccess;
@@ -40,11 +41,15 @@ class TwitterExtractor extends BaseVideoExtractor {
     }
 
     if (tweetId == null) {
-      throw ExtractionException(l10n.xInvalidPost);
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.xInvalidPost),
+      );
     }
 
     if (!externalServiceAccess.allowExternalServices) {
-      throw ExtractionException(l10n.externalServicesDisabled);
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.externalServicesDisabled),
+      );
     }
 
     final viaFx = await _fromFxTwitter(tweetId, cleanUrl, l10n);
@@ -53,7 +58,9 @@ class TwitterExtractor extends BaseVideoExtractor {
     final viaVx = await _fromVxTwitter(tweetId, cleanUrl, l10n);
     if (viaVx != null) return viaVx;
 
-    throw ExtractionException(l10n.xNoVideo);
+    throw ExtractionException(
+      const ExtractionFailure(ExtractionFailureKind.xNoVideo),
+    );
   }
 
   Future<VideoMetadata?> _fromFxTwitter(

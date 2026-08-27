@@ -8,6 +8,8 @@ import 'package:nimble_clip/core/utils/external_service_policy.dart';
 import 'package:nimble_clip/l10n/generated/app_localizations.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
+import 'package:nimble_clip/services/extractors/base_extractor.dart';
+import 'package:nimble_clip/services/extractors/extraction_failure.dart';
 import 'package:nimble_clip/services/extractors/facebook_extractor.dart';
 import 'package:nimble_clip/services/extractors/generic_extractor.dart';
 import 'package:nimble_clip/services/extractors/instagram_extractor.dart';
@@ -30,10 +32,13 @@ void main() {
         externalServiceAccess: FixedExternalServiceAccess(false),
       ).extract('https://www.tiktok.com/@u/video/1', l10n),
       throwsA(
-        isA<Exception>().having(
-          (error) => error.toString(),
-          'message',
-          contains('disabled'),
+        // Asserted on identity, not on wording. The previous version checked
+        // that the text contained "disabled", which the new `toString()` also
+        // satisfies — it would have stayed green while testing nothing.
+        isA<ExtractionException>().having(
+          (error) => error.failure.kind,
+          'failure kind',
+          ExtractionFailureKind.externalServicesDisabled,
         ),
       ),
     );

@@ -2,6 +2,7 @@ import '../../core/utils/url_helper.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
 import 'base_extractor.dart';
+import 'extraction_failure.dart';
 import 'facebook_extractor.dart';
 import 'generic_extractor.dart';
 import 'instagram_extractor.dart';
@@ -34,12 +35,16 @@ class ExtractorRegistry {
   Future<VideoMetadata> extract(String rawUrl, AppLocalizations l10n) async {
     final cleanUrl = UrlHelper.extractCleanUrl(rawUrl);
     if (!UrlHelper.isValidVideoUrl(cleanUrl)) {
-      throw ExtractionException(l10n.invalidLink);
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.invalidLink),
+      );
     }
 
     final metadata = await getExtractorFor(cleanUrl).extract(cleanUrl, l10n);
     if (metadata.qualities.isEmpty) {
-      throw ExtractionException(l10n.noDownloadStreams);
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.noDownloadStreams),
+      );
     }
     return metadata;
   }

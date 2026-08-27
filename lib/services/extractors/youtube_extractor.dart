@@ -12,6 +12,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
+import 'extraction_failure.dart';
 
 class YouTubeExtractor extends BaseVideoExtractor {
   const YouTubeExtractor({this.useNativeClient = true});
@@ -43,7 +44,9 @@ class YouTubeExtractor extends BaseVideoExtractor {
 
     final videoId = _extractVideoId(url);
     if (videoId == null) {
-      throw ExtractionException(l10n.youtubeInvalidId);
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.youtubeInvalidId),
+      );
     }
     return _extractFromWatchPage(url, videoId, l10n);
   }
@@ -124,7 +127,12 @@ class YouTubeExtractor extends BaseVideoExtractor {
         'https://www.youtube.com/watch?v=$videoId',
       );
     } catch (e) {
-      throw ExtractionException(l10n.youtubeLoadFailed(e.toString()));
+      throw ExtractionException(
+        ExtractionFailure(
+          ExtractionFailureKind.youtubeLoadFailed,
+          detail: e.toString(),
+        ),
+      );
     }
 
     // A balanced-brace scan, not a non-greedy regex: the player response
@@ -134,21 +142,33 @@ class YouTubeExtractor extends BaseVideoExtractor {
       'ytInitialPlayerResponse',
     );
     if (blob == null) {
-      throw ExtractionException(l10n.youtubeNoPlayerData);
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.youtubeNoPlayerData),
+      );
     }
 
     final Map<String, dynamic> json;
     try {
       json = jsonDecode(blob) as Map<String, dynamic>;
     } catch (e) {
-      throw ExtractionException(l10n.youtubeInvalidData(e.toString()));
+      throw ExtractionException(
+        ExtractionFailure(
+          ExtractionFailureKind.youtubeInvalidData,
+          detail: e.toString(),
+        ),
+      );
     }
 
     final playability = json['playabilityStatus'] as Map<String, dynamic>?;
     final status = playability?['status']?.toString();
     if (status != null && status != 'OK') {
       final reason = playability?['reason']?.toString() ?? status;
-      throw ExtractionException(l10n.youtubePlaybackRejected(reason));
+      throw ExtractionException(
+        ExtractionFailure(
+          ExtractionFailureKind.youtubePlaybackRejected,
+          detail: reason,
+        ),
+      );
     }
 
     final details = json['videoDetails'] as Map<String, dynamic>? ?? {};
@@ -238,8 +258,10 @@ class YouTubeExtractor extends BaseVideoExtractor {
     if (qualities.isEmpty) {
       throw ExtractionException(
         hasCipheredStreams
-            ? l10n.youtubeCipherUnsupported
-            : l10n.youtubeNoStreams,
+            ? const ExtractionFailure(
+                ExtractionFailureKind.youtubeCipherUnsupported,
+              )
+            : const ExtractionFailure(ExtractionFailureKind.youtubeNoStreams),
         diagnosticCode: hasCipheredStreams
             ? 'youtube_signature_decipher_failed'
             : 'youtube_no_streams',

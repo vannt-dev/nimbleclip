@@ -16,6 +16,8 @@ import 'package:nimble_clip/providers/video_extractor_provider.dart';
 import 'package:nimble_clip/providers/analysis_history_provider.dart';
 import 'package:nimble_clip/providers/shared_intent_provider.dart';
 import 'package:nimble_clip/core/utils/external_service_policy.dart';
+import 'package:nimble_clip/services/extractors/base_extractor.dart';
+import 'package:nimble_clip/services/extractors/extraction_failure.dart';
 import 'package:nimble_clip/services/extractors/facebook_extractor.dart';
 import 'package:nimble_clip/services/extractors/registry.dart';
 import 'package:nimble_clip/views/home/home_screen.dart';
@@ -30,6 +32,17 @@ class _FixtureExtractorRegistry extends ExtractorRegistry {
   @override
   Future<VideoMetadata> extract(String rawUrl, AppLocalizations l10n) async =>
       metadata;
+}
+
+class _FailingExtractorRegistry extends ExtractorRegistry {
+  _FailingExtractorRegistry(this.error);
+
+  final Object error;
+
+  @override
+  Future<VideoMetadata> extract(String rawUrl, AppLocalizations l10n) async {
+    throw error;
+  }
 }
 
 class _ConcurrentFixtureRegistry extends ExtractorRegistry {
@@ -222,6 +235,31 @@ void main() {
     expect(find.text('NimbleClip'), findsOneWidget);
     expect(find.text('Paste a video link'), findsOneWidget);
     expect(find.text('Analyze & Download'), findsOneWidget);
+  });
+
+  test('an extraction failure reaches the UI as localized text', () async {
+    final registry = _FailingExtractorRegistry(
+      const ExtractionException(
+        ExtractionFailure(ExtractionFailureKind.xNoVideo),
+      ),
+    );
+    final provider = VideoExtractorProvider(extractorRegistry: registry);
+
+    await provider.analyzeUrl('https://x.com/a/status/1', l10n: l10n);
+
+    // The trap this guards: `_readableError` used to call `toString()`, which
+    // after this change would surface `ExtractionFailureKind.xNoVideo`.
+    expect(provider.errorMessage, l10n.xNoVideo);
+    expect(provider.errorMessage, isNot(contains('ExtractionFailureKind')));
+  });
+
+  test('a non-extraction error still falls back to its message', () async {
+    final registry = _FailingExtractorRegistry(Exception('network down'));
+    final provider = VideoExtractorProvider(extractorRegistry: registry);
+
+    await provider.analyzeUrl('https://x.com/a/status/1', l10n: l10n);
+
+    expect(provider.errorMessage, 'network down');
   });
 
   testWidgets('the home image preview carries the source request headers', (

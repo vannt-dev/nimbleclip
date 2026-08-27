@@ -5,6 +5,7 @@ import '../core/utils/url_helper.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../models/video_metadata.dart';
 import '../services/extractors/registry.dart';
+import '../l10n/extraction_failure_text.dart';
 import '../services/extractors/base_extractor.dart';
 
 class VideoExtractorProvider extends ChangeNotifier {
@@ -85,7 +86,7 @@ class VideoExtractorProvider extends ChangeNotifier {
     } catch (e) {
       if (sequence != _requestSequence) return false;
       _isAnalyzing = false;
-      _errorMessage = _readableError(e, l10n.unableToAnalyze);
+      _errorMessage = _readableError(e, l10n.unableToAnalyze, l10n);
       if (e is ExtractionException) {
         _diagnosticCode =
             e.diagnosticCode ??
@@ -160,7 +161,7 @@ class VideoExtractorProvider extends ChangeNotifier {
         } catch (error) {
           results[index] = BatchAnalysisResult(
             url: url,
-            error: _readableError(error, l10n.unableToAnalyze),
+            error: _readableError(error, l10n.unableToAnalyze, l10n),
             diagnosticCode: error is ExtractionException
                 ? error.diagnosticCode ??
                       '${UrlHelper.detectPlatform(url).name}_extraction_failed'
@@ -214,7 +215,7 @@ class VideoExtractorProvider extends ChangeNotifier {
       final updated = [..._batchResults];
       updated[index] = BatchAnalysisResult(
         url: url,
-        error: _readableError(error, l10n.unableToAnalyze),
+        error: _readableError(error, l10n.unableToAnalyze, l10n),
         diagnosticCode: error is ExtractionException
             ? error.diagnosticCode ??
                   '${UrlHelper.detectPlatform(url).name}_extraction_failed'
@@ -247,7 +248,16 @@ class VideoExtractorProvider extends ChangeNotifier {
 
   /// Strips the `Exception:` prefixes Dart adds so the user sees the message the
   /// extractor actually wrote.
-  String _readableError(Object error, String fallbackErrorMessage) {
+  String _readableError(
+    Object error,
+    String fallbackErrorMessage,
+    AppLocalizations l10n,
+  ) {
+    // Must come before the toString() fallback: an ExtractionException now
+    // stringifies to its kind, which is not something to show a user.
+    if (error is ExtractionException) {
+      return describeExtractionFailure(error.failure, l10n);
+    }
     var message = error.toString();
     while (message.startsWith('Exception:')) {
       message = message.substring('Exception:'.length).trim();

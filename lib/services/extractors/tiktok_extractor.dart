@@ -9,6 +9,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
+import 'extraction_failure.dart';
 
 class TikTokExtractor extends BaseVideoExtractor {
   final ExternalServiceAccess externalServiceAccess;
@@ -29,7 +30,9 @@ class TikTokExtractor extends BaseVideoExtractor {
   @override
   Future<VideoMetadata> extract(String url, AppLocalizations l10n) async {
     if (!externalServiceAccess.allowExternalServices) {
-      throw ExtractionException(l10n.externalServicesDisabled);
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.externalServicesDisabled),
+      );
     }
     final Map<String, dynamic> json;
     try {
@@ -42,22 +45,33 @@ class TikTokExtractor extends BaseVideoExtractor {
       );
       if (response.statusCode != 200) {
         throw ExtractionException(
-          l10n.tiktokServiceStatus(response.statusCode),
+          ExtractionFailure(
+            ExtractionFailureKind.tiktokServiceStatus,
+            detail: '${response.statusCode}',
+          ),
         );
       }
       json = jsonDecode(response.body) as Map<String, dynamic>;
     } on ExtractionException {
       rethrow;
     } catch (e) {
-      throw ExtractionException(l10n.tiktokConnectionFailed(e.toString()));
+      throw ExtractionException(
+        ExtractionFailure(
+          ExtractionFailureKind.tiktokConnectionFailed,
+          detail: e.toString(),
+        ),
+      );
     }
 
     if (json['code'] != 0 || json['data'] == null) {
       final message = json['msg']?.toString();
+      // The `TikTok: ` prefix now lives in `describeExtractionFailure`, so the
+      // server's own wording still reaches the user unchanged.
       throw ExtractionException(
-        message != null && message.isNotEmpty
-            ? 'TikTok: $message'
-            : l10n.tiktokInvalidData,
+        ExtractionFailure(
+          ExtractionFailureKind.tiktokInvalidData,
+          detail: message,
+        ),
       );
     }
 
@@ -148,7 +162,9 @@ class TikTokExtractor extends BaseVideoExtractor {
     }
 
     if (qualities.isEmpty) {
-      throw ExtractionException(l10n.tiktokNoStreams);
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.tiktokNoStreams),
+      );
     }
 
     final title = data['title']?.toString().trim();
