@@ -247,9 +247,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not save to the gallery. Please check the app permission.';
 
   @override
-  String get gallerySaveFailedShort => 'Could not save to the gallery.';
-
-  @override
   String get resumeDownload => 'Resume download';
 
   @override

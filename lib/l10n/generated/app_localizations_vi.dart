@@ -244,9 +244,6 @@ class AppLocalizationsVi extends AppLocalizations {
       'Không thể lưu vào thư viện. Vui lòng kiểm tra quyền ứng dụng.';
 
   @override
-  String get gallerySaveFailedShort => 'Không thể lưu vào thư viện.';
-
-  @override
   String get resumeDownload => 'Tiếp tục tải';
 
   @override

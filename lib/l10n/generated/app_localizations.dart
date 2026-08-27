@@ -482,12 +482,6 @@ abstract class AppLocalizations {
   /// **'Could not save to the gallery. Please check the app permission.'**
   String get gallerySaveFailed;
 
-  /// No description provided for @gallerySaveFailedShort.
-  ///
-  /// In en, this message translates to:
-  /// **'Could not save to the gallery.'**
-  String get gallerySaveFailedShort;
-
   /// No description provided for @resumeDownload.
   ///
   /// In en, this message translates to:

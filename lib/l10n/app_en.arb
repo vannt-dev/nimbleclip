@@ -78,7 +78,6 @@
   "newDownload": "New download",
   "savedToGallery": "Video saved to your gallery!",
   "gallerySaveFailed": "Could not save to the gallery. Please check the app permission.",
-  "gallerySaveFailedShort": "Could not save to the gallery.",
   "resumeDownload": "Resume download",
   "pauseDownload": "Pause download",
   "cancelDownload": "Cancel download",
