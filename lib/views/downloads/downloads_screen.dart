@@ -142,6 +142,9 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     final provider = context.read<DownloadProvider>();
     final settings = context.read<SettingsProvider>();
     return ActiveDownloadCard(
+      // Tasks are inserted at the top of the list, so without a stable identity
+      // Flutter reuses each element for a different task on every insert.
+      key: ValueKey('download-${task.id}'),
       task: task,
       onCancel: () => provider.cancelTask(task.id),
       onPause: kIsWeb ? null : () => provider.pauseTask(task.id),
@@ -188,7 +191,7 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     final all = downloadProv.allTasks;
     final active = [...downloadProv.activeTasks, ...downloadProv.pausedTasks];
     final completed = downloadProv.completedTasks;
-    final hasFinished = all.any((t) => t.isDone);
+    final hasFinished = downloadProv.hasFinishedTasks;
 
     return Scaffold(
       appBar: AppBar(
@@ -319,6 +322,7 @@ class _DownloadsScreenState extends State<DownloadsScreen>
 
   Widget _completedCard(BuildContext context, DownloadTask task) {
     return CompletedDownloadCard(
+      key: ValueKey('download-${task.id}'),
       task: task,
       onPlay: () => unawaited(_openMedia(context, task)),
       onSaveGallery: () async {

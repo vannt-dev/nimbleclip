@@ -94,7 +94,7 @@ class _DownloadBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Selector<DownloadProvider, int>(
-      selector: (_, provider) => provider.activeTasks.length,
+      selector: (_, provider) => provider.activeTaskCount,
       builder: (_, count, _) => Badge(
         isLabelVisible: count > 0,
         label: Text('$count'),

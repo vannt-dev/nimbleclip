@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 class AsyncWorkQueue<T> {
   AsyncWorkQueue({
@@ -10,7 +11,10 @@ class AsyncWorkQueue<T> {
 
   final Future<void> Function(T item) worker;
   final bool Function(T item) _shouldRun;
-  final List<T> _pending = [];
+
+  /// A queue rather than a list: draining took the head with `removeAt(0)`,
+  /// which shifts every remaining element down on each dequeue.
+  final Queue<T> _pending = Queue<T>();
   int _running = 0;
   int _maxConcurrent;
 
@@ -36,7 +40,7 @@ class AsyncWorkQueue<T> {
 
   void _drain() {
     while (_running < _maxConcurrent && _pending.isNotEmpty) {
-      final item = _pending.removeAt(0);
+      final item = _pending.removeFirst();
       if (!_shouldRun(item)) continue;
       _running++;
       unawaited(

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,8 +10,11 @@ import 'package:nimble_clip/models/download_task.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/providers/download_provider.dart';
 import 'package:nimble_clip/providers/settings_provider.dart';
+import 'package:nimble_clip/services/download_history_repository.dart';
 import 'package:nimble_clip/services/download_service.dart';
+import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/views/downloads/downloads_screen.dart';
+import 'package:nimble_clip/views/downloads/widgets/active_download_card.dart';
 import 'package:nimble_clip/views/home/image_picker_screen.dart';
 import 'package:nimble_clip/views/player/video_player_screen.dart';
 import 'package:nimble_clip/views/settings/settings_screen.dart';
@@ -43,6 +47,35 @@ class _InertDownloadService implements DownloadGateway {
   void dispose() => disposed = true;
 }
 
+/// Serves a fixed history so a screen can be rendered with real tasks in it.
+class _SeededHistoryRepository implements DownloadHistoryRepository {
+  _SeededHistoryRepository(Iterable<DownloadTask> tasks)
+    : _seed = tasks.map((task) => task.toJson()).toList();
+
+  final List<Map<String, dynamic>> _seed;
+
+  @override
+  Future<List<DownloadTask>> loadHistory() async =>
+      _seed.map(DownloadTask.fromJson).toList();
+
+  @override
+  Future<List<DownloadTask>> loadDownloadReceipts() async => [];
+
+  @override
+  Future<void> saveHistory(List<Map<String, dynamic>> snapshots) async {}
+
+  @override
+  Future<void> saveDownloadReceipt(Map<String, dynamic> snapshot) async {}
+
+  @override
+  Future<void> saveDownloadReceipts(
+    Iterable<Map<String, dynamic>> snapshots,
+  ) async {}
+
+  @override
+  Future<void> removeDownloadReceipts(Set<String> ids) async {}
+}
+
 Widget _host(Widget child, {List<SingleChildWidget> providers = const []}) {
   final app = MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -70,6 +103,53 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
+  group('ActiveDownloadCard', () {
+    testWidgets('a progress tick does not rebuild the static header', (
+      tester,
+    ) async {
+      final task = DownloadTask(
+        id: 'task-1',
+        videoId: 'video',
+        title: 'Clip',
+        author: 'Creator',
+        thumbnailUrl: 'https://cdn.example.com/thumb.jpg',
+        downloadUrl: 'https://cdn.example.com/clip.mp4',
+        originalUrl: 'https://example.com/post',
+        platform: VideoPlatform.facebook,
+        qualityLabel: 'HD 720p',
+        status: DownloadStatus.downloading,
+        totalBytes: 1000,
+      );
+      addTearDown(task.dispose);
+
+      await tester.pumpWidget(
+        _host(
+          ActiveDownloadCard(task: task, onCancel: () {}),
+          providers: [
+            ChangeNotifierProvider(create: (_) => SettingsProvider()),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      CachedNetworkImage thumbnail() =>
+          tester.widget<CachedNetworkImage>(find.byType(CachedNetworkImage));
+      final before = thumbnail();
+
+      // A running download notifies roughly ten times a second. The thumbnail
+      // and title do not change with progress, so they must not be rebuilt.
+      task
+        ..receivedBytes = 500
+        ..progress = 0.5
+        ..notifyProgressChanged();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+
+      expect(find.textContaining('50%'), findsOneWidget);
+      expect(identical(thumbnail(), before), isTrue);
+    });
+  });
+
   group('DownloadsScreen', () {
     testWidgets('shows the empty state when nothing has been downloaded', (
       tester,
@@ -90,6 +170,57 @@ void main() {
 
       expect(find.text('Download manager'), findsOneWidget);
       expect(find.text('Your download list is empty'), findsOneWidget);
+    });
+
+    testWidgets('each list entry is keyed by its task id', (tester) async {
+      final tasks = [
+        DownloadTask(
+          id: 'running',
+          videoId: 'v1',
+          title: 'Running clip',
+          author: 'Creator',
+          thumbnailUrl: '',
+          downloadUrl: 'https://cdn.example.com/1.mp4',
+          originalUrl: 'https://example.com/1',
+          platform: VideoPlatform.facebook,
+          qualityLabel: 'HD 720p',
+          status: DownloadStatus.paused,
+        ),
+        DownloadTask(
+          id: 'finished',
+          videoId: 'v2',
+          title: 'Finished clip',
+          author: 'Creator',
+          thumbnailUrl: '',
+          downloadUrl: 'https://cdn.example.com/2.mp4',
+          originalUrl: 'https://example.com/2',
+          platform: VideoPlatform.instagram,
+          qualityLabel: 'HD 720p',
+          status: DownloadStatus.completed,
+        ),
+      ];
+
+      await tester.pumpWidget(
+        _host(
+          DownloadsScreen(onNavigateHome: () {}),
+          providers: [
+            ChangeNotifierProvider(create: (_) => SettingsProvider()),
+            ChangeNotifierProvider(
+              create: (_) => DownloadProvider(
+                downloadService: _InertDownloadService(),
+                historyRepository: _SeededHistoryRepository(tasks),
+              ),
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      // Without stable keys, inserting a new task at the top of the list makes
+      // Flutter reuse each element for a different task.
+      expect(find.byKey(const ValueKey('download-running')), findsWidgets);
+      expect(find.byKey(const ValueKey('download-finished')), findsWidgets);
     });
 
     testWidgets('disposing the provider releases the gateway', (tester) async {
