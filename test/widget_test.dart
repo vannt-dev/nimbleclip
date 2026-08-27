@@ -498,4 +498,123 @@ void main() {
       expect(submitted!.where((option) => option.isImage), [image1, image2]);
     },
   );
+
+  // Characterization tests for the parts of the result card the suite did not
+  // reach. They pass against the current single-file widget and must keep
+  // passing once it is split, which is what makes them a safety net.
+  group('VideoResultCard', () {
+    const hd = VideoQualityOption.video(
+      id: 'v-hd',
+      mediaId: 'v',
+      label: 'HD',
+      quality: '720p',
+      format: 'mp4',
+      downloadUrl: 'https://cdn.example.com/v.mp4',
+    );
+    const audio = VideoQualityOption.audio(
+      id: 'a-mp3',
+      label: 'Audio MP3',
+      quality: 'Audio',
+      format: 'mp3',
+      downloadUrl: 'https://cdn.example.com/a.mp3',
+    );
+
+    Widget host(
+      VideoMetadata metadata, {
+      ValueChanged<VideoQualityOption>? onSelected,
+    }) => MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: VideoResultCard(
+            metadata: metadata,
+            selectedQuality: hd,
+            onQualitySelected: onSelected ?? (_) {},
+            onDownload: (_) {},
+            onPreview: () {},
+          ),
+        ),
+      ),
+    );
+
+    testWidgets('switching to the audio tab selects an audio option', (
+      tester,
+    ) async {
+      const metadata = VideoMetadata(
+        id: 'post',
+        originalUrl: 'https://example.com/post',
+        title: 'A clip',
+        author: 'Creator',
+        coverUrl: '',
+        platform: VideoPlatform.youtube,
+        qualities: [hd, audio],
+      );
+      VideoQualityOption? selected;
+
+      await tester.pumpWidget(host(metadata, onSelected: (q) => selected = q));
+      await tester.pump();
+
+      expect(find.text('Video (1)'), findsOneWidget);
+      expect(find.text('Audio (1)'), findsOneWidget);
+
+      await tester.tap(find.text('Audio (1)'));
+      await tester.pump();
+
+      expect(selected, audio);
+      expect(find.text('Audio MP3'), findsWidgets);
+    });
+
+    testWidgets('the summary shows title, author, duration and stats', (
+      tester,
+    ) async {
+      const metadata = VideoMetadata(
+        id: 'post',
+        originalUrl: 'https://example.com/post',
+        title: 'A memorable title',
+        author: 'Some Creator',
+        // The duration pill lives inside the thumbnail header, which only
+        // renders when there is something to show a preview of.
+        coverUrl: 'https://cdn.example.com/cover.jpg',
+        platform: VideoPlatform.youtube,
+        qualities: [hd],
+        duration: Duration(minutes: 3, seconds: 7),
+        viewCount: 1500,
+        likeCount: 42,
+      );
+
+      await tester.pumpWidget(host(metadata));
+      await tester.pump();
+
+      expect(find.text('A memorable title'), findsOneWidget);
+      expect(find.text('Some Creator'), findsOneWidget);
+      expect(
+        find.text(Formatters.formatDuration(metadata.duration)),
+        findsOneWidget,
+      );
+      expect(find.text(Formatters.formatCount(1500)), findsOneWidget);
+      expect(find.text(Formatters.formatCount(42)), findsOneWidget);
+    });
+
+    testWidgets('the tab row is hidden when there is no audio option', (
+      tester,
+    ) async {
+      const metadata = VideoMetadata(
+        id: 'post',
+        originalUrl: 'https://example.com/post',
+        title: 'Video only',
+        author: 'Creator',
+        coverUrl: '',
+        platform: VideoPlatform.youtube,
+        qualities: [hd],
+      );
+
+      await tester.pumpWidget(host(metadata));
+      await tester.pump();
+
+      expect(find.text('Video (1)'), findsNothing);
+      expect(find.text('Audio (0)'), findsNothing);
+      expect(find.text('HD'), findsWidgets);
+    });
+  });
 }
