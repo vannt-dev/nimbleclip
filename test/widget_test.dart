@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -221,6 +222,72 @@ void main() {
     expect(find.text('NimbleClip'), findsOneWidget);
     expect(find.text('Paste a video link'), findsOneWidget);
     expect(find.text('Analyze & Download'), findsOneWidget);
+  });
+
+  testWidgets('the home image preview carries the source request headers', (
+    WidgetTester tester,
+  ) async {
+    const quality = VideoQualityOption(
+      id: 'fixture-image',
+      label: 'Original',
+      quality: 'Original',
+      format: 'jpg',
+      downloadUrl: 'https://cdn.example.com/photo.jpg',
+      kind: MediaKind.image,
+      headers: {'Referer': 'https://www.instagram.com/'},
+    );
+    const metadata = VideoMetadata(
+      id: 'fixture',
+      originalUrl: 'https://www.instagram.com/p/abc/',
+      title: 'Fixture image',
+      author: 'Author',
+      coverUrl: '',
+      platform: VideoPlatform.instagram,
+      qualities: [quality],
+    );
+    final extractor = VideoExtractorProvider(
+      extractorRegistry: _FixtureExtractorRegistry(metadata),
+    );
+    await extractor.analyzeUrl(metadata.originalUrl, l10n: l10n);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsProvider()),
+          ChangeNotifierProvider.value(value: extractor),
+          ChangeNotifierProvider(create: (_) => AnalysisHistoryProvider()),
+          ChangeNotifierProvider(create: (_) => SharedIntentProvider()),
+          ChangeNotifierProvider(create: (_) => DownloadProvider()),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: HomeScreen(onNavigateDownloads: () {}),
+        ),
+      ),
+    );
+    // The thumbnail placeholder spins forever, so settle is not reachable here.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final preview = find.byIcon(Icons.zoom_in_rounded);
+    await tester.ensureVisible(preview);
+    await tester.tap(preview);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final image = tester.widget<CachedNetworkImage>(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.byType(CachedNetworkImage),
+      ),
+    );
+    // Instagram and Facebook CDNs reject image requests without a Referer, so
+    // the preview has to send the same headers the download would.
+    expect(image.httpHeaders, quality.headers);
+    // An uncapped decode of a full-resolution post photo is the classic
+    // out-of-memory path on low-RAM devices.
+    expect(image.memCacheWidth, isNotNull);
   });
 
   testWidgets('new download action clears the result and focuses the URL', (

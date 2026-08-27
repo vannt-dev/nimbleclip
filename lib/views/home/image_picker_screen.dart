@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/image_cache_size.dart';
 import '../../l10n/l10n.dart';
 import '../../models/video_metadata.dart';
 
@@ -61,6 +62,7 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
                   imageUrl: option.downloadUrl,
                   httpHeaders: option.headers,
                   fit: BoxFit.contain,
+                  memCacheWidth: previewCacheWidth(dialogContext),
                   placeholder: (_, _) => const SizedBox(
                     height: 360,
                     child: Center(child: CircularProgressIndicator()),
@@ -95,6 +97,13 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
         : width >= 600
         ? 4
         : 3;
+    // Matches the grid delegate below: full width minus the outer padding and
+    // the gaps between columns.
+    const horizontalPadding = 12.0 * 2;
+    const crossAxisSpacing = 8.0;
+    final cellWidth =
+        (width - horizontalPadding - crossAxisSpacing * (columns - 1)) /
+        columns;
 
     return Scaffold(
       appBar: AppBar(
@@ -136,7 +145,10 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
                       imageUrl: option.thumbnailUrl ?? option.downloadUrl,
                       httpHeaders: option.headers,
                       fit: BoxFit.cover,
-                      memCacheWidth: 360,
+                      // Sized from the real cell width rather than a fixed 360,
+                      // which was blurry on high-density displays and wasteful
+                      // on low-density ones.
+                      memCacheWidth: imageCacheWidth(context, cellWidth),
                       placeholder: (_, _) => const Center(
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
