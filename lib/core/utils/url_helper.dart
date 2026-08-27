@@ -16,29 +16,35 @@ class UrlHelper {
     VideoPlatform.instagram: ['instagram.com', 'instagr.am', 'ig.me'],
   };
 
+  static final RegExp _singleUrl = RegExp(r'https?://[^\s<>"]+');
+  static final RegExp _multipleUrls = RegExp(r'''https?://[^\s<>"']+''');
+  static final RegExp _trailingPunctuation = RegExp(r'[.,;!)]+$');
+  static final RegExp _facebookSharePath = RegExp(
+    r'^/share/(?:r|v|p)/[^/]+/?$',
+  );
+
   static String extractCleanUrl(String text) {
     if (text.isEmpty) return '';
 
     // Pull the link out of potentially long shared text ("Check this out …").
-    final urlRegex = RegExp(r'https?://[^\s<>"]+');
-    final match = urlRegex.firstMatch(text);
+    final match = _singleUrl.firstMatch(text);
     if (match != null) {
       // Trailing punctuation is almost always sentence punctuation, not URL.
-      return (match.group(0) ?? '').trim().replaceAll(RegExp(r'[.,;!)]+$'), '');
+      return (match.group(0) ?? '').trim().replaceAll(_trailingPunctuation, '');
     }
     return text.trim();
   }
 
   static List<String> extractUrls(String text) {
-    final matches = RegExp(r'''https?://[^\s<>"']+''').allMatches(text);
     final seen = <String>{};
-    return [
-      for (final match in matches)
-        if (seen.add(
-          (match.group(0) ?? '').replaceAll(RegExp(r'[.,;!)]+$'), ''),
-        ))
-          (match.group(0) ?? '').replaceAll(RegExp(r'[.,;!)]+$'), ''),
-    ].where(isValidVideoUrl).toList(growable: false);
+    final urls = <String>[];
+    for (final match in _multipleUrls.allMatches(text)) {
+      // Trim once and reuse: the earlier version recomputed this for the
+      // duplicate check and again for the value it kept.
+      final url = (match.group(0) ?? '').replaceAll(_trailingPunctuation, '');
+      if (seen.add(url) && isValidVideoUrl(url)) urls.add(url);
+    }
+    return List.unmodifiable(urls);
   }
 
   /// Host of [url], lowercased and without a `www.` prefix. Empty when the URL
@@ -105,7 +111,7 @@ class UrlHelper {
     // so it must be expanded before a video or post can be extracted.
     if (hostMatches(host, 'facebook.com')) {
       final path = Uri.tryParse(url.trim())?.path.toLowerCase() ?? '';
-      return RegExp(r'^/share/(?:r|v|p)/[^/]+/?$').hasMatch(path);
+      return _facebookSharePath.hasMatch(path);
     }
     return false;
   }

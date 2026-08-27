@@ -79,11 +79,18 @@ class DownloadService implements DownloadGateway {
 
   static const String _pauseReason = 'paused-by-user';
 
+  static final RegExp _nonAlphanumeric = RegExp('[^a-zA-Z0-9]');
+  static final RegExp _pathSeparator = RegExp(r'[/\\]');
+  static final RegExp _contentRangeStart = RegExp(
+    r'^bytes\s+(\d+)-',
+    caseSensitive: false,
+  );
+
   /// Uses the source platform plus a short UUID-style name so Gallery apps
   /// receive a predictable, filesystem-safe display name while files from
   /// different services remain recognisable.
   String buildFileName(DownloadTask task, {String? extension}) {
-    final compactId = task.id.replaceAll(RegExp('[^a-zA-Z0-9]'), '');
+    final compactId = task.id.replaceAll(_nonAlphanumeric, '');
     final idPart = compactId.isEmpty
         ? 'NimbleClip'
         : compactId.substring(0, compactId.length.clamp(0, 12));
@@ -223,7 +230,7 @@ class DownloadService implements DownloadGateway {
       var completedPath = savePath;
       if (actualExtension.toLowerCase() != task.format.toLowerCase()) {
         final correctedName = buildFileName(task, extension: actualExtension);
-        final separator = savePath.lastIndexOf(RegExp(r'[/\\]'));
+        final separator = savePath.lastIndexOf(_pathSeparator);
         final correctedPath = separator == -1
             ? correctedName
             : '${savePath.substring(0, separator + 1)}$correctedName';
@@ -379,10 +386,7 @@ class DownloadService implements DownloadGateway {
 
   bool _contentRangeStartsAt(String? value, int offset) {
     if (value == null) return false;
-    final match = RegExp(
-      r'^bytes\s+(\d+)-',
-      caseSensitive: false,
-    ).firstMatch(value.trim());
+    final match = _contentRangeStart.firstMatch(value.trim());
     return match != null && int.tryParse(match.group(1)!) == offset;
   }
 

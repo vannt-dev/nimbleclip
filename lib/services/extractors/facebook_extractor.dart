@@ -43,6 +43,16 @@ class FacebookExtractor extends BaseVideoExtractor {
     RegExp(r'"sd_src"\s*:\s*"([^"]+)"'),
   ];
 
+  static final RegExp _facebookHost = RegExp(
+    r'https?://(www\.|web\.|m\.)?facebook\.com',
+  );
+  // `_isPhotoUrl` runs once per candidate URL, so these three stay hoisted.
+  static final RegExp _thumbnailCropParam = RegExp(
+    r'(?:[?&]|&amp;)ctp=s(?:16|24|32|40|48|50|60|64)x',
+  );
+  static final RegExp _avatarBucket = RegExp(r'/t\d+(?:\.\d+)?-1/');
+  static final RegExp _imageExtension = RegExp(r'\.(?:jpe?g|png|webp|gif)$');
+
   String? _firstMatch(String html, List<RegExp> patterns) {
     return _pageParser.firstMediaUrl(html, patterns);
   }
@@ -94,7 +104,7 @@ class FacebookExtractor extends BaseVideoExtractor {
 
     // Strategy 3: the mobile site, which renders a plainer document.
     final mobileUrl = cleanUrl.replaceFirst(
-      RegExp(r'https?://(www\.|web\.|m\.)?facebook\.com'),
+      _facebookHost,
       'https://m.facebook.com',
     );
     result = await _fromPage(
@@ -227,20 +237,17 @@ class FacebookExtractor extends BaseVideoExtractor {
     final lower = url.toLowerCase();
     if (lower.contains('external-') ||
         lower.contains('safe_image.php') ||
-        RegExp(
-          r'(?:[?&]|&amp;)ctp=s(?:16|24|32|40|48|50|60|64)x',
-        ).hasMatch(lower)) {
+        _thumbnailCropParam.hasMatch(lower)) {
       return false;
     }
 
     // Facebook reserves the `-1` CDN buckets for profile/avatar images. Post
     // photos use content buckets such as t39.30808-6 and t1.6435-9.
-    if (RegExp(r'/t\d+(?:\.\d+)?-1/').hasMatch(uri.path.toLowerCase())) {
+    final path = uri.path.toLowerCase();
+    if (_avatarBucket.hasMatch(path)) {
       return false;
     }
-    return RegExp(
-      r'\.(?:jpe?g|png|webp|gif)$',
-    ).hasMatch(uri.path.toLowerCase());
+    return _imageExtension.hasMatch(path);
   }
 
   String _photoIdentity(String url) {
@@ -270,7 +277,7 @@ class FacebookExtractor extends BaseVideoExtractor {
         ? null
         : Uri.parse(pageUrl).resolve(openGraphVideo).toString();
     final thumbnailUrl = _thumbnail(html);
-    final photoUrls = _pageParser.photoUrls(html);
+    final photoUrls = await _pageParser.photoUrlsAsync(html);
     if (photoUrls.isEmpty &&
         hdUrl == null &&
         sdUrl == null &&

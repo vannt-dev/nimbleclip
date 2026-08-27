@@ -21,6 +21,10 @@ class YouTubeExtractor extends BaseVideoExtractor {
   @override
   VideoPlatform get platform => VideoPlatform.youtube;
 
+  static final RegExp _playerJsUrl = RegExp(
+    r'"(?:jsUrl|PLAYER_JS_URL)"\s*:\s*"([^"]+)"',
+  );
+
   static final RegExp _videoIdPattern = RegExp(
     r'(?:youtu\.be/|youtube(?:-nocookie)?\.com/(?:embed/|v/|live/|shorts/|watch\?(?:.*&)?v=))([\w-]{11})',
   );
@@ -272,9 +276,7 @@ class YouTubeExtractor extends BaseVideoExtractor {
         .toList(growable: false);
     if (ciphers.isEmpty) return const {};
 
-    final playerMatch = RegExp(
-      r'"(?:jsUrl|PLAYER_JS_URL)"\s*:\s*"([^"]+)"',
-    ).firstMatch(watchPage);
+    final playerMatch = _playerJsUrl.firstMatch(watchPage);
     if (playerMatch == null) return const {};
     try {
       final relative = jsonDecode('"${playerMatch.group(1)!}"') as String;

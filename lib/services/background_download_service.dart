@@ -142,8 +142,11 @@ class BackgroundDownloadService
     }
   }
 
+  static final RegExp _nonAlphanumeric = RegExp('[^a-zA-Z0-9]');
+  static final RegExp _pathSeparator = RegExp(r'[/\\]');
+
   String buildFileName(DownloadTask task, {String? extension}) {
-    final compactId = task.id.replaceAll(RegExp('[^a-zA-Z0-9]'), '');
+    final compactId = task.id.replaceAll(_nonAlphanumeric, '');
     final length = compactId.length.clamp(0, 12);
     final idPart = compactId.isEmpty
         ? 'NimbleClip'
@@ -310,7 +313,7 @@ class BackgroundDownloadService
       }
       final extension = validator.extensionFor(inspection, task.kind);
       if (extension.toLowerCase() != task.format.toLowerCase()) {
-        final slash = path.lastIndexOf(RegExp(r'[/\\]'));
+        final slash = path.lastIndexOf(_pathSeparator);
         final corrected = slash < 0
             ? buildFileName(task, extension: extension)
             : '${path.substring(0, slash + 1)}${buildFileName(task, extension: extension)}';

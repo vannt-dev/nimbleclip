@@ -22,6 +22,9 @@ class TwitterExtractor extends BaseVideoExtractor {
 
   static final RegExp _tweetIdPattern = RegExp(r'status(?:es)?/(\d+)');
 
+  // Runs once per variant of every video in a tweet, so it stays hoisted.
+  static final RegExp _resolutionInPath = RegExp(r'/(\d{2,4})x(\d{2,4})/');
+
   String? _extractTweetId(String url) =>
       _tweetIdPattern.firstMatch(url)?.group(1);
 
@@ -101,9 +104,7 @@ class TwitterExtractor extends BaseVideoExtractor {
         final variantUrl = variant['url']?.toString();
         if (variantUrl == null || variantUrl.isEmpty) continue;
         final kbps = (((variant['bitrate'] as num?) ?? 0) / 1000).round();
-        final fromPath = RegExp(
-          r'/(\d{2,4})x(\d{2,4})/',
-        ).firstMatch(variantUrl);
+        final fromPath = _resolutionInPath.firstMatch(variantUrl);
         final quality = fromPath != null
             ? '${fromPath.group(2)}p'
             : _qualityFromBitrate(kbps);

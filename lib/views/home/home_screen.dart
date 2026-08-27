@@ -7,6 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/image_cache_size.dart';
 import '../../core/utils/url_helper.dart';
 import '../../l10n/l10n.dart';
 import '../../models/video_metadata.dart';
@@ -376,7 +377,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     maxScale: 4,
                     child: CachedNetworkImage(
                       imageUrl: quality.downloadUrl,
+                      // Instagram and Facebook CDNs reject image requests that
+                      // arrive without the Referer the extractor collected, so
+                      // the preview has to send what the download sends.
+                      httpHeaders: quality.headers,
                       fit: BoxFit.contain,
+                      memCacheWidth: previewCacheWidth(dialogContext),
                       placeholder: (_, _) => const SizedBox(
                         height: 320,
                         child: Center(child: CircularProgressIndicator()),

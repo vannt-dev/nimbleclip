@@ -22,13 +22,88 @@ class ActiveDownloadCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A running download notifies about ten times a second. The thumbnail and
+    // title never change with progress, so they are built once here and handed
+    // to the builder as `child` instead of being rebuilt on every tick.
     return AnimatedBuilder(
       animation: task,
-      builder: (context, _) => _buildCard(context),
+      child: _buildStaticHeader(context),
+      builder: (context, child) => _buildCard(context, child!),
     );
   }
 
-  Widget _buildCard(BuildContext context) {
+  Widget _buildStaticHeader(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final placeholder = Container(
+      color: task.platform.brandColor.withAlpha(30),
+      child: Icon(task.platform.icon, color: task.platform.brandColor),
+    );
+
+    return Expanded(
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: SizedBox(
+              width: 64,
+              height: 64,
+              child: task.thumbnailUrl.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: task.thumbnailUrl,
+                      fit: BoxFit.cover,
+                      memCacheWidth: imageCacheWidth(context, 64),
+                      errorWidget: (context, url, error) => placeholder,
+                    )
+                  : placeholder,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  task.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? AppColors.darkTextPrimary
+                        : AppColors.lightTextPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      task.platform.icon,
+                      size: 13,
+                      color: task.platform.brandColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      task.qualityLabel,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCard(BuildContext context, Widget staticHeader) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final percent = (task.progress * 100).toInt();
     final isPaused = task.status == DownloadStatus.paused;
@@ -49,77 +124,7 @@ class ActiveDownloadCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              // Thumbnail
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: SizedBox(
-                  width: 64,
-                  height: 64,
-                  child: task.thumbnailUrl.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: task.thumbnailUrl,
-                          fit: BoxFit.cover,
-                          memCacheWidth: imageCacheWidth(context, 64),
-                          errorWidget: (context, url, error) => Container(
-                            color: task.platform.brandColor.withAlpha(30),
-                            child: Icon(
-                              task.platform.icon,
-                              color: task.platform.brandColor,
-                            ),
-                          ),
-                        )
-                      : Container(
-                          color: task.platform.brandColor.withAlpha(30),
-                          child: Icon(
-                            task.platform.icon,
-                            color: task.platform.brandColor,
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(width: 12),
-
-              // Title and Platform
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      task.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: isDark
-                            ? AppColors.darkTextPrimary
-                            : AppColors.lightTextPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          task.platform.icon,
-                          size: 13,
-                          color: task.platform.brandColor,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          task.qualityLabel,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark
-                                ? AppColors.darkTextSecondary
-                                : AppColors.lightTextSecondary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+              staticHeader,
 
               // Pause / resume — only offered where a partial file can be kept.
               if (isPaused && onResume != null)

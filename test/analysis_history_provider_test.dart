@@ -82,6 +82,24 @@ void main() {
     expect(raw, isNot(contains('cdn.example.com')));
   });
 
+  test('leaves an already compact store untouched on load', () async {
+    // Key order is the observable proxy for "was not rewritten": `toJson`
+    // always emits `url` first, so a title-first payload that survives the load
+    // proves no save happened. Rewriting a store that needs no migration costs
+    // a full re-encode and a preferences write on every app start.
+    const seeded =
+        '[{"title":"Clip 7","url":"https://example.com/7","coverUrl":"",'
+        '"platform":"generic","analyzedAt":"2026-01-01T00:00:00.000"}]';
+    SharedPreferences.setMockInitialValues({'analysis_history_v1': seeded});
+
+    final history = AnalysisHistoryProvider();
+    await history.ready;
+
+    expect(history.entries.single.title, 'Clip 7');
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('analysis_history_v1'), seeded);
+  });
+
   test('migrates legacy full metadata to compact storage on load', () async {
     SharedPreferences.setMockInitialValues({
       'analysis_history_v1': jsonEncode([

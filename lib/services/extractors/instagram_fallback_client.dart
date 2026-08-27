@@ -13,6 +13,9 @@ class SnapInstaFallbackClient implements InstagramFallbackClient {
   static String? _cachedExpiry;
   static String? _cachedToken;
 
+  static final RegExp _expiryPattern = RegExp(r'\bk_exp\s*=\s*"([^"]+)"');
+  static final RegExp _tokenPattern = RegExp(r'\bk_token\s*=\s*"([^"]+)"');
+
   @override
   Future<String?> search(String postUrl) async {
     var expiry = _cachedExpiry;
@@ -31,12 +34,8 @@ class SnapInstaFallbackClient implements InstagramFallbackClient {
         userAgent: AppConstants.defaultUserAgent,
       );
       if (landing.statusCode != 200) return null;
-      expiry = RegExp(
-        r'\bk_exp\s*=\s*"([^"]+)"',
-      ).firstMatch(landing.body)?.group(1);
-      token = RegExp(
-        r'\bk_token\s*=\s*"([^"]+)"',
-      ).firstMatch(landing.body)?.group(1);
+      expiry = _expiryPattern.firstMatch(landing.body)?.group(1);
+      token = _tokenPattern.firstMatch(landing.body)?.group(1);
       if (!ExtractorHttp.isUsingOverrides) {
         _cachedExpiry = expiry;
         _cachedToken = token;

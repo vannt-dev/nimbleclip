@@ -62,8 +62,14 @@ class AnalysisHistoryProvider extends ChangeNotifier {
           ),
         );
       // Rewrite legacy entries immediately so temporary signed CDN URLs do
-      // not remain in local preferences until the next analysis.
-      await _save();
+      // not remain in local preferences until the next analysis. Only legacy
+      // entries carry the nested `metadata` object; rewriting an already
+      // compact store re-encoded the whole list and wrote preferences on every
+      // app start for no gain.
+      final hasLegacyEntries = values.any(
+        (value) => value is Map<String, dynamic> && value['metadata'] is Map,
+      );
+      if (hasLegacyEntries) await _save();
     } catch (_) {
       await prefs.remove(_storageKey);
     }
