@@ -27,18 +27,27 @@ class QualityHelper {
 
     // Explicit resolutions win: "HD 1080p" is 1080, not 720.
     final resolution =
-        RegExp(r'(\d{3,4})\s*p').firstMatch(lower) ??
-        RegExp(r'\d{3,4}\s*[x×]\s*(\d{3,4})').firstMatch(lower);
+        _progressiveHeight.firstMatch(lower) ?? _dimensions.firstMatch(lower);
     if (resolution != null) {
       final value = int.tryParse(resolution.group(1)!);
       if (value != null && value >= 100 && value <= 4320) return value;
     }
 
-    for (final entry in _namedHeights.entries) {
-      if (RegExp('\\b${entry.key}\\b').hasMatch(lower)) return entry.value;
+    for (final entry in _namedHeightPatterns.entries) {
+      if (entry.value.hasMatch(lower)) return _namedHeights[entry.key];
     }
     return null;
   }
+
+  static final RegExp _progressiveHeight = RegExp(r'(\d{3,4})\s*p');
+  static final RegExp _dimensions = RegExp(r'\d{3,4}\s*[x×]\s*(\d{3,4})');
+
+  /// One compiled word-boundary pattern per named tier. `parseHeight` runs for
+  /// every option while sorting, so building these per call recompiled the
+  /// whole table on each comparison.
+  static final Map<String, RegExp> _namedHeightPatterns = {
+    for (final key in _namedHeights.keys) key: RegExp('\\b$key\\b'),
+  };
 
   /// Rank used for ordering: audio-only sinks below every video option so
   /// `bestQuality` and the "Highest" preference never land on an audio track.

@@ -19,10 +19,7 @@ class MediaFormatHelper {
     }
 
     final path = Uri.tryParse(url)?.path ?? url;
-    final match = RegExp(
-      r'\.([a-zA-Z0-9]+)$',
-      caseSensitive: false,
-    ).firstMatch(path);
+    final match = _fileExtensionInsensitive.firstMatch(path);
     final extension = _normalize(match?.group(1));
     if (extension != null && _imageFormats.contains(extension)) {
       return extension == 'jpeg' ? 'jpg' : extension;
@@ -30,11 +27,15 @@ class MediaFormatHelper {
     return 'jpg';
   }
 
+  static final RegExp _fileExtensionInsensitive = RegExp(
+    r'\.([a-zA-Z0-9]+)$',
+    caseSensitive: false,
+  );
+  static final RegExp _fileExtension = RegExp(r'\.([a-zA-Z0-9]+)$');
+
   static bool isImageUrl(String url) {
     final path = Uri.tryParse(url)?.path ?? url;
-    final extension = _normalize(
-      RegExp(r'\.([a-zA-Z0-9]+)$').firstMatch(path)?.group(1),
-    );
+    final extension = _normalize(_fileExtension.firstMatch(path)?.group(1));
     return extension != null && _imageFormats.contains(extension);
   }
 

@@ -242,28 +242,39 @@ class GenericExtractor extends BaseVideoExtractor {
   /// `property=`.
   String? _meta(String html, List<String> keys) {
     for (final key in keys) {
-      final escaped = RegExp.escape(key);
-      final match =
+      final patterns = _metaPatterns.putIfAbsent(key, () {
+        final escaped = RegExp.escape(key);
+        return [
           RegExp(
             '<meta[^>]+(?:property|name)=["\']$escaped["\'][^>]*content=["\']([^"\']*)["\']',
             caseSensitive: false,
-          ).firstMatch(html) ??
+          ),
           RegExp(
             '<meta[^>]+content=["\']([^"\']*)["\'][^>]*(?:property|name)=["\']$escaped["\']',
             caseSensitive: false,
-          ).firstMatch(html);
+          ),
+        ];
+      });
+      final match =
+          patterns[0].firstMatch(html) ?? patterns[1].firstMatch(html);
       final value = match?.group(1);
       if (value != null && value.isNotEmpty) return decodeHtmlEntities(value);
     }
     return null;
   }
 
+  /// Meta keys come from the caller, so the pair of patterns per key is cached
+  /// rather than recompiled on every page.
+  static final Map<String, List<RegExp>> _metaPatterns = {};
+
+  static final RegExp _htmlTitle = RegExp(
+    r'<title[^>]*>(.*?)</title>',
+    caseSensitive: false,
+    dotAll: true,
+  );
+
   String? _title(String html) {
-    final raw = RegExp(
-      r'<title[^>]*>(.*?)</title>',
-      caseSensitive: false,
-      dotAll: true,
-    ).firstMatch(html)?.group(1)?.trim();
+    final raw = _htmlTitle.firstMatch(html)?.group(1)?.trim();
     return raw == null || raw.isEmpty ? null : decodeHtmlEntities(raw);
   }
 
