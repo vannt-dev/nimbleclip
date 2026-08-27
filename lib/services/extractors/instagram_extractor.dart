@@ -14,6 +14,15 @@ import '../../models/video_platform.dart';
 import 'base_extractor.dart';
 import 'instagram_fallback_client.dart';
 import 'instagram_page_parser.dart';
+import 'parse_offloading.dart';
+
+/// Isolate entry points for [InstagramExtractor.extractImageUrls]. Both must be
+/// top-level so they can be sent across an isolate boundary.
+List<String> _imageUrlsWithFallback(String html) =>
+    InstagramExtractor.extractImageUrls(html);
+
+List<String> _imageUrlsWithoutFallback(String html) =>
+    InstagramExtractor.extractImageUrls(html, includeFallback: false);
 
 /// Instagram extractor for public Reels and feed videos.
 ///
@@ -39,6 +48,106 @@ class InstagramExtractor extends BaseVideoExtractor {
 
   static final RegExp _shortcodePattern = RegExp(
     r'/(?:reels?|p|tv)/([A-Za-z0-9_-]+)',
+  );
+
+  /// Same scan as [extractImageUrls], moved off the UI isolate for documents
+  /// large enough to be worth the hand-off.
+  static Future<List<String>> _extractImageUrlsAsync(
+    String html, {
+    bool includeFallback = true,
+  }) => parseOffMainIsolate(
+    includeFallback ? _imageUrlsWithFallback : _imageUrlsWithoutFallback,
+    html,
+    debugLabel: 'instagram.imageUrls',
+  );
+
+  // Hoisted so the fallback-result loop below does not recompile seven
+  // expressions for every `<li>` in a carousel.
+  static final RegExp _listItem = RegExp(
+    r'<li[^>]*>([\s\S]*?)</li>',
+    caseSensitive: false,
+  );
+  static final List<RegExp> _previewPatterns = [
+    RegExp(r'<img[^>]+data-src="([^"]+)"', caseSensitive: false),
+    RegExp(r'<img[^>]+src="([^"]+)"', caseSensitive: false),
+  ];
+  static final RegExp _looksVideo = RegExp(
+    r'icon-dlvideo|<video|(?:type|media)[-_ ]?video|download[-_ ]?video',
+    caseSensitive: false,
+  );
+  static final List<RegExp> _videoDownloadPatterns = [
+    RegExp(
+      r'<a[^>]*title="[^"]*video"[^>]*href="(https://dl\.snapcdn\.app/get\?[^"]+)"[^>]*>',
+      caseSensitive: false,
+    ),
+    RegExp(
+      r'<a[^>]+href="(https://dl\.snapcdn\.app/get\?[^"]+)"[^>]*>[\s\S]*?(?:Tải|Download)[^<]*video',
+      caseSensitive: false,
+    ),
+  ];
+  static final List<RegExp> _downloadPatterns = [
+    RegExp(r'<option[^>]+value="([^"]+)"', caseSensitive: false),
+    RegExp(
+      r'<a[^>]+href="(https://dl\.snapcdn\.app/get\?[^"]+)"',
+      caseSensitive: false,
+    ),
+  ];
+
+  static final RegExp _ogVideo = RegExp(
+    r'<meta[^>]+property="og:video"[^>]+content="([^"]+)"',
+  );
+  static final RegExp _ogImage = RegExp(
+    r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"',
+  );
+  static final RegExp _ogTitle = RegExp(
+    r'<meta[^>]+property="og:title"[^>]+content="([^"]*)"',
+  );
+  static final RegExp _videoUrlField = RegExp(r'"video_url"\s*:\s*"([^"]+)"');
+  static final RegExp _videoVersionsField = RegExp(
+    r'"video_versions"\s*:\s*\[\{[^}]*"url"\s*:\s*"([^"]+)"',
+  );
+  static final RegExp _usernameField = RegExp(r'"username"\s*:\s*"([^"]+)"');
+  static final RegExp _ownerUsernameField = RegExp(
+    r'"owner"\s*:\s*\{[^}]*"username"\s*:\s*"([^"]+)"',
+  );
+  static final RegExp _captionField = RegExp(
+    r'"caption"\s*:\s*"([^"]{1,400})"',
+  );
+  static final RegExp _captionEdgeField = RegExp(
+    r'"edge_media_to_caption":\{"edges":\[\{"node":\{"text":"([^"]*)"',
+  );
+
+  static final List<RegExp> _authorPatterns = [
+    _usernameField,
+    _ownerUsernameField,
+  ];
+  static final List<RegExp> _captionPatterns = [
+    _captionEdgeField,
+    _captionField,
+  ];
+  static final List<RegExp> _embedVideoPatterns = [
+    _videoUrlField,
+    _videoVersionsField,
+    _ogVideo,
+  ];
+  static final List<RegExp> _postPageVideoPatterns = [_ogVideo, _videoUrlField];
+  static final List<RegExp> _thumbnailPatterns = [
+    _displayUrlField,
+    _thumbnailSrcField,
+    _ogImage,
+  ];
+  static final RegExp _displayUrlField = RegExp(r'"display_url":"([^"]+)"');
+  static final RegExp _thumbnailSrcField = RegExp(r'"thumbnail_src":"([^"]+)"');
+  static final RegExp _jsonScripts = RegExp(
+    r'''<script[^>]*type=["']application/json["'][^>]*>([\s\S]*?)</script>''',
+    caseSensitive: false,
+  );
+  // The image fallback below matches the tag case-insensitively, unlike the
+  // `og:image` lookup used for thumbnails. Kept as a separate pattern so the
+  // two call sites keep the behaviour they had.
+  static final RegExp _ogImageInsensitive = RegExp(
+    r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"',
+    caseSensitive: false,
   );
 
   String? _extractShortcode(String url) =>
@@ -108,40 +217,14 @@ class InstagramExtractor extends BaseVideoExtractor {
           sourcePath.contains('/reel/') ||
           sourcePath.contains('/reels/') ||
           sourcePath.contains('/tv/');
-      for (final match in RegExp(
-        r'<li[^>]*>([\s\S]*?)</li>',
-        caseSensitive: false,
-      ).allMatches(resultHtml)) {
+      for (final match in _listItem.allMatches(resultHtml)) {
         final item = match.group(1) ?? '';
-        final preview = _firstGroup(item, [
-          RegExp(r'<img[^>]+data-src="([^"]+)"', caseSensitive: false),
-          RegExp(r'<img[^>]+src="([^"]+)"', caseSensitive: false),
-        ]);
-        final itemLooksVideo = RegExp(
-          r'icon-dlvideo|<video|(?:type|media)[-_ ]?video|download[-_ ]?video',
-          caseSensitive: false,
-        ).hasMatch(item);
+        final preview = _firstGroup(item, _previewPatterns);
+        final itemLooksVideo = _looksVideo.hasMatch(item);
         final videoDownload = itemLooksVideo
-            ? _firstGroup(item, [
-                RegExp(
-                  r'<a[^>]*title="[^"]*video"[^>]*href="(https://dl\.snapcdn\.app/get\?[^"]+)"[^>]*>',
-                  caseSensitive: false,
-                ),
-                RegExp(
-                  r'<a[^>]+href="(https://dl\.snapcdn\.app/get\?[^"]+)"[^>]*>[\s\S]*?(?:Tải|Download)[^<]*video',
-                  caseSensitive: false,
-                ),
-              ])
+            ? _firstGroup(item, _videoDownloadPatterns)
             : null;
-        final download =
-            videoDownload ??
-            _firstGroup(item, [
-              RegExp(r'<option[^>]+value="([^"]+)"', caseSensitive: false),
-              RegExp(
-                r'<a[^>]+href="(https://dl\.snapcdn\.app/get\?[^"]+)"',
-                caseSensitive: false,
-              ),
-            ]);
+        final download = videoDownload ?? _firstGroup(item, _downloadPatterns);
         if (download == null || preview == null) continue;
 
         final cleanDownload = decodeHtmlEntities(download);
@@ -221,29 +304,17 @@ class InstagramExtractor extends BaseVideoExtractor {
       return null;
     }
 
-    final videoUrl = _firstGroup(html, [
-      RegExp(r'"video_url"\s*:\s*"([^"]+)"'),
-      RegExp(r'"video_versions"\s*:\s*\[\{[^}]*"url"\s*:\s*"([^"]+)"'),
-      RegExp(r'<meta[^>]+property="og:video"[^>]+content="([^"]+)"'),
-    ]);
+    final videoUrl = _firstGroup(html, _embedVideoPatterns);
     if (videoUrl == null) {
-      final imageUrls = _extractImageUrls(html);
+      final imageUrls = await _extractImageUrlsAsync(html);
       if (imageUrls.isEmpty) return null;
       return _buildImages(
         l10n: l10n,
         shortcode: shortcode,
         originalUrl: url,
         imageUrls: imageUrls,
-        author: _firstGroup(html, [
-          RegExp(r'"username"\s*:\s*"([^"]+)"'),
-          RegExp(r'"owner"\s*:\s*\{[^}]*"username"\s*:\s*"([^"]+)"'),
-        ]),
-        caption: _firstGroup(html, [
-          RegExp(
-            r'"edge_media_to_caption":\{"edges":\[\{"node":\{"text":"([^"]*)"',
-          ),
-          RegExp(r'"caption"\s*:\s*"([^"]{1,400})"'),
-        ]),
+        author: _firstGroup(html, _authorPatterns),
+        caption: _firstGroup(html, _captionPatterns),
       );
     }
 
@@ -252,22 +323,10 @@ class InstagramExtractor extends BaseVideoExtractor {
       shortcode: shortcode,
       originalUrl: url,
       videoUrl: videoUrl,
-      imageUrls: _extractImageUrls(html, includeFallback: false),
-      thumbnail: _firstGroup(html, [
-        RegExp(r'"display_url":"([^"]+)"'),
-        RegExp(r'"thumbnail_src":"([^"]+)"'),
-        RegExp(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"'),
-      ]),
-      author: _firstGroup(html, [
-        RegExp(r'"username"\s*:\s*"([^"]+)"'),
-        RegExp(r'"owner"\s*:\s*\{[^}]*"username"\s*:\s*"([^"]+)"'),
-      ]),
-      caption: _firstGroup(html, [
-        RegExp(
-          r'"edge_media_to_caption":\{"edges":\[\{"node":\{"text":"([^"]*)"',
-        ),
-        RegExp(r'"caption"\s*:\s*"([^"]{1,400})"'),
-      ]),
+      imageUrls: await _extractImageUrlsAsync(html, includeFallback: false),
+      thumbnail: _firstGroup(html, _thumbnailPatterns),
+      author: _firstGroup(html, _authorPatterns),
+      caption: _firstGroup(html, _captionPatterns),
       durationSeconds: _duration(html),
       viewCount:
           _intField(html, 'video_view_count') ?? _intField(html, 'play_count'),
@@ -295,22 +354,17 @@ class InstagramExtractor extends BaseVideoExtractor {
       return null;
     }
 
-    final videoUrl = _firstGroup(html, [
-      RegExp(r'<meta[^>]+property="og:video"[^>]+content="([^"]+)"'),
-      RegExp(r'"video_url"\s*:\s*"([^"]+)"'),
-    ]);
+    final videoUrl = _firstGroup(html, _postPageVideoPatterns);
     if (videoUrl == null) {
-      final imageUrls = _extractImageUrls(html);
+      final imageUrls = await _extractImageUrlsAsync(html);
       if (imageUrls.isEmpty) return null;
       return _buildImages(
         l10n: l10n,
         shortcode: shortcode,
         originalUrl: url,
         imageUrls: imageUrls,
-        author: _firstGroup(html, [RegExp(r'"username"\s*:\s*"([^"]+)"')]),
-        caption: _firstGroup(html, [
-          RegExp(r'<meta[^>]+property="og:title"[^>]+content="([^"]*)"'),
-        ]),
+        author: _firstGroup(html, [_usernameField]),
+        caption: _firstGroup(html, [_ogTitle]),
       );
     }
 
@@ -319,14 +373,10 @@ class InstagramExtractor extends BaseVideoExtractor {
       shortcode: shortcode,
       originalUrl: url,
       videoUrl: videoUrl,
-      imageUrls: _extractImageUrls(html, includeFallback: false),
-      thumbnail: _firstGroup(html, [
-        RegExp(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"'),
-      ]),
-      author: _firstGroup(html, [RegExp(r'"username"\s*:\s*"([^"]+)"')]),
-      caption: _firstGroup(html, [
-        RegExp(r'<meta[^>]+property="og:title"[^>]+content="([^"]*)"'),
-      ]),
+      imageUrls: await _extractImageUrlsAsync(html, includeFallback: false),
+      thumbnail: _firstGroup(html, [_ogImage]),
+      author: _firstGroup(html, [_usernameField]),
+      caption: _firstGroup(html, [_ogTitle]),
       durationSeconds: _duration(html),
       viewCount: null,
       likeCount: null,
@@ -430,12 +480,21 @@ class InstagramExtractor extends BaseVideoExtractor {
     );
   }
 
-  List<String> _extractImageUrls(String html, {bool includeFallback = true}) {
+  /// Scans a post document for image URLs.
+  ///
+  /// Static and free of instance state so it can run on a background isolate:
+  /// decoding and walking every inline JSON block is the heaviest step of an
+  /// Instagram extraction.
+  static List<String> extractImageUrls(
+    String html, {
+    bool includeFallback = true,
+  }) {
     final urls = <String>[];
+    final seen = <String>{};
 
     void addUrl(dynamic value) {
       final url = value?.toString() ?? '';
-      if (url.isNotEmpty && !urls.contains(url)) urls.add(url);
+      if (url.isNotEmpty && seen.add(url)) urls.add(url);
     }
 
     void addMedia(dynamic value) {
@@ -488,10 +547,7 @@ class InstagramExtractor extends BaseVideoExtractor {
       }
     }
 
-    final scripts = RegExp(
-      r'''<script[^>]*type=["']application/json["'][^>]*>([\s\S]*?)</script>''',
-      caseSensitive: false,
-    ).allMatches(html);
+    final scripts = _jsonScripts.allMatches(html);
     for (final script in scripts) {
       try {
         visit(jsonDecode(decodeHtmlEntities(script.group(1) ?? '')));
@@ -502,17 +558,12 @@ class InstagramExtractor extends BaseVideoExtractor {
     }
 
     if (includeFallback && urls.isEmpty) {
-      for (final match in RegExp(r'"display_url":"([^"]+)"').allMatches(html)) {
+      for (final match in _displayUrlField.allMatches(html)) {
         addUrl(match.group(1));
       }
     }
     if (includeFallback && urls.isEmpty) {
-      addUrl(
-        RegExp(
-          r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"',
-          caseSensitive: false,
-        ).firstMatch(html)?.group(1),
-      );
+      addUrl(_ogImageInsensitive.firstMatch(html)?.group(1));
     }
     return urls;
   }
