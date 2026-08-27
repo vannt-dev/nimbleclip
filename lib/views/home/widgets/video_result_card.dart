@@ -1,14 +1,14 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/platform_style.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/utils/formatters.dart';
-import '../../../core/utils/image_cache_size.dart';
 import '../../../core/utils/media_selection_helper.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/video_metadata.dart';
 import '../image_picker_screen.dart';
+import 'result_media_tabs.dart';
+import 'result_metadata_summary.dart';
+import 'result_quality_list.dart';
+import 'result_thumbnail_header.dart';
 
 class VideoResultCard extends StatefulWidget {
   final VideoMetadata metadata;
@@ -124,138 +124,12 @@ class _VideoResultCardState extends State<VideoResultCard> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // 1. Thumbnail Header with Duration & Play overlay
-          if (previewUrl.isNotEmpty)
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) => CachedNetworkImage(
-                      imageUrl: previewUrl,
-                      fit: BoxFit.cover,
-                      memCacheWidth: imageCacheWidth(
-                        context,
-                        constraints.maxWidth,
-                      ),
-                      placeholder: (context, url) => Container(
-                        color: isDark
-                            ? AppColors.darkCardElevated
-                            : Colors.grey[200],
-                        child: const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => Container(
-                        color: isDark
-                            ? AppColors.darkCardElevated
-                            : Colors.grey[200],
-                        child: Icon(
-                          meta.platform.icon,
-                          size: 48,
-                          color: meta.platform.brandColor,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                // Gradient overlay
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withAlpha(20),
-                          Colors.black.withAlpha(120),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                // Play button to preview
-                InkWell(
-                  onTap: widget.onPreview,
-                  borderRadius: BorderRadius.circular(32),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withAlpha(140),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white70, width: 2),
-                    ),
-                    child: Icon(
-                      widget.selectedQuality?.isImage == true
-                          ? Icons.zoom_in_rounded
-                          : Icons.play_arrow_rounded,
-                      color: Colors.white,
-                      size: 32,
-                    ),
-                  ),
-                ),
-                // Platform Badge
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: meta.platform.brandColor,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(60),
-                          blurRadius: 6,
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(meta.platform.icon, size: 14, color: Colors.white),
-                        const SizedBox(width: 4),
-                        Text(
-                          meta.platform.displayName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                // Duration Pill
-                if (meta.duration != null)
-                  Positioned(
-                    bottom: 12,
-                    right: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withAlpha(180),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        Formatters.formatDuration(meta.duration),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+          ResultThumbnailHeader(
+            metadata: meta,
+            previewUrl: previewUrl,
+            isImagePreview: widget.selectedQuality?.isImage == true,
+            onPreview: widget.onPreview,
+          ),
 
           // 2. Body Details
           Padding(
@@ -263,334 +137,51 @@ class _VideoResultCardState extends State<VideoResultCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Title
-                Text(
-                  meta.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: isDark
-                        ? AppColors.darkTextPrimary
-                        : AppColors.lightTextPrimary,
-                    height: 1.3,
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                // Author & Engagement stats
-                Row(
-                  children: [
-                    if (meta.authorAvatar != null &&
-                        meta.authorAvatar!.isNotEmpty) ...[
-                      ClipOval(
-                        child: CachedNetworkImage(
-                          imageUrl: meta.authorAvatar!,
-                          width: 22,
-                          height: 22,
-                          fit: BoxFit.cover,
-                          memCacheWidth: imageCacheWidth(context, 22),
-                          errorWidget: (context, url, error) =>
-                              const Icon(Icons.person_rounded, size: 18),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    Expanded(
-                      child: Text(
-                        meta.author,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: isDark
-                              ? AppColors.darkTextSecondary
-                              : AppColors.lightTextSecondary,
-                        ),
-                      ),
-                    ),
-                    if (meta.viewCount != null) ...[
-                      Icon(
-                        Icons.visibility_outlined,
-                        size: 14,
-                        color: isDark
-                            ? AppColors.darkTextSecondary
-                            : AppColors.lightTextSecondary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        Formatters.formatCount(meta.viewCount!),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark
-                              ? AppColors.darkTextSecondary
-                              : AppColors.lightTextSecondary,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                    ],
-                    if (meta.likeCount != null) ...[
-                      const Icon(
-                        Icons.favorite_rounded,
-                        size: 14,
-                        color: Colors.redAccent,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        Formatters.formatCount(meta.likeCount!),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark
-                              ? AppColors.darkTextSecondary
-                              : AppColors.lightTextSecondary,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+                ResultMetadataSummary(metadata: meta),
                 const SizedBox(height: 16),
 
                 // 3. Video / Audio Mode Tabs
-                if (audioOptions.isNotEmpty &&
-                    (videoOptions.isNotEmpty || imageOptions.isNotEmpty))
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? AppColors.darkCardElevated
-                          : AppColors.lightCardElevated,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: () {
-                              setState(() => _selectedTab = 0);
-                              if (videoOptions.isNotEmpty) {
-                                widget.onQualitySelected(videoOptions.first);
-                              } else if (imageOptions.isNotEmpty) {
-                                widget.onQualitySelected(imageOptions.first);
-                              }
-                            },
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              decoration: BoxDecoration(
-                                color: _selectedTab == 0
-                                    ? AppColors.primary
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                videoOptions.isNotEmpty
-                                    ? context.l10n.videoOptions(
-                                        videoOptions.length,
-                                      )
-                                    : context.l10n.imageOptions(
-                                        imageOptions.length,
-                                      ),
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: _selectedTab == 0
-                                      ? Colors.white
-                                      : (isDark
-                                            ? AppColors.darkTextSecondary
-                                            : AppColors.lightTextSecondary),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: InkWell(
-                            onTap: () {
-                              setState(() => _selectedTab = 1);
-                              if (audioOptions.isNotEmpty) {
-                                widget.onQualitySelected(audioOptions.first);
-                              }
-                            },
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              decoration: BoxDecoration(
-                                color: _selectedTab == 1
-                                    ? AppColors.primary
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                context.l10n.audioOptions(audioOptions.length),
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: _selectedTab == 1
-                                      ? Colors.white
-                                      : (isDark
-                                            ? AppColors.darkTextSecondary
-                                            : AppColors.lightTextSecondary),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                ResultMediaTabs(
+                  selectedTab: _selectedTab,
+                  videoCount: videoOptions.length,
+                  imageCount: imageOptions.length,
+                  audioCount: audioOptions.length,
+                  onVisualSelected: () {
+                    setState(() => _selectedTab = 0);
+                    if (videoOptions.isNotEmpty) {
+                      widget.onQualitySelected(videoOptions.first);
+                    } else if (imageOptions.isNotEmpty) {
+                      widget.onQualitySelected(imageOptions.first);
+                    }
+                  },
+                  onAudioSelected: () {
+                    setState(() => _selectedTab = 1);
+                    if (audioOptions.isNotEmpty) {
+                      widget.onQualitySelected(audioOptions.first);
+                    }
+                  },
+                ),
 
                 // 4. Quality Selector List
-                if (currentOptions.isNotEmpty) ...[
-                  Text(
-                    context.l10n.selectDownloadQuality,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ...currentOptions.map((opt) {
-                    final isSelected = widget.selectedQuality?.id == opt.id;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: InkWell(
-                        onTap: () => widget.onQualitySelected(opt),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? AppColors.primary.withAlpha(isDark ? 40 : 25)
-                                : (isDark
-                                      ? AppColors.darkCardElevated.withAlpha(
-                                          120,
-                                        )
-                                      : AppColors.lightCardElevated),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : (isDark
-                                        ? AppColors.darkBorder
-                                        : AppColors.lightBorder),
-                              width: isSelected ? 1.5 : 1,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                isSelected
-                                    ? Icons.radio_button_checked_rounded
-                                    : Icons.radio_button_off_rounded,
-                                size: 18,
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : (isDark
-                                          ? AppColors.darkTextSecondary
-                                          : AppColors.lightTextSecondary),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  opt.label,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: isSelected
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                    color: isSelected
-                                        ? (isDark
-                                              ? Colors.white
-                                              : AppColors.primaryDark)
-                                        : (isDark
-                                              ? AppColors.darkTextPrimary
-                                              : AppColors.lightTextPrimary),
-                                  ),
-                                ),
-                              ),
-                              if (opt.sizeBytes != null && opt.sizeBytes! > 0)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isDark
-                                        ? Colors.black26
-                                        : Colors.white,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    Formatters.formatBytes(opt.sizeBytes!),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: isDark
-                                          ? AppColors.darkTextSecondary
-                                          : AppColors.lightTextSecondary,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ],
-                if (imageOptions.isNotEmpty && _selectedTab == 0) ...[
-                  if (currentOptions.isNotEmpty) const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          context.l10n.imageOptions(imageOptions.length),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            if (_selectedImageIds.length ==
-                                imageOptions.length) {
-                              _selectedImageIds.clear();
-                            } else {
-                              _selectedImageIds
-                                ..clear()
-                                ..addAll(
-                                  imageOptions.map((option) => option.id),
-                                );
-                            }
-                          });
-                        },
-                        child: Text(
-                          _selectedImageIds.length == imageOptions.length
-                              ? context.l10n.deselectAll
-                              : context.l10n.selectAll,
-                        ),
-                      ),
-                    ],
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => _openImagePicker(imageOptions),
-                    icon: const Icon(Icons.photo_library_outlined),
-                    label: Text(
-                      '${context.l10n.selectImages} '
-                      '(${_selectedImageIds.length}/${imageOptions.length})',
-                    ),
-                  ),
-                ],
+                ResultQualityList(
+                  options: currentOptions,
+                  selectedQualityId: widget.selectedQuality?.id,
+                  onQualitySelected: widget.onQualitySelected,
+                  imageOptions: imageOptions,
+                  selectedImageIds: _selectedImageIds,
+                  showImageSelection:
+                      imageOptions.isNotEmpty && _selectedTab == 0,
+                  onToggleAllImages: () {
+                    setState(() {
+                      if (_selectedImageIds.length == imageOptions.length) {
+                        _selectedImageIds.clear();
+                      } else {
+                        _selectAllImages();
+                      }
+                    });
+                  },
+                  onOpenPicker: () => _openImagePicker(imageOptions),
+                ),
 
                 const SizedBox(height: 12),
 
