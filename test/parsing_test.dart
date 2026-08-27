@@ -67,6 +67,26 @@ void main() {
       // A literal "&#39;" written as &amp;#39; must not become an apostrophe.
       expect(decodeHtmlEntities('&amp;#39;'), '&#39;');
     });
+
+    test('decodes the remaining named entities', () {
+      expect(decodeHtmlEntities('a&nbsp;b'), 'a b');
+      expect(decodeHtmlEntities('it&apos;s'), "it's");
+      expect(decodeHtmlEntities('&lt;&gt;&amp;'), '<>&');
+    });
+
+    test('decodes a hex numeric entity above the basic plane', () {
+      expect(decodeHtmlEntities('&#x1F600;'), '\u{1F600}');
+    });
+
+    test('leaves a bare ampersand and an unterminated entity alone', () {
+      expect(decodeHtmlEntities('a=1&b=2'), 'a=1&b=2');
+      expect(decodeHtmlEntities('Tom &amp'), 'Tom &amp');
+      expect(decodeHtmlEntities('a & b; c'), 'a & b; c');
+    });
+
+    test('decodes a double-escaped ampersand only once', () {
+      expect(decodeHtmlEntities('&amp;amp;'), '&amp;');
+    });
   });
 
   group('extractBalancedJson', () {
