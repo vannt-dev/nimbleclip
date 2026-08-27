@@ -1,13 +1,11 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
-import '../../core/utils/image_cache_size.dart';
 import '../../core/utils/url_helper.dart';
 import '../../l10n/l10n.dart';
 import '../../models/video_metadata.dart';
@@ -18,6 +16,8 @@ import '../../providers/analysis_history_provider.dart';
 import '../../providers/shared_intent_provider.dart';
 import '../player/video_player_screen.dart';
 import 'widgets/batch_results_card.dart';
+import 'widgets/download_feedback.dart';
+import 'widgets/media_preview_dialog.dart';
 import 'widgets/how_to_guide_card.dart';
 import 'widgets/platform_badges.dart';
 import 'widgets/recent_links_card.dart';
@@ -224,26 +224,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
       if (!mounted) return;
       if (existing.isNotEmpty) {
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: Text(context.l10n.duplicateDownloadTitle),
-            content: Text(
-              context.l10n.duplicateDownloadMessage(existing.length),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: Text(context.l10n.cancel),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: Text(context.l10n.downloadAgain),
-              ),
-            ],
-          ),
+        final confirmed = await DownloadFeedback.confirmDuplicate(
+          context,
+          existing.length,
         );
-        if (confirmed != true || !mounted) return;
+        if (!confirmed || !mounted) return;
       }
 
       final tasks = await provider.startNewDownloads(
@@ -254,55 +239,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
       if (!mounted) return;
       if (tasks.isEmpty) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(context.l10n.downloadAlreadyInProgress),
-              action: SnackBarAction(
-                label: context.l10n.viewProgress,
-                onPressed: widget.onNavigateDownloads,
-              ),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+        DownloadFeedback.showAlreadyInProgress(
+          context,
+          onViewProgress: widget.onNavigateDownloads,
+        );
         return;
       }
 
-      final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
-      final notification = messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            tasks.length == 1
-                ? context.l10n.downloadStarted(
-                    meta.title,
-                    tasks.first.qualityLabel,
-                  )
-                : context.l10n.batchDownloadStarted(tasks.length),
-          ),
-          action: SnackBarAction(
-            label: context.l10n.viewProgress,
-            textColor: AppColors.tiktokAccent,
-            onPressed: widget.onNavigateDownloads,
-          ),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(days: 1),
-        ),
+      DownloadFeedback.showStarted(
+        context,
+        provider: provider,
+        tasks: tasks,
+        title: meta.title,
+        onViewProgress: widget.onNavigateDownloads,
       );
-      void closeWhenFinished() {
-        final finished = tasks.every((task) => !task.isActive);
-        if (!finished) return;
-        provider.removeListener(closeWhenFinished);
-        notification.close();
-      }
-
-      provider.addListener(closeWhenFinished);
-      unawaited(
-        notification.closed.then((_) {
-          provider.removeListener(closeWhenFinished);
-        }),
-      );
-      closeWhenFinished();
     }
   }
 
@@ -331,14 +281,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       queued += tasks.length;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(context.l10n.batchDownloadStarted(queued)),
-        action: SnackBarAction(
-          label: context.l10n.viewProgress,
-          onPressed: widget.onNavigateDownloads,
-        ),
-      ),
+    DownloadFeedback.showBatchStarted(
+      context,
+      queued: queued,
+      onViewProgress: widget.onNavigateDownloads,
     );
   }
 
@@ -365,47 +311,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     if (meta != null && quality != null) {
       if (quality.isImage) {
-        unawaited(
-          showDialog<void>(
-            context: context,
-            builder: (dialogContext) => Dialog(
-              clipBehavior: Clip.antiAlias,
-              child: Stack(
-                children: [
-                  InteractiveViewer(
-                    minScale: 0.8,
-                    maxScale: 4,
-                    child: CachedNetworkImage(
-                      imageUrl: quality.downloadUrl,
-                      // Instagram and Facebook CDNs reject image requests that
-                      // arrive without the Referer the extractor collected, so
-                      // the preview has to send what the download sends.
-                      httpHeaders: quality.headers,
-                      fit: BoxFit.contain,
-                      memCacheWidth: previewCacheWidth(dialogContext),
-                      placeholder: (_, _) => const SizedBox(
-                        height: 320,
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                      errorWidget: (_, _, _) => const SizedBox(
-                        height: 240,
-                        child: Center(child: Icon(Icons.broken_image_outlined)),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: IconButton.filledTonal(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+        unawaited(MediaPreviewDialog.show(context, quality));
         return;
       }
       unawaited(

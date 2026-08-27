@@ -7,6 +7,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/image_cache_size.dart';
 import '../../l10n/l10n.dart';
 import '../../models/video_metadata.dart';
+import 'widgets/media_preview_dialog.dart';
 
 /// A lazy, full-screen image chooser for carousel posts.
 ///
@@ -48,44 +49,7 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
   }
 
   void _preview(VideoQualityOption option) {
-    unawaited(
-      showDialog<void>(
-        context: context,
-        builder: (dialogContext) => Dialog(
-          clipBehavior: Clip.antiAlias,
-          child: Stack(
-            children: [
-              InteractiveViewer(
-                minScale: 0.8,
-                maxScale: 4,
-                child: CachedNetworkImage(
-                  imageUrl: option.downloadUrl,
-                  httpHeaders: option.headers,
-                  fit: BoxFit.contain,
-                  memCacheWidth: previewCacheWidth(dialogContext),
-                  placeholder: (_, _) => const SizedBox(
-                    height: 360,
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  errorWidget: (_, _, _) => const SizedBox(
-                    height: 280,
-                    child: Center(child: Icon(Icons.broken_image_outlined)),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 4,
-                right: 4,
-                child: IconButton.filledTonal(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    unawaited(MediaPreviewDialog.show(context, option));
   }
 
   @override
