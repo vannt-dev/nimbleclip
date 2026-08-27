@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/platform_style.dart';
 import 'package:provider/provider.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/analysis_history_entry.dart';

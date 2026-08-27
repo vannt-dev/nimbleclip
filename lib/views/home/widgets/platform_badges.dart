@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/platform_style.dart';
 import '../../../models/video_platform.dart';
 
 class PlatformBadges extends StatelessWidget {
