@@ -926,6 +926,12 @@ abstract class AppLocalizations {
   /// **'M4A audio ({kbps} kbps)'**
   String audioM4aLabel(int kbps);
 
+  /// No description provided for @videoBitrateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{quality} ({kbps} kbps)'**
+  String videoBitrateLabel(String quality, int kbps);
+
   /// No description provided for @youtubeLoadFailed.
   ///
   /// In en, this message translates to:

@@ -499,6 +499,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String videoBitrateLabel(String quality, int kbps) {
+    return '$quality ($kbps kbps)';
+  }
+
+  @override
   String youtubeLoadFailed(String error) {
     return 'Could not load the YouTube page: $error';
   }
