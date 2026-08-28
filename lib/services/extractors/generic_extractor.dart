@@ -4,7 +4,7 @@ import '../../core/utils/http_helper.dart';
 import '../../core/utils/media_format_helper.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/text_unescape.dart';
-import '../../l10n/generated/app_localizations.dart';
+import '../../models/quality_descriptor.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -51,13 +51,13 @@ class GenericExtractor extends BaseVideoExtractor {
   bool canHandle(String url) => true;
 
   @override
-  Future<VideoMetadata> extract(String url, AppLocalizations l10n) async {
+  Future<VideoMetadata> extract(String url) async {
     final cleanUrl = url.trim();
     final uri = Uri.parse(cleanUrl);
     final id = DateTime.now().millisecondsSinceEpoch.toString();
 
     final direct = _directMediaFormat(uri);
-    if (direct != null) return _directMedia(uri, cleanUrl, id, direct, l10n);
+    if (direct != null) return _directMedia(uri, cleanUrl, id, direct);
 
     // An extensionless media URL may point at a multi-gigabyte file. Probe its
     // headers first so extraction never buffers the payload just to inspect
@@ -68,7 +68,7 @@ class GenericExtractor extends BaseVideoExtractor {
           cleanUrl,
           timeout: const Duration(seconds: 8),
         );
-        final media = _fromMediaHeaders(head, uri, cleanUrl, id, l10n);
+        final media = _fromMediaHeaders(head, uri, cleanUrl, id);
         if (media != null) return media;
       } catch (_) {
         // Many sites reject HEAD. Fall through to the HTML GET path.
@@ -91,10 +91,10 @@ class GenericExtractor extends BaseVideoExtractor {
     }
 
     // The URL had no media extension but the server says it is media anyway.
-    final media = _fromMediaHeaders(response, uri, cleanUrl, id, l10n);
+    final media = _fromMediaHeaders(response, uri, cleanUrl, id);
     if (media != null) return media;
 
-    return _fromOpenGraph(response.body, uri, cleanUrl, id, l10n);
+    return _fromOpenGraph(response.body, uri, cleanUrl, id);
   }
 
   VideoMetadata? _fromMediaHeaders(
@@ -102,7 +102,6 @@ class GenericExtractor extends BaseVideoExtractor {
     Uri uri,
     String cleanUrl,
     String id,
-    AppLocalizations l10n,
   ) {
     final contentType = (response.headers['content-type'] ?? '').toLowerCase();
     if (!contentType.startsWith('video/') &&
@@ -117,7 +116,8 @@ class GenericExtractor extends BaseVideoExtractor {
       id: id,
       originalUrl: cleanUrl,
       title: _fileNameOf(uri) ?? 'Media Stream ($id)',
-      description: l10n.directMediaLink,
+      // Nothing renders VideoMetadata.description; this was filler text.
+      description: null,
       author: uri.host,
       coverUrl: '',
       platform: VideoPlatform.generic,
@@ -125,10 +125,10 @@ class GenericExtractor extends BaseVideoExtractor {
         VideoQualityOption(
           id: 'gen_$id',
           label: isImage
-              ? l10n.imageLabel(1)
+              ? const ImageIndex(1)
               : isAudio
-              ? l10n.originalAudio
-              : l10n.originalVideo,
+              ? const OriginalAudio()
+              : const OriginalVideo(),
           quality: 'Original',
           format: format,
           downloadUrl: cleanUrl,
@@ -151,20 +151,15 @@ class GenericExtractor extends BaseVideoExtractor {
     return null;
   }
 
-  VideoMetadata _directMedia(
-    Uri uri,
-    String url,
-    String id,
-    String format,
-    AppLocalizations l10n,
-  ) {
+  VideoMetadata _directMedia(Uri uri, String url, String id, String format) {
     final isAudio = _audioFormats.contains(format);
     final isImage = _imageFormats.contains(format);
     return VideoMetadata(
       id: id,
       originalUrl: url,
       title: _fileNameOf(uri) ?? 'Direct_Media_$id',
-      description: l10n.directMediaLink,
+      // Nothing renders VideoMetadata.description; this was filler text.
+      description: null,
       author: uri.host,
       coverUrl: '',
       platform: VideoPlatform.generic,
@@ -172,10 +167,10 @@ class GenericExtractor extends BaseVideoExtractor {
         VideoQualityOption(
           id: 'gen_$id',
           label: isImage
-              ? l10n.imageLabel(1)
+              ? const ImageIndex(1)
               : isAudio
-              ? l10n.originalAudio
-              : l10n.originalVideo,
+              ? const OriginalAudio()
+              : const OriginalVideo(),
           quality: 'Original',
           format: format,
           downloadUrl: url,
@@ -189,13 +184,7 @@ class GenericExtractor extends BaseVideoExtractor {
     );
   }
 
-  VideoMetadata _fromOpenGraph(
-    String html,
-    Uri uri,
-    String url,
-    String id,
-    AppLocalizations l10n,
-  ) {
+  VideoMetadata _fromOpenGraph(String html, Uri uri, String url, String id) {
     final videoUrl =
         _meta(html, ['og:video:secure_url', 'og:video:url', 'og:video']) ??
         _meta(html, ['twitter:player:stream']);
@@ -226,7 +215,7 @@ class GenericExtractor extends BaseVideoExtractor {
         if (resolved != null)
           VideoQualityOption.video(
             id: 'gen_og_$id',
-            label: l10n.embeddedVideo,
+            label: const EmbeddedVideo(),
             quality: height != null ? '${height}p' : 'Original',
             format: 'mp4',
             downloadUrl: resolved,
@@ -236,7 +225,7 @@ class GenericExtractor extends BaseVideoExtractor {
         if (resolved == null && resolvedImage != null)
           VideoQualityOption.image(
             id: 'gen_image_$id',
-            label: l10n.imageLabel(1),
+            label: const ImageIndex(1),
             quality: 'Original',
             format: MediaFormatHelper.inferImageFormat(resolvedImage),
             downloadUrl: resolvedImage,

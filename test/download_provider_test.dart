@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nimble_clip/l10n/generated/app_localizations.dart';
+import 'package:nimble_clip/l10n/quality_descriptor_text.dart';
+import 'package:nimble_clip/models/quality_descriptor.dart';
 import 'package:nimble_clip/models/download_task.dart';
 import 'package:nimble_clip/models/download_options.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
@@ -175,7 +177,7 @@ VideoMetadata _metadata(int count) => VideoMetadata(
     count,
     (index) => VideoQualityOption(
       id: 'image-${index + 1}',
-      label: 'Image ${index + 1}',
+      label: ImageIndex(index + 1),
       quality: 'Image ${index + 1}',
       format: 'jpg',
       downloadUrl: 'https://cdn.example.com/${index + 1}.jpg',
@@ -229,6 +231,27 @@ void main() {
       expect(provider.completedTasks.single.filePath, '/tmp/native-task.jpg');
     },
   );
+
+  test('a started download persists its label as rendered text', () async {
+    // The extractors now hand over a QualityDescriptor rather than a string,
+    // but DownloadTask.qualityLabel is written to storage and read back by
+    // builds that predate descriptors. It must stay the rendered sentence, not
+    // a descriptor token, so no history migration is needed.
+    final provider = _provider(
+      _ControlledDownloadService(),
+      _MemoryStorageService(),
+    );
+
+    final tasks = await provider.startNewDownloads(
+      metadata: _metadata(1),
+      qualities: _metadata(1).qualities,
+      l10n: l10n,
+      options: const DownloadOptions(autoSaveToGallery: false),
+    );
+
+    expect(tasks.single.qualityLabel, l10n.imageLabel(1));
+    expect(tasks.single.qualityLabel, 'Image 1');
+  });
 
   test(
     'queue caps concurrency globally and skips a cancelled queued task',
@@ -413,7 +436,7 @@ void main() {
         originalUrl: metadata.originalUrl,
         platform: metadata.platform,
         sourceOptionId: metadata.qualities.single.id,
-        qualityLabel: metadata.qualities.single.label,
+        qualityLabel: describeQuality(metadata.qualities.single.label, l10n),
         format: 'jpg',
         kind: MediaKind.image,
         status: DownloadStatus.completed,
@@ -446,7 +469,7 @@ void main() {
       originalUrl: metadata.originalUrl,
       platform: metadata.platform,
       sourceOptionId: metadata.qualities.single.id,
-      qualityLabel: metadata.qualities.single.label,
+      qualityLabel: describeQuality(metadata.qualities.single.label, l10n),
       format: metadata.qualities.single.format,
       kind: metadata.qualities.single.kind,
       status: DownloadStatus.completed,
@@ -458,6 +481,7 @@ void main() {
     final matches = await provider.findExistingDownloads(
       metadata: metadata,
       qualities: metadata.qualities,
+      l10n: l10n,
     );
 
     expect(matches, hasLength(1));
@@ -476,7 +500,7 @@ void main() {
       originalUrl: metadata.originalUrl,
       platform: metadata.platform,
       sourceOptionId: metadata.qualities.single.id,
-      qualityLabel: metadata.qualities.single.label,
+      qualityLabel: describeQuality(metadata.qualities.single.label, l10n),
       format: 'jpg',
       kind: MediaKind.image,
       status: DownloadStatus.completed,
@@ -492,6 +516,7 @@ void main() {
       await provider.findExistingDownloads(
         metadata: metadata,
         qualities: metadata.qualities,
+        l10n: l10n,
       ),
       hasLength(1),
     );
@@ -511,7 +536,7 @@ void main() {
         originalUrl: metadata.originalUrl,
         platform: metadata.platform,
         sourceOptionId: metadata.qualities.single.id,
-        qualityLabel: metadata.qualities.single.label,
+        qualityLabel: describeQuality(metadata.qualities.single.label, l10n),
         format: 'jpg',
         kind: MediaKind.image,
         status: DownloadStatus.completed,
@@ -527,6 +552,7 @@ void main() {
         await provider.findExistingDownloads(
           metadata: metadata,
           qualities: metadata.qualities,
+          l10n: l10n,
         ),
         isEmpty,
       );

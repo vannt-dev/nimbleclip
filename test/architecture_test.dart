@@ -72,9 +72,18 @@ void main() {
     );
   });
 
-  // Known debt, deliberately not asserted yet: `lib/services/extractors/` still
-  // imports AppLocalizations, because quality labels are built there and are
-  // still translated strings. Phase 2 of
-  // docs/superpowers/specs/2026-08-27-extractor-decoupling-design.md moves
-  // labels to typed descriptors; add the rule here once it lands.
+  test('the extractor layer carries no localizations', () {
+    // Extractors describe an option with a QualityDescriptor and report a
+    // failure with an ExtractionFailure; both are turned into text by the
+    // caller. Nothing in the layer should need a locale.
+    final extractors = [
+      ...?layers['services'],
+    ].where((file) => file.path.replaceAll(r'\', '/').contains('/extractors/'));
+    expect(extractors, isNotEmpty);
+    _expectNoImports(
+      files: extractors.toList(),
+      forbidden: ['app_localizations'],
+      rule: 'lib/services/extractors/ must not import the localizations.',
+    );
+  });
 }

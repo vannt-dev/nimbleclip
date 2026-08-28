@@ -53,7 +53,10 @@ class QualityHelper {
   /// `bestQuality` and the "Highest" preference never land on an audio track.
   static int rankOf(VideoQualityOption option) {
     if (option.isAudioOnly) return -1;
-    return parseHeight(option.quality) ?? parseHeight(option.label) ?? 0;
+    // `label` used to be a second place to look for a resolution. It is now a
+    // descriptor with no text to parse, and every option sets `quality`, which
+    // is the field this was backing up.
+    return parseHeight(option.quality) ?? 0;
   }
 
   /// Returns [options] ordered best-first. Stable for equal ranks, so the order

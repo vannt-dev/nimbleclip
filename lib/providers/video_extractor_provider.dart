@@ -71,7 +71,7 @@ class VideoExtractorProvider extends ChangeNotifier {
     final stopwatch = Stopwatch()..start();
 
     try {
-      final metadata = await _extractorRegistry.extract(cleanUrl, l10n);
+      final metadata = await _extractorRegistry.extract(cleanUrl);
       if (sequence != _requestSequence) return false;
 
       _metadata = metadata;
@@ -152,7 +152,7 @@ class VideoExtractorProvider extends ChangeNotifier {
         final url = cleanUrls[index];
         final stopwatch = Stopwatch()..start();
         try {
-          final metadata = await _extractorRegistry.extract(url, l10n);
+          final metadata = await _extractorRegistry.extract(url);
           results[index] = BatchAnalysisResult(
             url: url,
             metadata: metadata,
@@ -200,7 +200,7 @@ class VideoExtractorProvider extends ChangeNotifier {
     notifyListeners();
     final stopwatch = Stopwatch()..start();
     try {
-      final metadata = await _extractorRegistry.extract(url, l10n);
+      final metadata = await _extractorRegistry.extract(url);
       final updated = [..._batchResults];
       updated[index] = BatchAnalysisResult(
         url: url,

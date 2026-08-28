@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import '../core/utils/file_action_result.dart';
 import '../l10n/generated/app_localizations.dart';
+import '../l10n/quality_descriptor_text.dart';
 import '../core/utils/quality_helper.dart';
 import '../models/download_task.dart';
 import '../models/download_options.dart';
@@ -182,6 +183,7 @@ class DownloadProvider extends ChangeNotifier {
   Future<List<DownloadTask>> findExistingDownloads({
     required VideoMetadata metadata,
     required List<VideoQualityOption> qualities,
+    required AppLocalizations l10n,
   }) async {
     await _historyReady;
     final receipts = await _historyRepository.loadDownloadReceipts();
@@ -198,7 +200,7 @@ class DownloadProvider extends ChangeNotifier {
 
     for (final task in candidates) {
       if (task.status != DownloadStatus.completed ||
-          !_matchesSelection(task, metadata, qualities)) {
+          !_matchesSelection(task, metadata, qualities, l10n)) {
         continue;
       }
       final localExists =
@@ -233,6 +235,7 @@ class DownloadProvider extends ChangeNotifier {
     DownloadTask task,
     VideoMetadata metadata,
     List<VideoQualityOption> qualities,
+    AppLocalizations l10n,
   ) {
     final sameSource =
         task.platform == metadata.platform &&
@@ -244,7 +247,8 @@ class DownloadProvider extends ChangeNotifier {
       if (task.sourceOptionId.isNotEmpty && quality.id.isNotEmpty) {
         return task.sourceOptionId == quality.id;
       }
-      return task.qualityLabel == quality.label && task.kind == quality.kind;
+      return task.qualityLabel == describeQuality(quality.label, l10n) &&
+          task.kind == quality.kind;
     });
   }
 
@@ -263,7 +267,7 @@ class DownloadProvider extends ChangeNotifier {
       (quality) => !_tasks.any(
         (task) =>
             (task.isActive || task.status == DownloadStatus.paused) &&
-            _matchesSelection(task, metadata, [quality]),
+            _matchesSelection(task, metadata, [quality], l10n),
       ),
     );
     final tasks = pendingQualities
@@ -282,7 +286,7 @@ class DownloadProvider extends ChangeNotifier {
             originalUrl: metadata.originalUrl,
             platform: metadata.platform,
             sourceOptionId: quality.id,
-            qualityLabel: quality.label,
+            qualityLabel: describeQuality(quality.label, l10n),
             format: quality.format,
             kind: quality.kind,
             headers: quality.headers,
@@ -437,14 +441,16 @@ class DownloadProvider extends ChangeNotifier {
   ) async {
     if (task.originalUrl.isEmpty) return null;
     try {
-      final metadata = await _extractorRegistry.extract(task.originalUrl, l10n);
+      final metadata = await _extractorRegistry.extract(task.originalUrl);
       if (task.sourceOptionId.isNotEmpty) {
         for (final option in metadata.qualities) {
           if (option.id == task.sourceOptionId) return option;
         }
       }
       for (final option in metadata.qualities) {
-        if (option.label == task.qualityLabel) return option;
+        if (describeQuality(option.label, l10n) == task.qualityLabel) {
+          return option;
+        }
       }
       return QualityHelper.bestMatch(
         metadata.qualities,

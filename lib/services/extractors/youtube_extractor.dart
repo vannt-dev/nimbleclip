@@ -8,7 +8,7 @@ import '../../core/utils/http_helper.dart';
 import '../../core/utils/cors_helper.dart';
 import '../../core/utils/json_scanner.dart';
 import '../../core/utils/quality_helper.dart';
-import '../../l10n/generated/app_localizations.dart';
+import '../../models/quality_descriptor.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -34,11 +34,11 @@ class YouTubeExtractor extends BaseVideoExtractor {
       _videoIdPattern.firstMatch(url)?.group(1);
 
   @override
-  Future<VideoMetadata> extract(String url, AppLocalizations l10n) async {
+  Future<VideoMetadata> extract(String url) async {
     // Native platforms get the real deal: youtube_explode_dart deciphers
     // signature-protected stream URLs, which plain HTML scraping cannot.
     if (!kIsWeb && useNativeClient) {
-      final native = await _extractNative(url, l10n);
+      final native = await _extractNative(url);
       if (native != null) return native;
     }
 
@@ -48,13 +48,10 @@ class YouTubeExtractor extends BaseVideoExtractor {
         const ExtractionFailure(ExtractionFailureKind.youtubeInvalidId),
       );
     }
-    return _extractFromWatchPage(url, videoId, l10n);
+    return _extractFromWatchPage(url, videoId);
   }
 
-  Future<VideoMetadata?> _extractNative(
-    String url,
-    AppLocalizations l10n,
-  ) async {
+  Future<VideoMetadata?> _extractNative(String url) async {
     final yt = yt_lib.YoutubeExplode();
     try {
       final video = await yt.videos.get(url);
@@ -65,7 +62,7 @@ class YouTubeExtractor extends BaseVideoExtractor {
         qualities.add(
           VideoQualityOption(
             id: 'yt_muxed_${stream.tag}',
-            label: l10n.videoAndAudioLabel(stream.qualityLabel),
+            label: VideoWithAudio(stream.qualityLabel),
             quality: stream.qualityLabel,
             format: stream.container.name,
             downloadUrl: stream.url.toString(),
@@ -81,7 +78,7 @@ class YouTubeExtractor extends BaseVideoExtractor {
         qualities.add(
           VideoQualityOption(
             id: 'yt_audio_${bestAudio.tag}',
-            label: l10n.audioM4aLabel(kbps),
+            label: AudioM4a(kbps),
             quality: 'Audio ($kbps kbps)',
             format: 'm4a',
             downloadUrl: bestAudio.url.toString(),
@@ -119,7 +116,6 @@ class YouTubeExtractor extends BaseVideoExtractor {
   Future<VideoMetadata> _extractFromWatchPage(
     String url,
     String videoId,
-    AppLocalizations l10n,
   ) async {
     final http.Response response;
     try {
@@ -212,7 +208,7 @@ class YouTubeExtractor extends BaseVideoExtractor {
       qualities.add(
         VideoQualityOption(
           id: 'yt_video_${videoId}_$i',
-          label: l10n.videoAndAudioLabel(quality),
+          label: VideoWithAudio(quality),
           quality: quality,
           format: mimeType.contains('webm') ? 'webm' : 'mp4',
           downloadUrl: directUrl,
@@ -245,7 +241,7 @@ class YouTubeExtractor extends BaseVideoExtractor {
       qualities.add(
         VideoQualityOption(
           id: 'yt_audio_$videoId',
-          label: l10n.audioM4aLabel(kbps),
+          label: AudioM4a(kbps),
           quality: 'Audio ($kbps kbps)',
           format: 'm4a',
           downloadUrl: bestAudio['url'].toString(),

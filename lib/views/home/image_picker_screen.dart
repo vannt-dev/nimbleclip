@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/image_cache_size.dart';
 import '../../l10n/l10n.dart';
+import '../../l10n/quality_descriptor_text.dart';
 import '../../models/video_metadata.dart';
 import 'widgets/media_preview_dialog.dart';
 
@@ -94,7 +95,7 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
           final option = widget.options[index];
           final selected = _selectedIds.contains(option.id);
           return Semantics(
-            label: option.label,
+            label: describeQuality(option.label, context.l10n),
             selected: selected,
             button: true,
             child: Material(
@@ -160,7 +161,7 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
                       right: 6,
                       bottom: 6,
                       child: Text(
-                        option.label,
+                        describeQuality(option.label, context.l10n),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(

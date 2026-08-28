@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:nimble_clip/models/quality_descriptor.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/providers/analysis_history_provider.dart';
@@ -16,7 +17,7 @@ VideoMetadata metadata(int index, {String? url}) => VideoMetadata(
   qualities: [
     VideoQualityOption.video(
       id: 'q$index',
-      label: '720p',
+      label: const Hd720(),
       quality: '720p',
       format: 'mp4',
       downloadUrl: 'https://cdn.example.com/$index.mp4',

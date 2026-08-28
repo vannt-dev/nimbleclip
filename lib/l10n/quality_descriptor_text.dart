@@ -14,7 +14,9 @@ String describeQuality(QualityDescriptor descriptor, AppLocalizations l10n) {
     OriginalMp4() => l10n.originalMp4,
     OriginalAudio() => l10n.originalAudio,
     EmbeddedVideo() => l10n.embeddedVideo,
-    AudioMp3(:final title) => l10n.audioMp3Label(title),
+    AudioMp3(:final title) => l10n.audioMp3Label(
+      title == null || title.isEmpty ? l10n.originalSound : title,
+    ),
     AudioM4a(:final kbps) => l10n.audioM4aLabel(kbps),
     VideoWithAudio(:final quality) => l10n.videoAndAudioLabel(quality),
     WatermarkedVideo(:final quality, :final watermarked) =>
