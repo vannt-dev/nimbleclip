@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:nimble_clip/core/utils/http_helper.dart';
+import 'package:nimble_clip/core/utils/quality_helper.dart';
 import 'package:nimble_clip/models/quality_descriptor.dart';
 import 'package:nimble_clip/core/utils/external_service_policy.dart';
 import 'package:nimble_clip/models/video_platform.dart';
@@ -15,6 +16,21 @@ import 'package:nimble_clip/services/extractors/instagram_extractor.dart';
 import 'package:nimble_clip/services/extractors/tiktok_extractor.dart';
 import 'package:nimble_clip/services/extractors/twitter_extractor.dart';
 import 'package:nimble_clip/services/extractors/youtube_extractor.dart';
+
+/// A post holding both photos and video must default to the video.
+///
+/// Regression: `VideoQualityOption.image` leaves `quality` at 'Original',
+/// which the named-height table reads as 2160. Every photo therefore outranked
+/// every video, the default selection landed on a photo, and the video tab —
+/// which lists video options only — showed nothing selected.
+void _expectDefaultSelectionIsVideo(VideoMetadata result) {
+  expect(result.qualities.any((option) => option.isImage), isTrue);
+  expect(
+    QualityHelper.bestMatch(result.qualities, 'Highest')!.isImage,
+    isFalse,
+  );
+  expect(result.bestQuality!.isImage, isFalse);
+}
 
 String fixture(String name) =>
     File('test/fixtures/extractors/$name').readAsStringSync();
@@ -109,6 +125,7 @@ void main() {
 
     expect(result.qualities.where((option) => option.isImage), hasLength(2));
     expect(result.qualities.where((option) => !option.isImage), hasLength(1));
+    _expectDefaultSelectionIsVideo(result);
   });
 
   test('Facebook parses playable URLs from a page fixture', () async {
@@ -299,6 +316,7 @@ void main() {
       ),
       hasLength(1),
     );
+    _expectDefaultSelectionIsVideo(result);
   });
 
   test('Instagram parses a public embed fixture', () async {
@@ -343,6 +361,7 @@ void main() {
       ),
       hasLength(1),
     );
+    _expectDefaultSelectionIsVideo(result);
   });
 
   test(
