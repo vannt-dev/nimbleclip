@@ -221,6 +221,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final existing = await provider.findExistingDownloads(
         metadata: meta,
         qualities: selected,
+        l10n: context.l10n,
       );
       if (!mounted) return;
       if (existing.isNotEmpty) {
@@ -270,6 +271,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final existing = await downloads.findExistingDownloads(
         metadata: metadata,
         qualities: [quality],
+        l10n: l10n,
       );
       if (existing.isNotEmpty) continue;
       final tasks = await downloads.startNewDownloads(

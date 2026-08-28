@@ -5,7 +5,7 @@ import '../../core/utils/external_service_policy.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/text_unescape.dart';
 import '../../core/utils/url_helper.dart';
-import '../../l10n/generated/app_localizations.dart';
+import '../../models/quality_descriptor.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -59,7 +59,7 @@ class FacebookExtractor extends BaseVideoExtractor {
   }
 
   @override
-  Future<VideoMetadata> extract(String url, AppLocalizations l10n) async {
+  Future<VideoMetadata> extract(String url) async {
     var cleanUrl = url.trim();
     if (UrlHelper.isShortLink(cleanUrl)) {
       cleanUrl = await ExtractorHttp.resolveRedirects(cleanUrl);
@@ -86,10 +86,10 @@ class FacebookExtractor extends BaseVideoExtractor {
     }
 
     // Strategy 1: the watch page itself.
-    var result = await _fromPage(cleanUrl, cleanUrl, l10n);
+    var result = await _fromPage(cleanUrl, cleanUrl);
     final pageVideo = accept(result);
     if (pageVideo != null) {
-      return _withPostPhotoFallback(pageVideo, cleanUrl, l10n);
+      return _withPostPhotoFallback(pageVideo, cleanUrl);
     }
 
     // Strategy 2: the embed player. It serves a much smaller page that still
@@ -97,10 +97,10 @@ class FacebookExtractor extends BaseVideoExtractor {
     // interstitial than the full watch page.
     final embedUrl =
         'https://www.facebook.com/plugins/video.php?href=${Uri.encodeComponent(cleanUrl)}';
-    result = await _fromPage(embedUrl, cleanUrl, l10n);
+    result = await _fromPage(embedUrl, cleanUrl);
     final embedVideo = accept(result);
     if (embedVideo != null) {
-      return _withPostPhotoFallback(embedVideo, cleanUrl, l10n);
+      return _withPostPhotoFallback(embedVideo, cleanUrl);
     }
 
     // Strategy 3: the mobile site, which renders a plainer document.
@@ -111,12 +111,12 @@ class FacebookExtractor extends BaseVideoExtractor {
     result = await _fromPage(
       mobileUrl,
       cleanUrl,
-      l10n,
+
       userAgent: AppConstants.mobileUserAgent,
     );
     final mobileVideo = accept(result);
     if (mobileVideo != null) {
-      return _withPostPhotoFallback(mobileVideo, cleanUrl, l10n);
+      return _withPostPhotoFallback(mobileVideo, cleanUrl);
     }
 
     if (imageFallback != null) {
@@ -127,7 +127,7 @@ class FacebookExtractor extends BaseVideoExtractor {
           attemptedStrategies: const ['page', 'embed', 'mobile'],
         );
       }
-      return _withPostPhotoFallback(imageFallback!, cleanUrl, l10n);
+      return _withPostPhotoFallback(imageFallback!, cleanUrl);
     }
 
     throw ExtractionException(
@@ -157,7 +157,6 @@ class FacebookExtractor extends BaseVideoExtractor {
   Future<VideoMetadata> _withPostPhotoFallback(
     VideoMetadata metadata,
     String postUrl,
-    AppLocalizations l10n,
   ) async {
     final uri = Uri.tryParse(postUrl);
     final isPostPermalink =
@@ -201,7 +200,7 @@ class FacebookExtractor extends BaseVideoExtractor {
           VideoQualityOption.image(
             id: 'fb_image_${index + 1}_${metadata.id}',
             mediaId: 'fb_image_${index + 1}_${metadata.id}',
-            label: l10n.imageLabel(index + 1),
+            label: ImageIndex(index + 1),
             quality: 'Original',
             format: MediaFormatHelper.inferImageFormat(fallbackImages[index]),
             downloadUrl: fallbackImages[index],
@@ -258,8 +257,7 @@ class FacebookExtractor extends BaseVideoExtractor {
 
   Future<VideoMetadata?> _fromPage(
     String pageUrl,
-    String originalUrl,
-    AppLocalizations l10n, {
+    String originalUrl, {
     String userAgent = AppConstants.defaultUserAgent,
   }) async {
     final String html;
@@ -294,7 +292,7 @@ class FacebookExtractor extends BaseVideoExtractor {
         VideoQualityOption.video(
           id: 'fb_hd_$id',
           mediaId: 'fb_video_$id',
-          label: l10n.highQuality720,
+          label: const Hd720(),
           quality: 'HD 720p',
           format: 'mp4',
           downloadUrl: hdUrl,
@@ -303,7 +301,7 @@ class FacebookExtractor extends BaseVideoExtractor {
         VideoQualityOption.video(
           id: 'fb_sd_$id',
           mediaId: 'fb_video_$id',
-          label: l10n.standardQuality480,
+          label: const Sd480(),
           quality: 'SD 480p',
           format: 'mp4',
           downloadUrl: sdUrl,
@@ -312,7 +310,7 @@ class FacebookExtractor extends BaseVideoExtractor {
         VideoQualityOption.video(
           id: 'fb_original_$id',
           mediaId: 'fb_video_$id',
-          label: l10n.originalVideo,
+          label: const OriginalVideo(),
           quality: 'Original',
           format: 'mp4',
           downloadUrl: openGraphVideoUrl,
@@ -321,7 +319,7 @@ class FacebookExtractor extends BaseVideoExtractor {
         VideoQualityOption.image(
           id: 'fb_image_${index + 1}_$id',
           mediaId: 'fb_image_${index + 1}_$id',
-          label: l10n.imageLabel(index + 1),
+          label: ImageIndex(index + 1),
           quality: 'Original',
           format: MediaFormatHelper.inferImageFormat(photoUrls[index]),
           downloadUrl: photoUrls[index],

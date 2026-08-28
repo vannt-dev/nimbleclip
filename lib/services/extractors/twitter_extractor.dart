@@ -5,7 +5,7 @@ import '../../core/utils/media_format_helper.dart';
 import '../../core/utils/external_service_policy.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/url_helper.dart';
-import '../../l10n/generated/app_localizations.dart';
+import '../../models/quality_descriptor.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -30,7 +30,7 @@ class TwitterExtractor extends BaseVideoExtractor {
       _tweetIdPattern.firstMatch(url)?.group(1);
 
   @override
-  Future<VideoMetadata> extract(String url, AppLocalizations l10n) async {
+  Future<VideoMetadata> extract(String url) async {
     var cleanUrl = url.trim();
     var tweetId = _extractTweetId(cleanUrl);
 
@@ -52,10 +52,10 @@ class TwitterExtractor extends BaseVideoExtractor {
       );
     }
 
-    final viaFx = await _fromFxTwitter(tweetId, cleanUrl, l10n);
+    final viaFx = await _fromFxTwitter(tweetId, cleanUrl);
     if (viaFx != null) return viaFx;
 
-    final viaVx = await _fromVxTwitter(tweetId, cleanUrl, l10n);
+    final viaVx = await _fromVxTwitter(tweetId, cleanUrl);
     if (viaVx != null) return viaVx;
 
     throw ExtractionException(
@@ -63,11 +63,7 @@ class TwitterExtractor extends BaseVideoExtractor {
     );
   }
 
-  Future<VideoMetadata?> _fromFxTwitter(
-    String tweetId,
-    String url,
-    AppLocalizations l10n,
-  ) async {
+  Future<VideoMetadata?> _fromFxTwitter(String tweetId, String url) async {
     final Map<String, dynamic> json;
     try {
       final response = await ExtractorHttp.getWithRetry(
@@ -119,7 +115,7 @@ class TwitterExtractor extends BaseVideoExtractor {
           VideoQualityOption.video(
             id: 'x_${tweetId}_${videoIndex}_$variantIndex',
             mediaId: 'x_video_${tweetId}_$videoIndex',
-            label: '$quality ($kbps kbps)',
+            label: VideoBitrate(quality, kbps),
             quality: quality,
             format: 'mp4',
             downloadUrl: variantUrl,
@@ -137,7 +133,7 @@ class TwitterExtractor extends BaseVideoExtractor {
           VideoQualityOption.video(
             id: 'x_${tweetId}_${videoIndex}_default',
             mediaId: 'x_video_${tweetId}_$videoIndex',
-            label: l10n.originalMp4,
+            label: const OriginalMp4(),
             quality: 'Original',
             format: 'mp4',
             downloadUrl: directUrl,
@@ -155,7 +151,7 @@ class TwitterExtractor extends BaseVideoExtractor {
         VideoQualityOption.image(
           id: 'x_image_${tweetId}_$photoIndex',
           mediaId: 'x_image_${tweetId}_$photoIndex',
-          label: l10n.imageLabel(photoIndex + 1),
+          label: ImageIndex(photoIndex + 1),
           quality: 'Original',
           format: MediaFormatHelper.inferImageFormat(
             photoUrl,
@@ -176,9 +172,12 @@ class TwitterExtractor extends BaseVideoExtractor {
     return VideoMetadata(
       id: tweetId,
       originalUrl: url,
+      // A post with no text falls back to its handle. That reads the same in
+      // every language, which is what lets this layer drop its localizations;
+      // the previous "Post by @handle" was the last translated string here.
       title: text != null && text.isNotEmpty
           ? text
-          : l10n.xPostBy((author['screen_name'] ?? 'X').toString()),
+          : '@${author['screen_name'] ?? 'X'}',
       description: text,
       author:
           author['name']?.toString() ??
@@ -201,11 +200,7 @@ class TwitterExtractor extends BaseVideoExtractor {
     );
   }
 
-  Future<VideoMetadata?> _fromVxTwitter(
-    String tweetId,
-    String url,
-    AppLocalizations l10n,
-  ) async {
+  Future<VideoMetadata?> _fromVxTwitter(String tweetId, String url) async {
     final Map<String, dynamic> json;
     try {
       final response = await ExtractorHttp.getWithRetry(
@@ -240,8 +235,8 @@ class TwitterExtractor extends BaseVideoExtractor {
             id: 'vx_${tweetId}_$index',
             mediaId: 'vx_media_${tweetId}_$index',
             label: MediaFormatHelper.isImageUrl(mediaUrls[index])
-                ? l10n.imageLabel(index + 1)
-                : l10n.originalMp4,
+                ? ImageIndex(index + 1)
+                : const OriginalMp4(),
             quality: 'Original',
             format: MediaFormatHelper.isImageUrl(mediaUrls[index])
                 ? MediaFormatHelper.inferImageFormat(mediaUrls[index])

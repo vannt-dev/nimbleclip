@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nimble_clip/core/utils/media_format_helper.dart';
 import 'package:nimble_clip/core/utils/media_url_helper.dart';
+import 'package:nimble_clip/models/quality_descriptor.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 
@@ -60,20 +61,20 @@ void main() {
 
     const image = VideoQualityOption.image(
       id: 'image',
-      label: 'Image',
+      label: ImageIndex(1),
       format: 'jpg',
       downloadUrl: 'https://cdn.example/image.jpg',
     );
     const video = VideoQualityOption.video(
       id: 'video',
-      label: 'Video',
+      label: OriginalMp4(),
       quality: '720p',
       format: 'mp4',
       downloadUrl: 'https://cdn.example/video.mp4',
     );
     const audio = VideoQualityOption.audio(
       id: 'audio',
-      label: 'Audio',
+      label: OriginalAudio(),
       quality: 'Audio',
       format: 'mp3',
       downloadUrl: 'https://cdn.example/audio.mp3',

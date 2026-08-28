@@ -1,11 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:nimble_clip/core/utils/http_helper.dart';
+import 'package:nimble_clip/models/quality_descriptor.dart';
 import 'package:nimble_clip/core/utils/external_service_policy.dart';
-import 'package:nimble_clip/l10n/generated/app_localizations.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/services/extractors/base_extractor.dart';
@@ -21,7 +20,6 @@ String fixture(String name) =>
     File('test/fixtures/extractors/$name').readAsStringSync();
 
 void main() {
-  final l10n = lookupAppLocalizations(const Locale('en'));
   tearDown(() {
     ExtractorHttp.resetOverrides();
   });
@@ -30,7 +28,7 @@ void main() {
     await expectLater(
       const TikTokExtractor(
         externalServiceAccess: FixedExternalServiceAccess(false),
-      ).extract('https://www.tiktok.com/@u/video/1', l10n),
+      ).extract('https://www.tiktok.com/@u/video/1'),
       throwsA(
         // Asserted on identity, not on wording. The previous version checked
         // that the text contained "disabled", which the new `toString()` also
@@ -50,13 +48,20 @@ void main() {
 
     final result = await const TikTokExtractor().extract(
       'https://www.tiktok.com/@u/video/1',
-      l10n,
     );
 
     expect(result.platform, VideoPlatform.tiktok);
     expect(result.title, 'TikTok fixture');
     expect(result.qualities, hasLength(2));
     expect(result.qualities.first.downloadUrl, endsWith('/video/hd.mp4'));
+    // Asserted on the descriptor, not on rendered text: the layer no longer
+    // produces wording, so a locale change cannot move this test.
+    expect(
+      result.qualities.first.label,
+      isA<WatermarkedVideo>()
+          .having((label) => label.quality, 'quality', 'HD 1080p')
+          .having((label) => label.watermarked, 'watermarked', isFalse),
+    );
   });
 
   test('TikTok exposes every slideshow image as a download option', () async {
@@ -65,7 +70,6 @@ void main() {
 
     final result = await const TikTokExtractor().extract(
       'https://www.tiktok.com/@u/photo/1',
-      l10n,
     );
 
     final images = result.qualities.where((option) => option.isImage).toList();
@@ -73,6 +77,7 @@ void main() {
     expect(images.first.format, 'jpg');
     expect(images.last.downloadUrl, endsWith('/images/image-2.webp'));
     expect(images.last.format, 'webp');
+    expect(images.map((option) => (option.label as ImageIndex).index), [1, 2]);
   });
 
   test('X parses and sorts the FxTwitter fixture', () async {
@@ -81,13 +86,17 @@ void main() {
 
     final result = await const TwitterExtractor().extract(
       'https://x.com/fixture/status/123456789',
-      l10n,
     );
 
     expect(result.platform, VideoPlatform.twitter);
     expect(result.author, 'Fixture User');
     expect(result.qualities.first.quality, '720p');
     expect(result.qualities, hasLength(2));
+    // X names its variants by bitrate rather than by resolution alone.
+    expect(
+      result.qualities.first.label,
+      isA<VideoBitrate>().having((label) => label.quality, 'quality', '720p'),
+    );
   });
 
   test('X exposes videos and photos from the same post', () async {
@@ -96,7 +105,6 @@ void main() {
 
     final result = await const TwitterExtractor().extract(
       'https://x.com/fixture/status/987654321',
-      l10n,
     );
 
     expect(result.qualities.where((option) => option.isImage), hasLength(2));
@@ -109,7 +117,6 @@ void main() {
 
     final result = await const FacebookExtractor().extract(
       'https://www.facebook.com/watch/?v=123456',
-      l10n,
     );
 
     expect(result.platform, VideoPlatform.facebook);
@@ -137,7 +144,6 @@ void main() {
 
     final result = await const FacebookExtractor().extract(
       'https://www.facebook.com/share/r/1DoJYK37gr/',
-      l10n,
     );
 
     expect(requestedPaths, ['/share/r/1DoJYK37gr/', '/reel/123456/']);
@@ -167,7 +173,6 @@ void main() {
 
       final result = await const FacebookExtractor().extract(
         'https://www.facebook.com/share/r/ShareToken/',
-        l10n,
       );
 
       expect(result.qualities, hasLength(1));
@@ -194,7 +199,6 @@ void main() {
 
       final result = await const FacebookExtractor().extract(
         'https://www.facebook.com/example/videos/123456/',
-        l10n,
       );
 
       expect(requestCount, 2);
@@ -209,7 +213,6 @@ void main() {
 
     final result = await const FacebookExtractor().extract(
       'https://www.facebook.com/photo/?fbid=654321',
-      l10n,
     );
 
     expect(result.qualities, hasLength(1));
@@ -223,7 +226,6 @@ void main() {
 
     final result = await const FacebookExtractor().extract(
       'https://www.facebook.com/example/posts/654321',
-      l10n,
     );
 
     expect(result.qualities, hasLength(2));
@@ -252,7 +254,6 @@ void main() {
 
       final result = await const FacebookExtractor().extract(
         'https://www.facebook.com/example/posts/richest',
-        l10n,
       );
 
       expect(result.qualities.where((option) => option.isImage), hasLength(2));
@@ -269,7 +270,6 @@ void main() {
 
       final result = await const FacebookExtractor().extract(
         'https://www.facebook.com/cebuanafinance/posts/662287040177856/',
-        l10n,
       );
 
       final images = result.qualities
@@ -290,7 +290,6 @@ void main() {
 
     final result = await const FacebookExtractor().extract(
       'https://www.facebook.com/example/posts/mixed123',
-      l10n,
     );
 
     expect(result.qualities.where((option) => option.isImage), hasLength(2));
@@ -308,7 +307,6 @@ void main() {
 
     final result = await const InstagramExtractor().extract(
       'https://www.instagram.com/reel/fixture123/',
-      l10n,
     );
 
     expect(result.platform, VideoPlatform.instagram);
@@ -322,7 +320,6 @@ void main() {
 
     final result = await const InstagramExtractor().extract(
       'https://www.instagram.com/p/imageFixture/',
-      l10n,
     );
 
     expect(result.author, 'fixture_photographer');
@@ -337,7 +334,6 @@ void main() {
 
     final result = await const InstagramExtractor().extract(
       'https://www.instagram.com/p/mixedFixture/',
-      l10n,
     );
 
     expect(result.qualities.where((option) => option.isImage), hasLength(2));
@@ -370,7 +366,6 @@ void main() {
 
       final result = await const InstagramExtractor().extract(
         'https://www.instagram.com/p/carousel/',
-        l10n,
       );
 
       expect(result.qualities, hasLength(2));
@@ -395,7 +390,6 @@ void main() {
 
     final result = await const InstagramExtractor().extract(
       'https://www.instagram.com/reel/videoFixture/',
-      l10n,
     );
 
     expect(result.qualities, hasLength(1));
@@ -413,7 +407,7 @@ void main() {
 
     final result = await const YouTubeExtractor(
       useNativeClient: false,
-    ).extract('https://www.youtube.com/watch?v=abcdefghijk', l10n);
+    ).extract('https://www.youtube.com/watch?v=abcdefghijk');
 
     expect(result.platform, VideoPlatform.youtube);
     expect(result.title, 'YouTube fixture');
@@ -429,7 +423,6 @@ void main() {
 
     final result = await const GenericExtractor().extract(
       'https://fixture.example/post',
-      l10n,
     );
 
     expect(result.platform, VideoPlatform.generic);
@@ -449,7 +442,6 @@ void main() {
 
     final result = await const GenericExtractor().extract(
       'https://fixture.example/media/photo.png',
-      l10n,
     );
 
     expect(result.qualities.single.isImage, isTrue);
@@ -465,7 +457,6 @@ void main() {
 
     final result = await const GenericExtractor().extract(
       'https://fixture.example/image-post',
-      l10n,
     );
 
     expect(result.qualities.single.isImage, isTrue);

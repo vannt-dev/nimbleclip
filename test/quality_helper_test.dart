@@ -1,16 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nimble_clip/core/utils/quality_helper.dart';
+import 'package:nimble_clip/models/quality_descriptor.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
 
 VideoQualityOption option(
   String quality, {
   bool audio = false,
   int? sizeBytes,
-  String? label,
+  String? id,
 }) {
   return VideoQualityOption(
-    id: quality,
-    label: label ?? quality,
+    id: id ?? quality,
+    label: audio ? const OriginalAudio() : const OriginalMp4(),
     quality: quality,
     format: audio ? 'mp3' : 'mp4',
     downloadUrl: 'https://cdn.example.com/${quality.replaceAll(' ', '_')}.mp4',
@@ -64,10 +65,10 @@ void main() {
 
     test('is stable for options of equal rank', () {
       final sorted = QualityHelper.sortedByQuality([
-        option('720p', label: 'first'),
-        option('720p', label: 'second'),
+        option('720p', id: 'first'),
+        option('720p', id: 'second'),
       ]);
-      expect(sorted.map((o) => o.label).toList(), ['first', 'second']);
+      expect(sorted.map((o) => o.id).toList(), ['first', 'second']);
     });
   });
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../l10n/l10n.dart';
+import '../../../l10n/quality_descriptor_text.dart';
 import '../../../models/video_metadata.dart';
 
 /// The download options for the active tab, plus the image-selection controls
@@ -149,7 +150,7 @@ class _QualityRow extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                option.label,
+                describeQuality(option.label, context.l10n),
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,

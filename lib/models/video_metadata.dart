@@ -1,10 +1,11 @@
+import 'quality_descriptor.dart';
 import 'video_platform.dart';
 
 enum MediaKind { video, audio, image }
 
 class VideoQualityOption {
   final String id;
-  final String label;
+  final QualityDescriptor label;
   final String quality; // e.g. "1080p", "720p", "480p", "Audio"
   final String format; // "mp4", "mp3", "m4a"
   final String downloadUrl;
@@ -71,7 +72,7 @@ class VideoQualityOption {
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'label': label,
+    'label': qualityDescriptorToken(label),
     'quality': quality,
     'format': format,
     'downloadUrl': downloadUrl,
@@ -85,7 +86,10 @@ class VideoQualityOption {
   factory VideoQualityOption.fromJson(Map<String, dynamic> json) =>
       VideoQualityOption(
         id: json['id'] as String? ?? '',
-        label: json['label'] as String? ?? '',
+        // Payloads written before descriptors existed carry a translated
+        // string here. The only reader of that path discards its qualities, so
+        // the text is kept verbatim rather than guessed back into a variant.
+        label: LiteralLabel(json['label'] as String? ?? ''),
         quality: json['quality'] as String? ?? '',
         format: json['format'] as String? ?? 'mp4',
         downloadUrl: json['downloadUrl'] as String? ?? '',

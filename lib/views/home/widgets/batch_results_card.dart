@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../l10n/l10n.dart';
+import '../../../l10n/quality_descriptor_text.dart';
 import '../../../models/video_metadata.dart';
 import '../../../providers/video_extractor_provider.dart';
 
@@ -77,8 +78,11 @@ class _BatchResultTile extends StatelessWidget {
       return Text(error, maxLines: 2, overflow: TextOverflow.ellipsis);
     }
     final qualities = result.metadata!.qualities;
+    final selected = result.selectedQuality;
     if (qualities.length <= 1) {
-      return Text(result.selectedQuality?.label ?? '');
+      return Text(
+        selected == null ? '' : describeQuality(selected.label, context.l10n),
+      );
     }
     return DropdownButton<VideoQualityOption>(
       value: result.selectedQuality,
@@ -88,7 +92,7 @@ class _BatchResultTile extends StatelessWidget {
           DropdownMenuItem(
             value: quality,
             child: Text(
-              quality.label,
+              describeQuality(quality.label, context.l10n),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

@@ -5,7 +5,7 @@ import '../../core/utils/http_helper.dart';
 import '../../core/utils/media_format_helper.dart';
 import '../../core/utils/external_service_policy.dart';
 import '../../core/utils/quality_helper.dart';
-import '../../l10n/generated/app_localizations.dart';
+import '../../models/quality_descriptor.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -28,7 +28,7 @@ class TikTokExtractor extends BaseVideoExtractor {
       path.startsWith('http') ? path : '$_apiBase$path';
 
   @override
-  Future<VideoMetadata> extract(String url, AppLocalizations l10n) async {
+  Future<VideoMetadata> extract(String url) async {
     if (!externalServiceAccess.allowExternalServices) {
       throw ExtractionException(
         const ExtractionFailure(ExtractionFailureKind.externalServicesDisabled),
@@ -90,8 +90,7 @@ class TikTokExtractor extends BaseVideoExtractor {
         VideoQualityOption.image(
           id: 'tt_image_${index + 1}_$id',
           mediaId: 'tt_image_${index + 1}_$id',
-          label: l10n.imageLabel(index + 1),
-          quality: l10n.imageLabel(index + 1),
+          label: ImageIndex(index + 1),
           format: MediaFormatHelper.inferImageFormat(imageUrl),
           downloadUrl: _absolute(imageUrl),
         ),
@@ -104,7 +103,7 @@ class TikTokExtractor extends BaseVideoExtractor {
         VideoQualityOption.video(
           id: 'tt_hd_$id',
           mediaId: 'tt_video_$id',
-          label: 'HD 1080p (${l10n.noWatermark})',
+          label: const WatermarkedVideo('HD 1080p', watermarked: false),
           quality: 'HD 1080p',
           format: 'mp4',
           downloadUrl: _absolute(hdPlay),
@@ -119,7 +118,7 @@ class TikTokExtractor extends BaseVideoExtractor {
         VideoQualityOption.video(
           id: 'tt_sd_$id',
           mediaId: 'tt_video_$id',
-          label: '720p (${l10n.noWatermark})',
+          label: const WatermarkedVideo('720p', watermarked: false),
           quality: '720p',
           format: 'mp4',
           downloadUrl: _absolute(play),
@@ -137,7 +136,7 @@ class TikTokExtractor extends BaseVideoExtractor {
         VideoQualityOption.video(
           id: 'tt_wm_$id',
           mediaId: 'tt_video_$id',
-          label: '720p (${l10n.withWatermark})',
+          label: const WatermarkedVideo('720p', watermarked: true),
           quality: '720p',
           format: 'mp4',
           downloadUrl: _absolute(wmPlay),
@@ -149,11 +148,11 @@ class TikTokExtractor extends BaseVideoExtractor {
     final music = data['music']?.toString();
     if (music != null && music.isNotEmpty) {
       final musicInfo = data['music_info'] as Map<String, dynamic>? ?? {};
-      final musicTitle = musicInfo['title']?.toString() ?? l10n.originalSound;
+      final musicTitle = musicInfo['title']?.toString();
       qualities.add(
         VideoQualityOption.audio(
           id: 'tt_audio_$id',
-          label: l10n.audioMp3Label(musicTitle),
+          label: AudioMp3(musicTitle),
           quality: 'Audio MP3',
           format: 'mp3',
           downloadUrl: _absolute(music),

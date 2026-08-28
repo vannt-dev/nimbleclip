@@ -7,6 +7,7 @@ import 'package:provider/single_child_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nimble_clip/l10n/generated/app_localizations.dart';
 import 'package:nimble_clip/models/download_task.dart';
+import 'package:nimble_clip/models/quality_descriptor.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/providers/download_provider.dart';
 import 'package:nimble_clip/providers/settings_provider.dart';
@@ -86,10 +87,10 @@ Widget _host(Widget child, {List<SingleChildWidget> providers = const []}) {
   return MultiProvider(providers: providers, child: app);
 }
 
-VideoQualityOption _image(String id) => VideoQualityOption.image(
+VideoQualityOption _image(String id, int index) => VideoQualityOption.image(
   id: id,
   mediaId: id,
-  label: id,
+  label: ImageIndex(index),
   quality: 'Original',
   format: 'jpg',
   downloadUrl: 'https://cdn.example.com/$id.jpg',
@@ -308,7 +309,7 @@ void main() {
     testWidgets('starts from the given selection and can select them all', (
       tester,
     ) async {
-      final options = [_image('a'), _image('b'), _image('c')];
+      final options = [_image('a', 1), _image('b', 2), _image('c', 3)];
       await tester.pumpWidget(
         _host(
           ImagePickerScreen(

@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nimble_clip/l10n/generated/app_localizations.dart';
+import 'package:nimble_clip/models/quality_descriptor.dart';
 import 'package:nimble_clip/core/utils/formatters.dart';
 import 'package:nimble_clip/main.dart';
 import 'package:nimble_clip/models/video_platform.dart';
@@ -30,8 +31,7 @@ class _FixtureExtractorRegistry extends ExtractorRegistry {
   final VideoMetadata metadata;
 
   @override
-  Future<VideoMetadata> extract(String rawUrl, AppLocalizations l10n) async =>
-      metadata;
+  Future<VideoMetadata> extract(String rawUrl) async => metadata;
 }
 
 class _FailingExtractorRegistry extends ExtractorRegistry {
@@ -40,7 +40,7 @@ class _FailingExtractorRegistry extends ExtractorRegistry {
   final Object error;
 
   @override
-  Future<VideoMetadata> extract(String rawUrl, AppLocalizations l10n) async {
+  Future<VideoMetadata> extract(String rawUrl) async {
     throw error;
   }
 }
@@ -50,7 +50,7 @@ class _ConcurrentFixtureRegistry extends ExtractorRegistry {
   int maximumActive = 0;
 
   @override
-  Future<VideoMetadata> extract(String rawUrl, AppLocalizations l10n) async {
+  Future<VideoMetadata> extract(String rawUrl) async {
     active++;
     if (active > maximumActive) maximumActive = active;
     await Future<void>.delayed(const Duration(milliseconds: 5));
@@ -65,7 +65,7 @@ class _ConcurrentFixtureRegistry extends ExtractorRegistry {
       qualities: [
         VideoQualityOption.video(
           id: rawUrl,
-          label: 'HD',
+          label: const Hd720(),
           quality: '720p',
           format: 'mp4',
           downloadUrl: '$rawUrl/video.mp4',
@@ -113,7 +113,7 @@ void main() {
 
     test('rejects a non-http link before touching the network', () async {
       await expectLater(
-        registry.extract('not a url', l10n),
+        registry.extract('not a url'),
         throwsA(isA<Exception>()),
       );
     });
@@ -267,7 +267,7 @@ void main() {
   ) async {
     const quality = VideoQualityOption(
       id: 'fixture-image',
-      label: 'Original',
+      label: ImageIndex(1),
       quality: 'Original',
       format: 'jpg',
       downloadUrl: 'https://cdn.example.com/photo.jpg',
@@ -333,7 +333,7 @@ void main() {
   ) async {
     const quality = VideoQualityOption.video(
       id: 'fixture-video',
-      label: 'HD',
+      label: Hd720(),
       quality: '720p',
       format: 'mp4',
       downloadUrl: 'https://example.com/video.mp4',
@@ -431,7 +431,7 @@ void main() {
       const hd = VideoQualityOption(
         id: 'video-hd',
         mediaId: 'video-1',
-        label: 'HD',
+        label: Hd720(),
         quality: '720p',
         format: 'mp4',
         downloadUrl: 'https://example.com/video-hd.mp4',
@@ -439,7 +439,7 @@ void main() {
       const sd = VideoQualityOption(
         id: 'video-sd',
         mediaId: 'video-1',
-        label: 'SD',
+        label: Sd480(),
         quality: '480p',
         format: 'mp4',
         downloadUrl: 'https://example.com/video-sd.mp4',
@@ -447,7 +447,7 @@ void main() {
       const image1 = VideoQualityOption(
         id: 'image-1',
         mediaId: 'image-1',
-        label: 'Image 1',
+        label: ImageIndex(1),
         quality: 'Original',
         format: 'jpg',
         downloadUrl: 'https://example.com/image-1.jpg',
@@ -456,7 +456,7 @@ void main() {
       const image2 = VideoQualityOption(
         id: 'image-2',
         mediaId: 'image-2',
-        label: 'Image 2',
+        label: ImageIndex(2),
         quality: 'Original',
         format: 'webp',
         downloadUrl: 'https://example.com/image-2.webp',
@@ -506,14 +506,14 @@ void main() {
     const hd = VideoQualityOption.video(
       id: 'v-hd',
       mediaId: 'v',
-      label: 'HD',
+      label: Hd720(),
       quality: '720p',
       format: 'mp4',
       downloadUrl: 'https://cdn.example.com/v.mp4',
     );
     const audio = VideoQualityOption.audio(
       id: 'a-mp3',
-      label: 'Audio MP3',
+      label: AudioMp3(null),
       quality: 'Audio',
       format: 'mp3',
       downloadUrl: 'https://cdn.example.com/a.mp3',
@@ -562,7 +562,7 @@ void main() {
       await tester.pump();
 
       expect(selected, audio);
-      expect(find.text('Audio MP3'), findsWidgets);
+      expect(find.text('MP3 audio (Original sound)'), findsWidgets);
     });
 
     testWidgets('the summary shows title, author, duration and stats', (
@@ -614,7 +614,7 @@ void main() {
 
       expect(find.text('Video (1)'), findsNothing);
       expect(find.text('Audio (0)'), findsNothing);
-      expect(find.text('HD'), findsWidgets);
+      expect(find.text('HD 720p (High quality)'), findsWidgets);
     });
   });
 }

@@ -38,9 +38,12 @@ class EmbeddedVideo extends QualityDescriptor {
 }
 
 /// An audio track named after the sound it carries.
+///
+/// [title] is null when the source did not name the track; the renderer
+/// supplies the wording for that, which keeps the fallback translatable.
 class AudioMp3 extends QualityDescriptor {
   const AudioMp3(this.title);
-  final String title;
+  final String? title;
 }
 
 class AudioM4a extends QualityDescriptor {
@@ -77,4 +80,31 @@ class VideoBitrate extends QualityDescriptor {
 class LiteralLabel extends QualityDescriptor {
   const LiteralLabel(this.text);
   final String text;
+}
+
+/// A locale-independent name for [descriptor], for the one place that has to
+/// write a label without a locale in hand: `VideoMetadata.toJson`.
+///
+/// Deliberately lossy. Reading such a payload back produces a [LiteralLabel]
+/// holding this token rather than the original variant, which is acceptable
+/// because the sole reader — the legacy branch of
+/// `AnalysisHistoryEntry.fromJson` — discards the qualities it decodes. Do not
+/// show a token to a reader; use `describeQuality` for that.
+String qualityDescriptorToken(QualityDescriptor descriptor) {
+  return switch (descriptor) {
+    ImageIndex(:final index) => 'image:$index',
+    Hd720() => 'hd720',
+    Sd480() => 'sd480',
+    OriginalVideo() => 'originalVideo',
+    OriginalMp4() => 'originalMp4',
+    OriginalAudio() => 'originalAudio',
+    EmbeddedVideo() => 'embeddedVideo',
+    AudioMp3(:final title) => 'audioMp3:${title ?? ""}',
+    AudioM4a(:final kbps) => 'audioM4a:$kbps',
+    VideoWithAudio(:final quality) => 'videoWithAudio:$quality',
+    WatermarkedVideo(:final quality, :final watermarked) =>
+      'watermarked:$quality:$watermarked',
+    VideoBitrate(:final quality, :final kbps) => 'bitrate:$quality:$kbps',
+    LiteralLabel(:final text) => text,
+  };
 }

@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nimble_clip/l10n/generated/app_localizations.dart';
+import 'package:nimble_clip/l10n/quality_descriptor_text.dart';
+import 'package:nimble_clip/models/quality_descriptor.dart';
 import 'package:nimble_clip/models/download_task.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/models/video_platform.dart';
@@ -21,7 +23,7 @@ import 'package:nimble_clip/views/home/home_screen.dart';
 const _quality = VideoQualityOption.video(
   id: 'v-hd',
   mediaId: 'v',
-  label: 'HD 720p',
+  label: Hd720(),
   quality: '720p',
   format: 'mp4',
   downloadUrl: 'https://cdn.example.com/clip.mp4',
@@ -39,8 +41,7 @@ const _metadata = VideoMetadata(
 
 class _FixtureRegistry extends ExtractorRegistry {
   @override
-  Future<VideoMetadata> extract(String rawUrl, AppLocalizations l10n) async =>
-      _metadata;
+  Future<VideoMetadata> extract(String rawUrl) async => _metadata;
 }
 
 /// Records what was started without touching the network or the filesystem.
@@ -109,6 +110,8 @@ class _SeededHistory implements DownloadHistoryRepository, MediaFileActions {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+final _en = lookupAppLocalizations(const Locale('en'));
+
 DownloadTask _completedTask() => DownloadTask(
   id: 'already-here',
   videoId: _metadata.id,
@@ -119,7 +122,7 @@ DownloadTask _completedTask() => DownloadTask(
   originalUrl: _metadata.originalUrl,
   platform: _metadata.platform,
   sourceOptionId: _quality.id,
-  qualityLabel: _quality.label,
+  qualityLabel: describeQuality(_quality.label, _en),
   format: 'mp4',
   status: DownloadStatus.completed,
   filePath: '/downloads/already-here.mp4',
@@ -132,10 +135,7 @@ Future<void> _pumpHome(
   final extractor = VideoExtractorProvider(
     extractorRegistry: _FixtureRegistry(),
   );
-  await extractor.analyzeUrl(
-    _metadata.originalUrl,
-    l10n: lookupAppLocalizations(const Locale('en')),
-  );
+  await extractor.analyzeUrl(_metadata.originalUrl, l10n: _en);
 
   await tester.pumpWidget(
     MultiProvider(

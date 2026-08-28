@@ -1,6 +1,4 @@
-import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:nimble_clip/l10n/generated/app_localizations.dart';
 import 'package:nimble_clip/services/extractors/registry.dart';
 
 const _runLive = bool.fromEnvironment('RUN_LIVE_EXTRACTOR_TESTS');
@@ -8,8 +6,6 @@ const _instagramImageUrl = String.fromEnvironment('INSTAGRAM_IMAGE_URL');
 const _instagramVideoUrl = String.fromEnvironment('INSTAGRAM_VIDEO_URL');
 
 void main() {
-  final l10n = lookupAppLocalizations(const Locale('en'));
-
   final registry = ExtractorRegistry();
 
   final cases = <String, ({String url, int minimumMedia})>{
@@ -43,7 +39,7 @@ void main() {
     test(
       entry.key,
       () async {
-        final metadata = await registry.extract(entry.value.url, l10n);
+        final metadata = await registry.extract(entry.value.url);
         expect(
           metadata.qualities.length,
           greaterThanOrEqualTo(entry.value.minimumMedia),

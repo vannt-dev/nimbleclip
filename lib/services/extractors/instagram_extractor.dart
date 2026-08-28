@@ -8,7 +8,7 @@ import '../../core/utils/external_service_policy.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/text_unescape.dart';
 import '../../core/utils/url_helper.dart';
-import '../../l10n/generated/app_localizations.dart';
+import '../../models/quality_descriptor.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -155,7 +155,7 @@ class InstagramExtractor extends BaseVideoExtractor {
       _shortcodePattern.firstMatch(url)?.group(1);
 
   @override
-  Future<VideoMetadata> extract(String url, AppLocalizations l10n) async {
+  Future<VideoMetadata> extract(String url) async {
     var cleanUrl = url.trim();
     var shortcode = _extractShortcode(cleanUrl);
 
@@ -170,17 +170,17 @@ class InstagramExtractor extends BaseVideoExtractor {
       );
     }
 
-    final viaEmbed = await _fromEmbedPage(shortcode, cleanUrl, l10n);
+    final viaEmbed = await _fromEmbedPage(shortcode, cleanUrl);
     if (viaEmbed != null) {
-      return await _enrichImagePost(viaEmbed, shortcode, cleanUrl, l10n);
+      return await _enrichImagePost(viaEmbed, shortcode, cleanUrl);
     }
 
-    final viaPage = await _fromPostPage(shortcode, cleanUrl, l10n);
+    final viaPage = await _fromPostPage(shortcode, cleanUrl);
     if (viaPage != null) {
-      return await _enrichImagePost(viaPage, shortcode, cleanUrl, l10n);
+      return await _enrichImagePost(viaPage, shortcode, cleanUrl);
     }
 
-    final viaSnapInsta = await _fromSnapInsta(shortcode, cleanUrl, l10n);
+    final viaSnapInsta = await _fromSnapInsta(shortcode, cleanUrl);
     if (viaSnapInsta != null) return viaSnapInsta;
 
     throw ExtractionException(
@@ -192,12 +192,10 @@ class InstagramExtractor extends BaseVideoExtractor {
     VideoMetadata metadata,
     String shortcode,
     String url,
-    AppLocalizations l10n,
   ) async {
     final images = metadata.qualities.where((option) => option.isImage);
     if (images.length != 1) return metadata;
-    return await _fromSnapInsta(shortcode, url, l10n, fallback: metadata) ??
-        metadata;
+    return await _fromSnapInsta(shortcode, url, fallback: metadata) ?? metadata;
   }
 
   /// SnapInsta exposes carousel slides that Instagram omits from anonymous
@@ -205,8 +203,7 @@ class InstagramExtractor extends BaseVideoExtractor {
   /// request instead of being persisted because the token is time-limited.
   Future<VideoMetadata?> _fromSnapInsta(
     String shortcode,
-    String url,
-    AppLocalizations l10n, {
+    String url, {
     VideoMetadata? fallback,
   }) async {
     if (!externalServiceAccess.allowExternalServices) return fallback;
@@ -270,11 +267,9 @@ class InstagramExtractor extends BaseVideoExtractor {
                   ? 'ig_video_${index + 1}_$shortcode'
                   : 'ig_image_${index + 1}_$shortcode',
               label: mediaKinds[index] == MediaKind.video
-                  ? l10n.originalMp4
-                  : l10n.imageLabel(index + 1),
-              quality: mediaKinds[index] == MediaKind.video
-                  ? 'Original'
-                  : l10n.imageLabel(index + 1),
+                  ? const OriginalMp4()
+                  : ImageIndex(index + 1),
+              quality: 'Original',
               format: mediaKinds[index] == MediaKind.video ? 'mp4' : 'jpg',
               downloadUrl: downloadUrls[index],
               thumbnailUrl: previewUrls[index],
@@ -292,11 +287,7 @@ class InstagramExtractor extends BaseVideoExtractor {
   }
 
   /// The embed player ships the media URL inside a `contextJSON` blob.
-  Future<VideoMetadata?> _fromEmbedPage(
-    String shortcode,
-    String url,
-    AppLocalizations l10n,
-  ) async {
+  Future<VideoMetadata?> _fromEmbedPage(String shortcode, String url) async {
     final String html;
     try {
       final response = await ExtractorHttp.get(
@@ -314,7 +305,6 @@ class InstagramExtractor extends BaseVideoExtractor {
       final imageUrls = await _extractImageUrlsAsync(html);
       if (imageUrls.isEmpty) return null;
       return _buildImages(
-        l10n: l10n,
         shortcode: shortcode,
         originalUrl: url,
         imageUrls: imageUrls,
@@ -324,7 +314,6 @@ class InstagramExtractor extends BaseVideoExtractor {
     }
 
     return _build(
-      l10n: l10n,
       shortcode: shortcode,
       originalUrl: url,
       videoUrl: videoUrl,
@@ -342,11 +331,7 @@ class InstagramExtractor extends BaseVideoExtractor {
   }
 
   /// The post page still exposes an `og:video` tag for some public Reels.
-  Future<VideoMetadata?> _fromPostPage(
-    String shortcode,
-    String url,
-    AppLocalizations l10n,
-  ) async {
+  Future<VideoMetadata?> _fromPostPage(String shortcode, String url) async {
     final String html;
     try {
       final response = await ExtractorHttp.get(
@@ -364,7 +349,6 @@ class InstagramExtractor extends BaseVideoExtractor {
       final imageUrls = await _extractImageUrlsAsync(html);
       if (imageUrls.isEmpty) return null;
       return _buildImages(
-        l10n: l10n,
         shortcode: shortcode,
         originalUrl: url,
         imageUrls: imageUrls,
@@ -374,7 +358,6 @@ class InstagramExtractor extends BaseVideoExtractor {
     }
 
     return _build(
-      l10n: l10n,
       shortcode: shortcode,
       originalUrl: url,
       videoUrl: videoUrl,
@@ -389,7 +372,6 @@ class InstagramExtractor extends BaseVideoExtractor {
   }
 
   VideoMetadata _build({
-    required AppLocalizations l10n,
     required String shortcode,
     required String originalUrl,
     required String videoUrl,
@@ -425,7 +407,7 @@ class InstagramExtractor extends BaseVideoExtractor {
         VideoQualityOption(
           id: 'ig_$shortcode',
           mediaId: 'ig_video_$shortcode',
-          label: l10n.originalMp4,
+          label: const OriginalMp4(),
           quality: 'Original',
           format: 'mp4',
           downloadUrl: MediaUrlHelper.decode(videoUrl),
@@ -434,7 +416,7 @@ class InstagramExtractor extends BaseVideoExtractor {
           VideoQualityOption.image(
             id: 'ig_image_${index + 1}_$shortcode',
             mediaId: 'ig_image_${index + 1}_$shortcode',
-            label: l10n.imageLabel(index + 1),
+            label: ImageIndex(index + 1),
             quality: 'Original',
             format: MediaFormatHelper.inferImageFormat(imageUrls[index]),
             downloadUrl: MediaUrlHelper.decode(imageUrls[index]),
@@ -446,7 +428,6 @@ class InstagramExtractor extends BaseVideoExtractor {
   }
 
   VideoMetadata _buildImages({
-    required AppLocalizations l10n,
     required String shortcode,
     required String originalUrl,
     required List<String> imageUrls,
@@ -476,8 +457,7 @@ class InstagramExtractor extends BaseVideoExtractor {
           VideoQualityOption.image(
             id: 'ig_image_${index + 1}_$shortcode',
             mediaId: 'ig_image_${index + 1}_$shortcode',
-            label: l10n.imageLabel(index + 1),
-            quality: l10n.imageLabel(index + 1),
+            label: ImageIndex(index + 1),
             format: MediaFormatHelper.inferImageFormat(decodedUrls[index]),
             downloadUrl: decodedUrls[index],
           ),
