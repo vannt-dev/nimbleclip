@@ -237,6 +237,41 @@ void main() {
     expect(find.text('Analyze & Download'), findsOneWidget);
   });
 
+  testWidgets('the home screen lays out on a phone in every locale', (
+    tester,
+  ) async {
+    // The default 800px test surface is wider than any phone, which is what
+    // let two horizontal overflows go unnoticed. Vietnamese matters here:
+    // several of its strings are longer than the English ones.
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.75;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    for (final locale in const [Locale('en'), Locale('vi')]) {
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => SettingsProvider()),
+            ChangeNotifierProvider(create: (_) => VideoExtractorProvider()),
+            ChangeNotifierProvider(create: (_) => AnalysisHistoryProvider()),
+            ChangeNotifierProvider(create: (_) => SharedIntentProvider()),
+            ChangeNotifierProvider(create: (_) => DownloadProvider()),
+          ],
+          child: MaterialApp(
+            locale: locale,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: HomeScreen(onNavigateDownloads: () {}),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(tester.takeException(), isNull, reason: 'locale $locale');
+    }
+  });
+
   test('an extraction failure reaches the UI as localized text', () async {
     final registry = _FailingExtractorRegistry(
       const ExtractionException(

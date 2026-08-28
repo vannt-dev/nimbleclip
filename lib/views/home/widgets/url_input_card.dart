@@ -114,17 +114,23 @@ class _UrlInputCardState extends State<UrlInputCard> {
                 ),
               ),
               const SizedBox(width: 10),
-              Text(
-                context.l10n.pasteVideoLink,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: isDark
-                      ? AppColors.darkTextPrimary
-                      : AppColors.lightTextPrimary,
+              // Expanded rather than a bare Text plus a Spacer: the heading
+              // has to give way to the platform badge beside it instead of
+              // pushing it off a narrow phone.
+              Expanded(
+                child: Text(
+                  context.l10n.pasteVideoLink,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? AppColors.darkTextPrimary
+                        : AppColors.lightTextPrimary,
+                  ),
                 ),
               ),
-              const Spacer(),
               if (hasText && detectedPlatform != VideoPlatform.generic)
                 Container(
                   padding: const EdgeInsets.symmetric(
