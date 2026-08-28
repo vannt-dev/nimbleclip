@@ -6,6 +6,36 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-28
+
+- Added support for Instagram story and highlight links, which were previously
+  rejected as unrecognised. These are served only through the external
+  fallback service: the page Instagram returns for one without a login has no
+  media in it, so the feature is unavailable when external services are turned
+  off, and says so rather than failing silently.
+- Added a video picker. A post carrying several videos previously downloaded
+  all of them and listed each as a row of text, with no way to see what they
+  were or leave any out. Videos now use the same thumbnail grid as photos,
+  with multi-select, select-all, and playback to preview one before choosing.
+- Fixed a post holding both photos and video offering no way to pick the
+  video. Photos were ranked as though "Original" meant 2160p, so they
+  outranked every video and the video tab came up with nothing selected. Worst
+  on X, where photos always outranked the real resolutions its videos carry.
+- Fixed the download notification growing with the title. A long post name
+  wrapped it to four lines and its action to a line of its own, leaving the
+  notice standing over the page it was reporting on.
+- Fixed the app name and the link-field heading running off the side of a
+  narrow screen, which longer Vietnamese wording made more likely.
+- Changed the videos of a multi-video post to be numbered. They were all
+  labelled "MP4 (Original quality)", which on a highlight meant a column of
+  identical rows.
+- Changed a text-less X post to be titled `@handle` rather than "Post by
+  @handle".
+- Changed the extractors to describe a download option with a typed descriptor
+  instead of building its text, so the layer no longer needs a locale.
+  Download history keeps storing the rendered name, so entries written by
+  earlier versions read back unchanged.
+
 ## [1.4.0] - 2026-08-27
 
 - Fixed a startup failure that replaced the whole app with an error screen

@@ -31,6 +31,11 @@ management, local playback, and gallery export.
 - Shows carousel thumbnails in a lazy full-screen picker, with preview,
   select-all, and multi-image download for supported Facebook, Instagram,
   TikTok, and X posts.
+- Offers the same picker for a post carrying several videos, so they can be
+  told apart by thumbnail, played before choosing, and downloaded together or
+  left out individually. The grid builds only the cells on screen, so a story
+  highlight holding a hundred clips costs no more to open than one holding
+  ten.
 - Uses one shared download queue with a configurable limit of one to five
   concurrent transfers, so separate batches cannot overload the device or
   network.
@@ -66,7 +71,9 @@ management, local playback, and gallery export.
   copyable extraction diagnostics with timing and app-version context.
 - Lets users disable external extraction services. Some TikTok and X downloads,
   plus carousel fallbacks for Facebook and Instagram, require these services
-  and may send the public post URL to them.
+  and may send the public post URL to them. Instagram stories and highlights
+  depend on them entirely and are unavailable while they are off, because
+  Instagram serves no media for those links without a login.
 - Supports light, dark, and system themes.
 - Supports English and Vietnamese, with automatic device-locale detection and
   a persisted in-app language preference.
@@ -80,7 +87,7 @@ management, local playback, and gallery export.
 | TikTok | Public videos, slideshows/image posts, including watermark-free variants when exposed by the source, and audio |
 | Facebook | Public videos, Watch links, Reels, image posts, carousels, and mixed-media posts |
 | X / Twitter | Public posts containing images, videos, or mixed media |
-| Instagram | Public image/carousel posts, video posts, Reels, and mixed-media posts |
+| Instagram | Public image/carousel posts, video posts, Reels, mixed-media posts, and story/highlight links (these need external services) |
 | Direct URLs | Public image, video, or audio files and pages exposing standard Open Graph media metadata |
 
 Extraction depends on public endpoints and page formats controlled by third
