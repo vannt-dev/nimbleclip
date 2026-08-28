@@ -29,8 +29,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 - Changed the videos of a multi-video post to be numbered. They were all
   labelled "MP4 (Original quality)", which on a highlight meant a column of
   identical rows.
-- Changed a text-less X post to be titled `@handle` rather than "Post by
-  @handle".
+- Changed a text-less X post to be titled with the author's handle alone, such
+  as `@example`, instead of the "Post by" wording that preceded it.
 - Changed the extractors to describe a download option with a typed descriptor
   instead of building its text, so the layer no longer needs a locale.
   Download history keeps storing the rendered name, so entries written by
