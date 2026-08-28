@@ -81,15 +81,43 @@ class DownloadFeedback {
     final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
     final notification = messenger.showSnackBar(
       SnackBar(
-        content: Text(
-          tasks.length == 1
-              ? context.l10n.downloadStarted(title, tasks.first.qualityLabel)
-              : context.l10n.batchDownloadStarted(tasks.length),
-        ),
-        action: SnackBarAction(
-          label: context.l10n.viewProgress,
-          textColor: AppColors.tiktokAccent,
-          onPressed: onViewProgress,
+        // The action lives in the content rather than in `action:` so that it
+        // sits beside the message. Passed as `action:`, Material gave it a
+        // line of its own as soon as the message filled the width, which on a
+        // phone is always — the bar then stood two rows tall over the page it
+        // was reporting on.
+        content: Row(
+          children: [
+            Expanded(
+              child: Text(
+                tasks.length == 1
+                    ? context.l10n.downloadStarted(
+                        title,
+                        tasks.first.qualityLabel,
+                      )
+                    : context.l10n.batchDownloadStarted(tasks.length),
+                // A passing notice, not the download itself: a long post title
+                // used to wrap to four lines. The full name is on the
+                // downloads page.
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: () {
+                messenger.hideCurrentSnackBar();
+                onViewProgress();
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.tiktokAccent,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(context.l10n.viewProgress),
+            ),
+          ],
         ),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(days: 1),
