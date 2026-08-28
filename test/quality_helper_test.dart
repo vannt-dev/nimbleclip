@@ -20,7 +20,67 @@ VideoQualityOption option(
   );
 }
 
+/// A photo as the extractors actually build one: `VideoQualityOption.image`
+/// defaults `quality` to the literal 'Original'.
+VideoQualityOption imageOption(String id) => VideoQualityOption.image(
+  id: id,
+  mediaId: id,
+  label: const ImageIndex(1),
+  format: 'jpg',
+  downloadUrl: 'https://cdn.example.com/$id.jpg',
+);
+
 void main() {
+  group('a post carrying both photos and video', () {
+    // Regression: `quality` on an image is the word 'Original', which the
+    // named-height table reads as 2160. That ranked every photo above every
+    // video, so the default selection landed on a photo and the video tab —
+    // which lists only video options — showed nothing selected.
+    final mixed = [option('720p', id: 'video'), imageOption('photo')];
+
+    test('an image never outranks a video', () {
+      expect(
+        QualityHelper.rankOf(imageOption('photo')),
+        lessThan(QualityHelper.rankOf(option('360p'))),
+      );
+    });
+
+    test('sorting puts the video ahead of the photo', () {
+      expect(
+        QualityHelper.sortedByQuality([
+          imageOption('photo'),
+          option('720p', id: 'video'),
+        ]).first.id,
+        'video',
+      );
+    });
+
+    test('Highest selects the video, not the photo', () {
+      expect(QualityHelper.bestMatch(mixed, 'Highest')!.id, 'video');
+    });
+
+    test('a resolution preference selects the video, not the photo', () {
+      // The photo used to be the only option ranked at or below 720.
+      expect(
+        QualityHelper.bestMatch([
+          option('1080p', id: 'video'),
+          imageOption('photo'),
+        ], '720p')!.id,
+        'video',
+      );
+    });
+
+    test('a post of photos alone still selects a photo', () {
+      expect(
+        QualityHelper.bestMatch([
+          imageOption('photo-1'),
+          imageOption('photo-2'),
+        ], 'Highest')!.id,
+        'photo-1',
+      );
+    });
+  });
+
   group('QualityHelper.parseHeight', () {
     test('reads explicit resolutions', () {
       expect(QualityHelper.parseHeight('1080p'), 1080);

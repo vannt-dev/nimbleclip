@@ -49,14 +49,20 @@ class QualityHelper {
     for (final key in _namedHeights.keys) key: RegExp('\\b$key\\b'),
   };
 
-  /// Rank used for ordering: audio-only sinks below every video option so
-  /// `bestQuality` and the "Highest" preference never land on an audio track.
+  /// Rank used for ordering: video first, then images, then audio, so neither
+  /// `bestQuality` nor the "Highest" preference lands on a photo or a track.
   static int rankOf(VideoQualityOption option) {
     if (option.isAudioOnly) return -1;
+    // An image carries no resolution: `VideoQualityOption.image` leaves
+    // `quality` at the literal 'Original', which the named-height table reads
+    // as 2160. Parsing it ranked every photo above every video, so a post
+    // holding both selected a photo by default and its video tab — which lists
+    // video options only — came up with nothing selected.
+    if (option.isImage) return 0;
     // `label` used to be a second place to look for a resolution. It is now a
     // descriptor with no text to parse, and every option sets `quality`, which
     // is the field this was backing up.
-    return parseHeight(option.quality) ?? 0;
+    return parseHeight(option.quality) ?? 1;
   }
 
   /// Returns [options] ordered best-first. Stable for equal ranks, so the order
@@ -95,7 +101,9 @@ class QualityHelper {
       return sorted.first;
     }
 
-    final videoOnly = sorted.where((o) => !o.isAudioOnly).toList();
+    final videoOnly = sorted
+        .where((o) => !o.isAudioOnly && !o.isImage)
+        .toList();
     if (videoOnly.isEmpty) return sorted.first;
 
     if (preferred == 'Highest') return videoOnly.first;
