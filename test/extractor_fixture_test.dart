@@ -397,6 +397,67 @@ void main() {
     },
   );
 
+  test('Instagram reads a highlight link, video and photos alike', () async {
+    // A highlight has no post shortcode, so the direct embed and post-page
+    // strategies cannot apply; the page itself is a JavaScript shell behind a
+    // login wall. The fallback service is the only route.
+    ExtractorHttp.getOverride = (_, _) async =>
+        http.Response(fixture('snapinsta_page.html'), 200);
+    ExtractorHttp.postOverride = (_, _, _) async =>
+        http.Response(fixture('snapinsta_story.json'), 200);
+
+    final result = await const InstagramExtractor().extract(
+      'https://www.instagram.com/s/aGlnaGxpZ2h0OjE3OTUyMDE2NTI2OTUyMjAx'
+      '?story_media_id=3338279895419090365_15710939660',
+    );
+
+    expect(result.platform, VideoPlatform.instagram);
+    expect(result.qualities.where((option) => option.isImage), hasLength(2));
+    expect(result.qualities.where((option) => !option.isImage), hasLength(2));
+    // A highlight carries many videos. Labelling each one "MP4 (Original
+    // quality)" leaves a column of identical rows with no way to tell them
+    // apart; photos have always been numbered.
+    expect(
+      result.qualities
+          .where((option) => !option.isImage)
+          .map((option) => (option.label as VideoIndex).index),
+      [1, 2],
+    );
+    _expectDefaultSelectionIsVideo(result);
+  });
+
+  test('Instagram reads a story link', () async {
+    ExtractorHttp.getOverride = (_, _) async =>
+        http.Response(fixture('snapinsta_page.html'), 200);
+    ExtractorHttp.postOverride = (_, _, _) async =>
+        http.Response(fixture('snapinsta_story.json'), 200);
+
+    final result = await const InstagramExtractor().extract(
+      'https://www.instagram.com/stories/someone/3338279895419090365/',
+    );
+
+    expect(result.qualities, hasLength(4));
+  });
+
+  test('a highlight says so when external services are off', () async {
+    // Without the fallback there is no other route, so this must report the
+    // real reason rather than the "that is not an Instagram post" message.
+    await expectLater(
+      const InstagramExtractor(
+        externalServiceAccess: FixedExternalServiceAccess(false),
+      ).extract(
+        'https://www.instagram.com/s/aGlnaGxpZ2h0OjE3OTUyMDE2NTI2OTUyMjAx',
+      ),
+      throwsA(
+        isA<ExtractionException>().having(
+          (error) => error.failure.kind,
+          'failure kind',
+          ExtractionFailureKind.externalServicesDisabled,
+        ),
+      ),
+    );
+  });
+
   test('Instagram classifies a SnapInsta Reel result as video', () async {
     ExtractorHttp.getOverride = (uri, _) async {
       if (uri.host == 'snap-insta.to') {

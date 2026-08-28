@@ -51,6 +51,11 @@ class InstagramExtractor extends BaseVideoExtractor {
     r'/(?:reels?|p|tv)/([A-Za-z0-9_-]+)',
   );
 
+  /// A highlight is `/s/<base64>`, a story `/stories/<user>/<media id>`.
+  /// Neither carries a post shortcode, so they take their own route.
+  static final RegExp _highlightPattern = RegExp(r'/s/([A-Za-z0-9_-]+=*)');
+  static final RegExp _storyPattern = RegExp(r'/stories/[^/]+/(\d+)');
+
   /// Same scan as [extractImageUrls], moved off the UI isolate for documents
   /// large enough to be worth the hand-off.
   static Future<List<String>> _extractImageUrlsAsync(
@@ -154,15 +159,37 @@ class InstagramExtractor extends BaseVideoExtractor {
   String? _extractShortcode(String url) =>
       _shortcodePattern.firstMatch(url)?.group(1);
 
+  /// Identifies a story or highlight, or null when [url] is neither.
+  ///
+  /// Instagram puts the media's own id in `story_media_id` as
+  /// `<media>_<owner>`; that is the most stable name available, so it wins
+  /// over the opaque token in the path.
+  String? _storyId(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return null;
+    final fromPath =
+        _storyPattern.firstMatch(uri.path)?.group(1) ??
+        _highlightPattern.firstMatch(uri.path)?.group(1);
+    if (fromPath == null) return null;
+    final mediaId = uri.queryParameters['story_media_id']?.split('_').first;
+    return (mediaId != null && mediaId.isNotEmpty) ? mediaId : fromPath;
+  }
+
   @override
   Future<VideoMetadata> extract(String url) async {
     var cleanUrl = url.trim();
     var shortcode = _extractShortcode(cleanUrl);
+    var storyId = _storyId(cleanUrl);
 
-    if (shortcode == null && UrlHelper.isShortLink(cleanUrl)) {
+    if (shortcode == null &&
+        storyId == null &&
+        UrlHelper.isShortLink(cleanUrl)) {
       cleanUrl = await ExtractorHttp.resolveRedirects(cleanUrl);
       shortcode = _extractShortcode(cleanUrl);
+      storyId = _storyId(cleanUrl);
     }
+
+    if (storyId != null) return await _fromStory(storyId, cleanUrl);
 
     if (shortcode == null) {
       throw ExtractionException(
@@ -183,6 +210,26 @@ class InstagramExtractor extends BaseVideoExtractor {
     final viaSnapInsta = await _fromSnapInsta(shortcode, cleanUrl);
     if (viaSnapInsta != null) return viaSnapInsta;
 
+    throw ExtractionException(
+      const ExtractionFailure(ExtractionFailureKind.instagramLoginRequired),
+    );
+  }
+
+  /// Stories and highlights are reachable only through the fallback service.
+  ///
+  /// The page Instagram serves anonymously for one is a JavaScript shell
+  /// behind a login wall: no `og:video`, no `og:image`, no media URL to read.
+  /// So unlike a post, there is nothing to fall back to, and turning external
+  /// services off has to be reported as the reason rather than passed off as
+  /// an unrecognised link.
+  Future<VideoMetadata> _fromStory(String storyId, String url) async {
+    if (!externalServiceAccess.allowExternalServices) {
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.externalServicesDisabled),
+      );
+    }
+    final viaSnapInsta = await _fromSnapInsta(storyId, url);
+    if (viaSnapInsta != null) return viaSnapInsta;
     throw ExtractionException(
       const ExtractionFailure(ExtractionFailureKind.instagramLoginRequired),
     );
@@ -248,6 +295,16 @@ class InstagramExtractor extends BaseVideoExtractor {
       }
       if (downloadUrls.isEmpty) return null;
 
+      // Number each kind from one, so a mixed result reads "Video 1, Video 2,
+      // Photo 1, Photo 2" rather than numbering by position in the combined
+      // list, which would skip.
+      final ordinals = <int>[];
+      var videoCount = 0;
+      var imageCount = 0;
+      for (final kind in mediaKinds) {
+        ordinals.add(kind == MediaKind.video ? ++videoCount : ++imageCount);
+      }
+
       return VideoMetadata(
         id: shortcode,
         originalUrl: url,
@@ -266,9 +323,13 @@ class InstagramExtractor extends BaseVideoExtractor {
               mediaId: mediaKinds[index] == MediaKind.video
                   ? 'ig_video_${index + 1}_$shortcode'
                   : 'ig_image_${index + 1}_$shortcode',
+              // A lone video has nothing to be told apart from, so it keeps
+              // the plain name.
               label: mediaKinds[index] == MediaKind.video
-                  ? const OriginalMp4()
-                  : ImageIndex(index + 1),
+                  ? (videoCount > 1
+                        ? VideoIndex(ordinals[index])
+                        : const OriginalMp4())
+                  : ImageIndex(ordinals[index]),
               quality: 'Original',
               format: mediaKinds[index] == MediaKind.video ? 'mp4' : 'jpg',
               downloadUrl: downloadUrls[index],

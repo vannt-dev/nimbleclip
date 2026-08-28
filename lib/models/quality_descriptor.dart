@@ -13,6 +13,17 @@ class ImageIndex extends QualityDescriptor {
   final int index;
 }
 
+/// The nth video of a post that carries several.
+///
+/// A story highlight can hold a dozen or more, and every one of them is served
+/// at a single quality. Without a number they render as a column of identical
+/// rows. A post with one video uses [OriginalMp4] instead — there is nothing
+/// to tell it apart from.
+class VideoIndex extends QualityDescriptor {
+  const VideoIndex(this.index);
+  final int index;
+}
+
 class Hd720 extends QualityDescriptor {
   const Hd720();
 }
@@ -93,6 +104,7 @@ class LiteralLabel extends QualityDescriptor {
 String qualityDescriptorToken(QualityDescriptor descriptor) {
   return switch (descriptor) {
     ImageIndex(:final index) => 'image:$index',
+    VideoIndex(:final index) => 'video:$index',
     Hd720() => 'hd720',
     Sd480() => 'sd480',
     OriginalVideo() => 'originalVideo',

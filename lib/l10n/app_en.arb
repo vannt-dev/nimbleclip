@@ -32,6 +32,14 @@
   "imageOptions": "Images ({count})",
   "@imageOptions": {"placeholders": {"count": {"type": "int"}}},
   "imageLabel": "Image {index}",
+  "videoLabel": "Video {index}",
+  "@videoLabel": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
   "@imageLabel": {"placeholders": {"index": {"type": "int"}}},
   "audioOptions": "Audio ({count})",
   "@audioOptions": {"placeholders": {"count": {"type": "int"}}},
@@ -185,7 +193,7 @@
   "audioMp3Label": "MP3 audio ({title})",
   "@audioMp3Label": {"placeholders": {"title": {"type": "String"}}},
   "tiktokNoStreams": "TikTok did not return any downloadable streams for this video.",
-  "instagramInvalidPost": "Could not recognize this Instagram post. Use an instagram.com/reel/<code> or instagram.com/p/<code> link.",
+  "instagramInvalidPost": "Could not recognize this Instagram link. Use a post, reel, story or highlight link.",
   "instagramLoginRequired": "Instagram requires a login for this post. Only public Reels and videos can be downloaded.",
   "linkAccessFailed": "Could not access this link: {error}",
   "@linkAccessFailed": {"placeholders": {"error": {"type": "String"}}},
