@@ -19,6 +19,7 @@ import 'package:nimble_clip/services/download_service.dart';
 import 'package:nimble_clip/services/extractors/registry.dart';
 import 'package:nimble_clip/services/media_file_actions.dart';
 import 'package:nimble_clip/views/home/home_screen.dart';
+import 'package:nimble_clip/views/home/widgets/download_feedback.dart';
 
 const _quality = VideoQualityOption.video(
   id: 'v-hd',
@@ -39,9 +40,23 @@ const _metadata = VideoMetadata(
   qualities: [_quality],
 );
 
+VideoMetadata _metadataTitled(String title) => VideoMetadata(
+  id: _metadata.id,
+  originalUrl: _metadata.originalUrl,
+  title: title,
+  author: _metadata.author,
+  coverUrl: '',
+  platform: _metadata.platform,
+  qualities: const [_quality],
+);
+
 class _FixtureRegistry extends ExtractorRegistry {
+  _FixtureRegistry([this.metadata = _metadata]);
+
+  final VideoMetadata metadata;
+
   @override
-  Future<VideoMetadata> extract(String rawUrl) async => _metadata;
+  Future<VideoMetadata> extract(String rawUrl) async => metadata;
 }
 
 /// Records what was started without touching the network or the filesystem.
@@ -131,11 +146,12 @@ DownloadTask _completedTask() => DownloadTask(
 Future<void> _pumpHome(
   WidgetTester tester, {
   required DownloadProvider downloads,
+  VideoMetadata metadata = _metadata,
 }) async {
   final extractor = VideoExtractorProvider(
-    extractorRegistry: _FixtureRegistry(),
+    extractorRegistry: _FixtureRegistry(metadata),
   );
-  await extractor.analyzeUrl(_metadata.originalUrl, l10n: _en);
+  await extractor.analyzeUrl(metadata.originalUrl, l10n: _en);
 
   await tester.pumpWidget(
     MultiProvider(
@@ -163,6 +179,111 @@ void main() {
   setUp(() {
     GoogleFonts.config.allowRuntimeFetching = false;
     SharedPreferences.setMockInitialValues({});
+  });
+
+  /// Starts a download for a post titled [title] and returns how tall the
+  /// resulting notification is.
+  Future<double> snackBarHeightFor(WidgetTester tester, String title) async {
+    await _pumpHome(
+      tester,
+      downloads: DownloadProvider(
+        downloadService: _RecordingGateway(),
+        historyRepository: _SeededHistory(),
+      ),
+      metadata: _metadataTitled(title),
+    );
+
+    final button = find.text('Download now');
+    await tester.ensureVisible(button);
+    await tester.tap(button);
+    await tester.pump();
+    // Let the bar finish sliding in, or it is measured mid-animation.
+    await tester.pump(const Duration(seconds: 1));
+
+    final height = tester.getSize(find.byType(SnackBar)).height;
+
+    // Tear the tree down so a second call starts without the previous bar
+    // still animating out.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 1));
+    return height;
+  }
+
+  testWidgets('a long title does not make the download notification taller', (
+    tester,
+  ) async {
+    // The bar is a passing notice, not the download itself: it should stay the
+    // same size whatever the post is called, rather than growing to four lines
+    // and covering the page underneath.
+    final short = await snackBarHeightFor(tester, 'A clip');
+    final long = await snackBarHeightFor(
+      tester,
+      'Big Buck Bunny 60fps 4K - Official Blender Foundation Short Film '
+      'With A Rather Long Subtitle Attached To It As Well',
+    );
+
+    expect(long, short);
+  });
+
+  testWidgets('the download notification keeps its action on the same row', (
+    tester,
+  ) async {
+    // Measured at phone width: at the default 800px test surface everything
+    // fits on one row anyway, which is what hid this.
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.75;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final downloads = DownloadProvider(
+      downloadService: _RecordingGateway(),
+      historyRepository: _SeededHistory(),
+    );
+    final task = DownloadTask(
+      id: 'task',
+      videoId: 'clip',
+      title: 'A clip',
+      author: 'Creator',
+      thumbnailUrl: '',
+      downloadUrl: _quality.downloadUrl,
+      originalUrl: _metadata.originalUrl,
+      platform: VideoPlatform.youtube,
+      qualityLabel: describeQuality(_quality.label, _en),
+      format: 'mp4',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () => DownloadFeedback.showStarted(
+                  context,
+                  provider: downloads,
+                  tasks: [task],
+                  title:
+                      'Big Buck Bunny 60fps 4K - Official Blender '
+                      'Foundation Short Film',
+                  onViewProgress: () {},
+                ),
+                child: const Text('go'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('go'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    // One row of text beside its action. Anything taller means the action was
+    // pushed onto a line of its own and the bar is covering the page.
+    expect(tester.getSize(find.byType(SnackBar)).height, lessThan(80));
   });
 
   testWidgets('a fresh download starts and reports progress', (tester) async {
