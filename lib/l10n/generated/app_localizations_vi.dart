@@ -114,6 +114,11 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String videoLabel(int index) {
+    return 'Video $index';
+  }
+
+  @override
   String audioOptions(int count) {
     return 'Âm thanh ($count)';
   }
@@ -578,7 +583,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get instagramInvalidPost =>
-      'Không nhận diện được bài đăng Instagram. Hãy dùng link dạng instagram.com/reel/<mã> hoặc instagram.com/p/<mã>.';
+      'Không nhận diện được link Instagram. Hãy dùng link bài đăng, reel, story hoặc highlight.';
 
   @override
   String get instagramLoginRequired =>

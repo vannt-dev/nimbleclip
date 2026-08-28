@@ -266,6 +266,12 @@ abstract class AppLocalizations {
   /// **'Image {index}'**
   String imageLabel(int index);
 
+  /// No description provided for @videoLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Video {index}'**
+  String videoLabel(int index);
+
   /// No description provided for @audioOptions.
   ///
   /// In en, this message translates to:
@@ -1043,7 +1049,7 @@ abstract class AppLocalizations {
   /// No description provided for @instagramInvalidPost.
   ///
   /// In en, this message translates to:
-  /// **'Could not recognize this Instagram post. Use an instagram.com/reel/<code> or instagram.com/p/<code> link.'**
+  /// **'Could not recognize this Instagram link. Use a post, reel, story or highlight link.'**
   String get instagramInvalidPost;
 
   /// No description provided for @instagramLoginRequired.

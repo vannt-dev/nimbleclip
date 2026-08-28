@@ -8,6 +8,7 @@ import 'generated/app_localizations.dart';
 String describeQuality(QualityDescriptor descriptor, AppLocalizations l10n) {
   return switch (descriptor) {
     ImageIndex(:final index) => l10n.imageLabel(index),
+    VideoIndex(:final index) => l10n.videoLabel(index),
     Hd720() => l10n.highQuality720,
     Sd480() => l10n.standardQuality480,
     OriginalVideo() => l10n.originalVideo,

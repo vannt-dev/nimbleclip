@@ -7,6 +7,7 @@ import 'package:nimble_clip/models/quality_descriptor.dart';
 /// One of every variant, so a new descriptor without a case here is noticed.
 const _all = <QualityDescriptor>[
   ImageIndex(3),
+  VideoIndex(2),
   Hd720(),
   Sd480(),
   OriginalVideo(),

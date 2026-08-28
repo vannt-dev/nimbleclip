@@ -116,6 +116,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String videoLabel(int index) {
+    return 'Video $index';
+  }
+
+  @override
   String audioOptions(int count) {
     return 'Audio ($count)';
   }
@@ -580,7 +585,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get instagramInvalidPost =>
-      'Could not recognize this Instagram post. Use an instagram.com/reel/<code> or instagram.com/p/<code> link.';
+      'Could not recognize this Instagram link. Use a post, reel, story or highlight link.';
 
   @override
   String get instagramLoginRequired =>
