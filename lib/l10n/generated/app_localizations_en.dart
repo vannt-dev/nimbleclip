@@ -132,6 +132,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get selectImages => 'Choose images:';
 
   @override
+  String get selectVideos => 'Choose videos:';
+
+  @override
   String get selectAll => 'Select all';
 
   @override

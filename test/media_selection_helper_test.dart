@@ -34,9 +34,59 @@ void main() {
       options: [firstHd, firstSd, second, imageOne, imageTwo],
       selectedQuality: firstSd,
       selectedImageIds: {'image-2'},
+      selectedVideoIds: {'first', 'second'},
     );
 
     expect(selected, [firstSd, second, imageTwo]);
+  });
+
+  test('an unchecked video is left out', () {
+    // A story highlight can hold a dozen videos. Downloading every one of
+    // them because the reader wanted two is the behaviour this replaces.
+    final first = video('first', 'first');
+    final second = video('second', 'second');
+    final third = video('third', 'third');
+
+    expect(
+      MediaSelectionHelper.downloads(
+        options: [first, second, third],
+        selectedQuality: first,
+        selectedImageIds: const {},
+        selectedVideoIds: {'first', 'third'},
+      ),
+      [first, third],
+    );
+  });
+
+  test('unchecking every video leaves nothing to download', () {
+    final only = video('only', 'only');
+
+    expect(
+      MediaSelectionHelper.downloads(
+        options: [only],
+        selectedQuality: only,
+        selectedImageIds: const {},
+        selectedVideoIds: const {},
+      ),
+      isEmpty,
+    );
+  });
+
+  test('the chosen quality still wins inside a checked video', () {
+    // Picking which videos to take and picking a quality for one of them are
+    // separate choices; checking a video must not discard the quality.
+    final hd = video('first-hd', 'first');
+    final sd = video('first-sd', 'first');
+
+    expect(
+      MediaSelectionHelper.downloads(
+        options: [hd, sd],
+        selectedQuality: sd,
+        selectedImageIds: const {},
+        selectedVideoIds: {'first'},
+      ),
+      [sd],
+    );
   });
 
   test('audio selection excludes visual media', () {
@@ -53,6 +103,7 @@ void main() {
         options: [video('video', 'video'), image('image', 1), audio],
         selectedQuality: audio,
         selectedImageIds: {'image'},
+        selectedVideoIds: {'video'},
       ),
       [audio],
     );
