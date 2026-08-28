@@ -32,6 +32,7 @@
   "audioOptions": "Âm thanh ({count})",
   "selectDownloadQuality": "Chọn chất lượng tải về:",
   "selectImages": "Chọn ảnh:",
+  "selectVideos": "Chọn video:",
   "selectAll": "Chọn tất cả",
   "deselectAll": "Bỏ chọn tất cả",
   "downloadSelected": "Tải xuống ({count})",

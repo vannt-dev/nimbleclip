@@ -16,7 +16,7 @@ import 'package:nimble_clip/services/download_service.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/views/downloads/downloads_screen.dart';
 import 'package:nimble_clip/views/downloads/widgets/active_download_card.dart';
-import 'package:nimble_clip/views/home/image_picker_screen.dart';
+import 'package:nimble_clip/views/home/media_picker_screen.dart';
 import 'package:nimble_clip/views/player/video_player_screen.dart';
 import 'package:nimble_clip/views/settings/settings_screen.dart';
 
@@ -305,23 +305,96 @@ void main() {
     });
   });
 
-  group('ImagePickerScreen', () {
+  group('MediaPickerScreen', () {
     testWidgets('starts from the given selection and can select them all', (
       tester,
     ) async {
       final options = [_image('a', 1), _image('b', 2), _image('c', 3)];
       await tester.pumpWidget(
         _host(
-          ImagePickerScreen(
+          MediaPickerScreen(
             options: options,
             initiallySelectedIds: const {'a'},
+            title: 'Choose images:',
           ),
         ),
       );
       await tester.pump();
 
-      expect(find.text('Choose images:'), findsOneWidget);
+      expect(find.text('Choose images:'), findsWidgets);
       expect(find.text('Select all'), findsOneWidget);
+
+      await tester.tap(find.text('Select all'));
+      await tester.pump();
+
+      expect(find.text('Deselect all'), findsOneWidget);
+    });
+
+    testWidgets('builds only the visible cells of a large post', (
+      tester,
+    ) async {
+      // A highlight can hold far more media than fits on screen. The grid
+      // must stay lazy: the quality list it replaced was a plain Column
+      // inside a scroll view, whose build cost grew with every extra video.
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 2.75;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final many = [
+        for (var i = 1; i <= 200; i++)
+          VideoQualityOption.video(
+            id: 'v$i',
+            mediaId: 'v$i',
+            label: VideoIndex(i),
+            quality: 'Original',
+            format: 'mp4',
+            downloadUrl: 'https://cdn.example.com/$i.mp4',
+            thumbnailUrl: 'https://cdn.example.com/$i.jpg',
+          ),
+      ];
+
+      await tester.pumpWidget(
+        _host(
+          MediaPickerScreen(
+            options: many,
+            initiallySelectedIds: many.map(MediaPickerScreen.keyOf).toSet(),
+            title: 'Choose videos:',
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final built = tester.widgetList(find.byType(InkWell)).length;
+      expect(built, lessThan(40), reason: 'built $built cells of 200');
+    });
+
+    testWidgets('checks a video by the id it shares with its qualities', (
+      tester,
+    ) async {
+      // Two qualities of one video are one entry: checking it must not leave
+      // the other quality behind as a second, invisible choice.
+      const hd = VideoQualityOption.video(
+        id: 'clip-hd',
+        mediaId: 'clip',
+        label: VideoIndex(1),
+        quality: '720p',
+        format: 'mp4',
+        downloadUrl: 'https://cdn.example.com/hd.mp4',
+      );
+
+      await tester.pumpWidget(
+        _host(
+          const MediaPickerScreen(
+            options: [hd],
+            initiallySelectedIds: {},
+            title: 'Choose videos:',
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(MediaPickerScreen.keyOf(hd), 'clip');
 
       await tester.tap(find.text('Select all'));
       await tester.pump();

@@ -5,35 +5,50 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/image_cache_size.dart';
+import '../../core/utils/media_selection_helper.dart';
 import '../../l10n/l10n.dart';
 import '../../l10n/quality_descriptor_text.dart';
 import '../../models/video_metadata.dart';
+import '../player/video_player_screen.dart';
 import 'widgets/media_preview_dialog.dart';
 
-/// A lazy, full-screen image chooser for carousel posts.
+/// A lazy, full-screen chooser for a post that carries several media.
 ///
-/// Keeping the grid outside the home page avoids eagerly decoding every image
-/// inside its parent scroll view. Only visible thumbnails are built and cached.
-class ImagePickerScreen extends StatefulWidget {
-  const ImagePickerScreen({
+/// Serves photos and videos alike: a highlight can hold a dozen videos, and
+/// picking between them from a list of names is guesswork. Keeping the grid
+/// outside the home page avoids eagerly decoding every thumbnail inside its
+/// parent scroll view; only visible cells are built and cached.
+class MediaPickerScreen extends StatefulWidget {
+  const MediaPickerScreen({
     super.key,
     required this.options,
     required this.initiallySelectedIds,
+    required this.title,
   });
 
   final List<VideoQualityOption> options;
+
+  /// Keyed the way the caller checks them: a photo by its own id, a video by
+  /// the id it shares with its other qualities.
   final Set<String> initiallySelectedIds;
 
+  final String title;
+
+  /// A photo is its own entry; every quality of one video is a single entry.
+  static String keyOf(VideoQualityOption option) =>
+      option.isImage ? option.id : MediaSelectionHelper.videoKeyOf(option);
+
   @override
-  State<ImagePickerScreen> createState() => _ImagePickerScreenState();
+  State<MediaPickerScreen> createState() => _MediaPickerScreenState();
 }
 
-class _ImagePickerScreenState extends State<ImagePickerScreen> {
+class _MediaPickerScreenState extends State<MediaPickerScreen> {
   late final Set<String> _selectedIds = {...widget.initiallySelectedIds};
 
   void _toggle(VideoQualityOption option) {
+    final key = MediaPickerScreen.keyOf(option);
     setState(() {
-      if (!_selectedIds.add(option.id)) _selectedIds.remove(option.id);
+      if (!_selectedIds.add(key)) _selectedIds.remove(key);
     });
   }
 
@@ -44,18 +59,34 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
       } else {
         _selectedIds
           ..clear()
-          ..addAll(widget.options.map((option) => option.id));
+          ..addAll(widget.options.map(MediaPickerScreen.keyOf));
       }
     });
   }
 
+  /// A photo opens in the lightweight dialog; a video needs a real player, or
+  /// the reader is choosing between still frames that all look alike.
   void _preview(VideoQualityOption option) {
-    unawaited(MediaPreviewDialog.show(context, option));
+    if (option.isImage) {
+      unawaited(MediaPreviewDialog.show(context, option));
+      return;
+    }
+    unawaited(
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => VideoPlayerScreen(
+            title: describeQuality(option.label, context.l10n),
+            videoUrl: option.downloadUrl,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final allSelected = _selectedIds.length == widget.options.length;
+    final keys = widget.options.map(MediaPickerScreen.keyOf).toSet();
+    final allSelected = _selectedIds.length == keys.length;
     final width = MediaQuery.sizeOf(context).width;
     final columns = width >= 900
         ? 5
@@ -72,7 +103,7 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(context.l10n.selectImages),
+        title: Text(widget.title),
         actions: [
           TextButton(
             onPressed: _toggleAll,
@@ -93,7 +124,9 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
         itemCount: widget.options.length,
         itemBuilder: (context, index) {
           final option = widget.options[index];
-          final selected = _selectedIds.contains(option.id);
+          final selected = _selectedIds.contains(
+            MediaPickerScreen.keyOf(option),
+          );
           return Semantics(
             label: describeQuality(option.label, context.l10n),
             selected: selected,
@@ -153,7 +186,12 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
                           foregroundColor: Colors.white,
                         ),
                         onPressed: () => _preview(option),
-                        icon: const Icon(Icons.zoom_in_rounded, size: 18),
+                        icon: Icon(
+                          option.isImage
+                              ? Icons.zoom_in_rounded
+                              : Icons.play_arrow_rounded,
+                          size: 18,
+                        ),
                       ),
                     ),
                     Positioned(
@@ -183,7 +221,7 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
         child: FilledButton.icon(
           onPressed: () => Navigator.pop(context, _selectedIds),
           icon: const Icon(Icons.check_rounded),
-          label: Text('${context.l10n.selectImages} (${_selectedIds.length})'),
+          label: Text('${widget.title} (${_selectedIds.length})'),
         ),
       ),
     );

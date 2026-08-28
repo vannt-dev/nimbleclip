@@ -130,6 +130,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get selectImages => 'Chọn ảnh:';
 
   @override
+  String get selectVideos => 'Chọn video:';
+
+  @override
   String get selectAll => 'Chọn tất cả';
 
   @override

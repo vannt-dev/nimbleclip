@@ -4,7 +4,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/media_selection_helper.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/video_metadata.dart';
-import '../image_picker_screen.dart';
+import '../media_picker_screen.dart';
 import 'result_media_tabs.dart';
 import 'result_metadata_summary.dart';
 import 'result_quality_list.dart';
@@ -33,15 +33,27 @@ class VideoResultCard extends StatefulWidget {
 class _VideoResultCardState extends State<VideoResultCard> {
   int _selectedTab = 0; // 0 = Video, 1 = Audio
   final Set<String> _selectedImageIds = {};
+  final Set<String> _selectedVideoIds = {};
 
   List<VideoQualityOption> get _imageOptions =>
       widget.metadata.qualities.where((option) => option.isImage).toList();
+
+  /// One entry per video, whatever qualities it is offered at.
+  List<VideoQualityOption> get _videoEntries {
+    final seen = <String>{};
+    return [
+      for (final option in widget.metadata.qualities)
+        if (!option.isAudioOnly && !option.isImage)
+          if (seen.add(MediaSelectionHelper.videoKeyOf(option))) option,
+    ];
+  }
 
   @override
   void initState() {
     super.initState();
     _selectedTab = widget.selectedQuality?.isAudioOnly == true ? 1 : 0;
     _selectAllImages();
+    _selectAllVideos();
   }
 
   @override
@@ -50,6 +62,7 @@ class _VideoResultCardState extends State<VideoResultCard> {
     if (oldWidget.metadata.id != widget.metadata.id ||
         oldWidget.metadata.originalUrl != widget.metadata.originalUrl) {
       _selectAllImages();
+      _selectAllVideos();
       _selectedTab = widget.selectedQuality?.isAudioOnly == true ? 1 : 0;
     }
   }
@@ -60,12 +73,21 @@ class _VideoResultCardState extends State<VideoResultCard> {
       ..addAll(_imageOptions.map((option) => option.id));
   }
 
+  /// Everything is checked to begin with, which is what the card downloaded
+  /// before there was any way to uncheck.
+  void _selectAllVideos() {
+    _selectedVideoIds
+      ..clear()
+      ..addAll(_videoEntries.map(MediaSelectionHelper.videoKeyOf));
+  }
+
   Future<void> _openImagePicker(List<VideoQualityOption> options) async {
     final selected = await Navigator.of(context).push<Set<String>>(
       MaterialPageRoute(
-        builder: (_) => ImagePickerScreen(
+        builder: (_) => MediaPickerScreen(
           options: options,
           initiallySelectedIds: _selectedImageIds,
+          title: context.l10n.selectImages,
         ),
       ),
     );
@@ -81,6 +103,24 @@ class _VideoResultCardState extends State<VideoResultCard> {
     if (first != null) widget.onQualitySelected(first);
   }
 
+  Future<void> _openVideoPicker(List<VideoQualityOption> options) async {
+    final selected = await Navigator.of(context).push<Set<String>>(
+      MaterialPageRoute(
+        builder: (_) => MediaPickerScreen(
+          options: options,
+          initiallySelectedIds: _selectedVideoIds,
+          title: context.l10n.selectVideos,
+        ),
+      ),
+    );
+    if (!mounted || selected == null) return;
+    setState(() {
+      _selectedVideoIds
+        ..clear()
+        ..addAll(selected);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -92,10 +132,12 @@ class _VideoResultCardState extends State<VideoResultCard> {
     final imageOptions = _imageOptions;
     final audioOptions = meta.qualities.where((q) => q.isAudioOnly).toList();
     final currentOptions = _selectedTab == 0 ? videoOptions : audioOptions;
+    final videoEntries = _videoEntries;
     final selectedDownloads = MediaSelectionHelper.downloads(
       options: meta.qualities,
       selectedQuality: widget.selectedQuality,
       selectedImageIds: _selectedImageIds,
+      selectedVideoIds: _selectedVideoIds,
     );
     final previewUrl = widget.selectedQuality?.isImage == true
         ? widget.selectedQuality!.downloadUrl
@@ -164,9 +206,28 @@ class _VideoResultCardState extends State<VideoResultCard> {
 
                 // 4. Quality Selector List
                 ResultQualityList(
-                  options: currentOptions,
+                  // With several videos the reader is choosing between videos,
+                  // not between qualities of one; the picker replaces the
+                  // quality list rather than sitting beside it.
+                  options: _selectedTab == 0 && videoEntries.length > 1
+                      ? const []
+                      : currentOptions,
                   selectedQualityId: widget.selectedQuality?.id,
                   onQualitySelected: widget.onQualitySelected,
+                  videoEntries: _selectedTab == 0 && videoEntries.length > 1
+                      ? videoEntries
+                      : const [],
+                  selectedVideoIds: _selectedVideoIds,
+                  onToggleAllVideos: () {
+                    setState(() {
+                      if (_selectedVideoIds.length == videoEntries.length) {
+                        _selectedVideoIds.clear();
+                      } else {
+                        _selectAllVideos();
+                      }
+                    });
+                  },
+                  onOpenVideoPicker: () => _openVideoPicker(videoEntries),
                   imageOptions: imageOptions,
                   selectedImageIds: _selectedImageIds,
                   showImageSelection:

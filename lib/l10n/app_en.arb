@@ -45,6 +45,7 @@
   "@audioOptions": {"placeholders": {"count": {"type": "int"}}},
   "selectDownloadQuality": "Choose download quality:",
   "selectImages": "Choose images:",
+  "selectVideos": "Choose videos:",
   "selectAll": "Select all",
   "deselectAll": "Deselect all",
   "downloadSelected": "Download ({count})",

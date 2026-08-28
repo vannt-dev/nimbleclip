@@ -290,6 +290,12 @@ abstract class AppLocalizations {
   /// **'Choose images:'**
   String get selectImages;
 
+  /// No description provided for @selectVideos.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose videos:'**
+  String get selectVideos;
+
   /// No description provided for @selectAll.
   ///
   /// In en, this message translates to:

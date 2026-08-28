@@ -17,6 +17,10 @@ class ResultQualityList extends StatelessWidget {
     required this.options,
     required this.selectedQualityId,
     required this.onQualitySelected,
+    required this.videoEntries,
+    required this.selectedVideoIds,
+    required this.onToggleAllVideos,
+    required this.onOpenVideoPicker,
     required this.imageOptions,
     required this.selectedImageIds,
     required this.showImageSelection,
@@ -30,6 +34,13 @@ class ResultQualityList extends StatelessWidget {
   final String? selectedQualityId;
   final ValueChanged<VideoQualityOption> onQualitySelected;
 
+  /// One entry per video, shown as a picker instead of the quality list when
+  /// a post carries several. Empty when there is nothing to choose between.
+  final List<VideoQualityOption> videoEntries;
+  final Set<String> selectedVideoIds;
+  final VoidCallback onToggleAllVideos;
+  final VoidCallback onOpenVideoPicker;
+
   final List<VideoQualityOption> imageOptions;
   final Set<String> selectedImageIds;
 
@@ -42,10 +53,43 @@ class ResultQualityList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final allImagesSelected = selectedImageIds.length == imageOptions.length;
+    final allVideosSelected = selectedVideoIds.length == videoEntries.length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (videoEntries.isNotEmpty) ...[
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  context.l10n.videoOptions(videoEntries.length),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: onToggleAllVideos,
+                child: Text(
+                  allVideosSelected
+                      ? context.l10n.deselectAll
+                      : context.l10n.selectAll,
+                ),
+              ),
+            ],
+          ),
+          OutlinedButton.icon(
+            onPressed: onOpenVideoPicker,
+            icon: const Icon(Icons.video_library_outlined),
+            label: Text(
+              '${context.l10n.selectVideos} '
+              '(${selectedVideoIds.length}/${videoEntries.length})',
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         if (options.isNotEmpty) ...[
           Text(
             context.l10n.selectDownloadQuality,
