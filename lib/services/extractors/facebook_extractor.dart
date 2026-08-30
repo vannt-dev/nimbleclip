@@ -60,6 +60,12 @@ class FacebookExtractor extends BaseVideoExtractor {
   // `/share/v/` name a reel or a video and are left out: they carry no gallery.
   static final RegExp _sharedPostPath = RegExp(r'^/share/(?:p/)?[^/]+/?$');
 
+  // A group names its posts either `/posts/<id>/`, which the general check
+  // below already covers, or `/permalink/<id>/`, which nothing did.
+  static final RegExp _groupPermalinkPath = RegExp(
+    r'^/groups/[^/]+/permalink/[^/]+/?$',
+  );
+
   String? _firstMatch(String html, List<RegExp> patterns) {
     return _pageParser.firstMediaUrl(html, patterns);
   }
@@ -171,7 +177,8 @@ class FacebookExtractor extends BaseVideoExtractor {
         (uri.path.contains('/posts/') ||
             uri.path.endsWith('/permalink.php') ||
             uri.path.endsWith('/story.php') ||
-            _sharedPostPath.hasMatch(uri.path));
+            _sharedPostPath.hasMatch(uri.path) ||
+            _groupPermalinkPath.hasMatch(uri.path));
     final currentImages = metadata.qualities
         .where((option) => option.isImage)
         .toList();

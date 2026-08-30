@@ -314,6 +314,19 @@ void main() {
     expect(result.qualities.where((option) => option.isImage), hasLength(4));
   });
 
+  test('Facebook reads a group post permalink album', () async {
+    ExtractorHttp.getOverride = (_, _) async =>
+        http.Response(fixture('facebook_image.html'), 200);
+    ExtractorHttp.postOverride = (_, _, _) async =>
+        http.Response(fixture('facebook_fallback.json'), 200);
+
+    final result = await const FacebookExtractor().extract(
+      'https://www.facebook.com/groups/1234567890/permalink/9876543210/',
+    );
+
+    expect(result.qualities.where((option) => option.isImage), hasLength(4));
+  });
+
   test('Facebook keeps video and photos from a mixed public post', () async {
     ExtractorHttp.getOverride = (_, _) async =>
         http.Response(fixture('facebook_mixed.html'), 200);
