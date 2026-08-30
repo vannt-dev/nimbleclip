@@ -301,6 +301,19 @@ void main() {
     },
   );
 
+  test('Facebook reads a shared album link that never redirects', () async {
+    ExtractorHttp.getOverride = (_, _) async =>
+        http.Response(fixture('facebook_image.html'), 200);
+    ExtractorHttp.postOverride = (_, _, _) async =>
+        http.Response(fixture('facebook_fallback.json'), 200);
+
+    final result = await const FacebookExtractor().extract(
+      'https://www.facebook.com/share/1CYGwgPahk/',
+    );
+
+    expect(result.qualities.where((option) => option.isImage), hasLength(4));
+  });
+
   test('Facebook keeps video and photos from a mixed public post', () async {
     ExtractorHttp.getOverride = (_, _) async =>
         http.Response(fixture('facebook_mixed.html'), 200);
