@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-08-30
+
 - Fixed a shared Facebook album link returning only its first photo. Facebook
   serves an anonymous visitor no gallery at all, so the whole set comes from
   the fallback service, and that step was reached only by a post permalink. A
