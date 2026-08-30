@@ -31,6 +31,10 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   heading carrying the count. Five entries laid out flat sat between the link
   field and the result. Each entry also gains a copy button, which the section
   previously had no way to do at all.
+- Added swiping between a post's photos, and between its videos, in the viewer.
+  Reaching the next one meant closing the current one and tapping it; the
+  viewer now carries the whole set of that kind, with a position counter.
+  Photos stay with photos and videos with videos.
 
 ## [1.5.0] - 2026-08-28
 
