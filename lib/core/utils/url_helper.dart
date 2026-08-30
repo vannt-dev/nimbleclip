@@ -19,8 +19,11 @@ class UrlHelper {
   static final RegExp _singleUrl = RegExp(r'https?://[^\s<>"]+');
   static final RegExp _multipleUrls = RegExp(r'''https?://[^\s<>"']+''');
   static final RegExp _trailingPunctuation = RegExp(r'[.,;!)]+$');
+  // The type segment names what was shared — `r` a reel, `v` a video, `p` a
+  // post — but Facebook also emits the bare `/share/<token>/`, which carries
+  // no segment at all and is the form its Share action produces for a post.
   static final RegExp _facebookSharePath = RegExp(
-    r'^/share/(?:r|v|p)/[^/]+/?$',
+    r'^/share/(?:(?:r|v|p)/)?[^/]+/?$',
   );
 
   static String extractCleanUrl(String text) {
