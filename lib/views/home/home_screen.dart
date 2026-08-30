@@ -6,6 +6,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/media_selection_helper.dart';
 import '../../core/utils/url_helper.dart';
 import '../../l10n/l10n.dart';
 import '../../models/video_metadata.dart';
@@ -313,9 +314,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     if (meta != null && quality != null) {
       if (quality.isImage) {
-        unawaited(MediaPreviewDialog.show(context, quality));
+        // The whole set goes in, so the reader can swipe on from the one they
+        // asked for rather than closing and reopening for each photo.
+        final images = meta.qualities
+            .where((option) => option.isImage)
+            .toList();
+        unawaited(
+          MediaPreviewDialog.show(
+            context,
+            images,
+            initialIndex: images.indexOf(quality),
+          ),
+        );
         return;
       }
+      final seen = <String>{};
+      final videos = [
+        for (final option in meta.qualities)
+          if (!option.isImage && !option.isAudioOnly)
+            if (seen.add(MediaSelectionHelper.videoKeyOf(option))) option,
+      ];
       unawaited(
         Navigator.push(
           context,
@@ -324,6 +342,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               title: meta.title,
               videoUrl: quality.downloadUrl,
               onDownload: _onStartDownload,
+              // One entry per video, not per quality: swiping is for moving
+              // between videos, and the same clip at 720p and 1080p is one.
+              playlist: videos,
+              initialIndex: videos.indexWhere(
+                (option) =>
+                    MediaSelectionHelper.videoKeyOf(option) ==
+                    MediaSelectionHelper.videoKeyOf(quality),
+              ),
             ),
           ),
         ),

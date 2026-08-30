@@ -68,7 +68,13 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
   /// the reader is choosing between still frames that all look alike.
   void _preview(VideoQualityOption option) {
     if (option.isImage) {
-      unawaited(MediaPreviewDialog.show(context, option));
+      unawaited(
+        MediaPreviewDialog.show(
+          context,
+          widget.options,
+          initialIndex: widget.options.indexOf(option),
+        ),
+      );
       return;
     }
     unawaited(
@@ -77,6 +83,10 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
           builder: (_) => VideoPlayerScreen(
             title: describeQuality(option.label, context.l10n),
             videoUrl: option.downloadUrl,
+            // The grid already holds one entry per video, so it is the set to
+            // swipe through as it stands.
+            playlist: widget.options,
+            initialIndex: widget.options.indexOf(option),
           ),
         ),
       ),
