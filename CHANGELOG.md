@@ -6,6 +6,12 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- Fixed a shared Facebook album link returning only its first photo. Facebook
+  serves an anonymous visitor no gallery at all, so the whole set comes from
+  the fallback service, and that step was reached only by a post permalink. A
+  link copied from the Share action, such as `facebook.com/share/<token>/`,
+  never redirects to one, so it was left with the single Open Graph image.
+
 ## [1.5.0] - 2026-08-28
 
 - Added support for Instagram story and highlight links, which were previously

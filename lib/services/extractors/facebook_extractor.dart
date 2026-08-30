@@ -54,6 +54,12 @@ class FacebookExtractor extends BaseVideoExtractor {
   static final RegExp _avatarBucket = RegExp(r'/t\d+(?:\.\d+)?-1/');
   static final RegExp _imageExtension = RegExp(r'\.(?:jpe?g|png|webp|gif)$');
 
+  // The Share action emits `/share/<token>/` and `/share/p/<token>/` for a
+  // post. Neither redirects to the permalink for an anonymous request, so the
+  // share link itself is what reaches the gallery fallback. `/share/r/` and
+  // `/share/v/` name a reel or a video and are left out: they carry no gallery.
+  static final RegExp _sharedPostPath = RegExp(r'^/share/(?:p/)?[^/]+/?$');
+
   String? _firstMatch(String html, List<RegExp> patterns) {
     return _pageParser.firstMediaUrl(html, patterns);
   }
@@ -151,8 +157,9 @@ class FacebookExtractor extends BaseVideoExtractor {
   }
 
   /// Facebook's anonymous mobile document often exposes only the first Open
-  /// Graph image of a gallery. For public post permalinks, use a narrowly
-  /// scoped extractor fallback when the Relay payload did not reveal the set.
+  /// Graph image of a gallery. For public post permalinks and the share links
+  /// that stand in for them, use a narrowly scoped extractor fallback when the
+  /// Relay payload did not reveal the set.
   /// A failure here is non-fatal: the directly extracted media remains usable.
   Future<VideoMetadata> _withPostPhotoFallback(
     VideoMetadata metadata,
@@ -163,7 +170,8 @@ class FacebookExtractor extends BaseVideoExtractor {
         uri != null &&
         (uri.path.contains('/posts/') ||
             uri.path.endsWith('/permalink.php') ||
-            uri.path.endsWith('/story.php'));
+            uri.path.endsWith('/story.php') ||
+            _sharedPostPath.hasMatch(uri.path));
     final currentImages = metadata.qualities
         .where((option) => option.isImage)
         .toList();
