@@ -633,4 +633,12 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get externalServicesDisabled =>
       'Dịch vụ trích xuất bên ngoài đang bị tắt trong Cài đặt. Hãy bật để tải bài này.';
+
+  @override
+  String get galleryMayBeIncomplete =>
+      'Chỉ đọc được ảnh bìa. Bật dịch vụ bên ngoài trong Cài đặt để tìm nốt những ảnh còn lại.';
+
+  @override
+  String get galleryCheckUnavailable =>
+      'Chỉ đọc được ảnh bìa, và dịch vụ liệt kê các ảnh còn lại không phản hồi. Bài này có thể còn ảnh khác.';
 }

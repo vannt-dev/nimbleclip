@@ -1135,6 +1135,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'External extraction services are disabled in Settings. Enable them to download this post.'**
   String get externalServicesDisabled;
+
+  /// No description provided for @galleryMayBeIncomplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the cover photo could be read. Turn external services on in Settings to check for the rest.'**
+  String get galleryMayBeIncomplete;
+
+  /// No description provided for @galleryCheckUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the cover photo could be read, and the service that lists the rest did not answer. This post may hold more.'**
+  String get galleryCheckUnavailable;
 }
 
 class _AppLocalizationsDelegate

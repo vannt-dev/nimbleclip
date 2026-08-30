@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/media_selection_helper.dart';
+import '../../../l10n/gallery_notice_text.dart';
 import '../../../l10n/l10n.dart';
+import '../../../models/gallery_notice.dart';
 import '../../../models/video_metadata.dart';
 import '../media_picker_screen.dart';
 import 'result_media_tabs.dart';
@@ -180,6 +182,10 @@ class _VideoResultCardState extends State<VideoResultCard> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 ResultMetadataSummary(metadata: meta),
+                if (meta.galleryNotice != null) ...[
+                  const SizedBox(height: 12),
+                  _GalleryNoticeLine(notice: meta.galleryNotice!),
+                ],
                 const SizedBox(height: 16),
 
                 // 3. Video / Audio Mode Tabs
@@ -301,6 +307,36 @@ class _VideoResultCardState extends State<VideoResultCard> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Says why the result may be holding fewer photos than the post does.
+///
+/// Deliberately part of the card rather than a snack bar: a snack bar dismisses
+/// itself, and this is a property of the result that stays true while the
+/// reader is deciding what to download.
+class _GalleryNoticeLine extends StatelessWidget {
+  final GalleryNotice notice;
+
+  const _GalleryNoticeLine({required this.notice});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.onSurfaceVariant;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.info_outline, size: 16, color: color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            describeGalleryNotice(notice, context.l10n),
+            style: theme.textTheme.bodySmall?.copyWith(color: color),
+          ),
+        ),
+      ],
     );
   }
 }

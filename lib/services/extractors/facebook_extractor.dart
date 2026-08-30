@@ -5,6 +5,7 @@ import '../../core/utils/external_service_policy.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/text_unescape.dart';
 import '../../core/utils/url_helper.dart';
+import '../../models/gallery_notice.dart';
 import '../../models/quality_descriptor.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
@@ -182,10 +183,13 @@ class FacebookExtractor extends BaseVideoExtractor {
     final currentImages = metadata.qualities
         .where((option) => option.isImage)
         .toList();
-    if (!isPostPermalink ||
-        currentImages.length > 1 ||
-        !externalServiceAccess.allowExternalServices) {
+    if (!isPostPermalink || currentImages.length > 1) {
       return metadata;
+    }
+    if (!externalServiceAccess.allowExternalServices) {
+      // The set was never requested, so the single photo on hand may well be a
+      // cover. Say which, rather than pass it off as the whole post.
+      return _withNotice(metadata, GalleryNotice.externalServicesDisabled);
     }
 
     // Fixture tests that only override GET must never leak into live network.
@@ -239,8 +243,32 @@ class FacebookExtractor extends BaseVideoExtractor {
         shareCount: metadata.shareCount,
       );
     } catch (_) {
-      return metadata;
+      // Every failure here lands in the same place: the request was made and
+      // produced no usable answer, so whether the post holds more photos is
+      // unknown. That is what the notice reports — the media already extracted
+      // stays usable either way.
+      return _withNotice(metadata, GalleryNotice.galleryCheckUnavailable);
     }
+  }
+
+  VideoMetadata _withNotice(VideoMetadata metadata, GalleryNotice notice) {
+    return VideoMetadata(
+      id: metadata.id,
+      originalUrl: metadata.originalUrl,
+      title: metadata.title,
+      description: metadata.description,
+      author: metadata.author,
+      authorAvatar: metadata.authorAvatar,
+      coverUrl: metadata.coverUrl,
+      duration: metadata.duration,
+      platform: metadata.platform,
+      qualities: metadata.qualities,
+      viewCount: metadata.viewCount,
+      likeCount: metadata.likeCount,
+      commentCount: metadata.commentCount,
+      shareCount: metadata.shareCount,
+      galleryNotice: notice,
+    );
   }
 
   bool _isPostPhoto(String url) {

@@ -6,6 +6,7 @@ import 'package:nimble_clip/core/utils/http_helper.dart';
 import 'package:nimble_clip/core/utils/quality_helper.dart';
 import 'package:nimble_clip/models/quality_descriptor.dart';
 import 'package:nimble_clip/core/utils/external_service_policy.dart';
+import 'package:nimble_clip/models/gallery_notice.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/services/extractors/base_extractor.dart';
@@ -325,6 +326,61 @@ void main() {
     );
 
     expect(result.qualities.where((option) => option.isImage), hasLength(4));
+  });
+
+  group('Facebook gallery notice', () {
+    test('says so when external services are off', () async {
+      ExtractorHttp.getOverride = (_, _) async =>
+          http.Response(fixture('facebook_image.html'), 200);
+
+      final result = await const FacebookExtractor(
+        externalServiceAccess: FixedExternalServiceAccess(false),
+      ).extract('https://www.facebook.com/example/posts/654321');
+
+      expect(result.galleryNotice, GalleryNotice.externalServicesDisabled);
+      expect(result.qualities.where((option) => option.isImage), hasLength(1));
+    });
+
+    test('says so when the service does not answer', () async {
+      ExtractorHttp.getOverride = (_, _) async =>
+          http.Response(fixture('facebook_image.html'), 200);
+      ExtractorHttp.postOverride = (_, _, _) async =>
+          http.Response('upstream exploded', 503);
+
+      final result = await const FacebookExtractor().extract(
+        'https://www.facebook.com/example/posts/654321',
+      );
+
+      expect(result.galleryNotice, GalleryNotice.galleryCheckUnavailable);
+      expect(result.qualities.where((option) => option.isImage), hasLength(1));
+    });
+
+    test('stays quiet when the post really holds one photo', () async {
+      ExtractorHttp.getOverride = (_, _) async =>
+          http.Response(fixture('facebook_image.html'), 200);
+      ExtractorHttp.postOverride = (_, _, _) async =>
+          http.Response('{"images":[]}', 200);
+
+      final result = await const FacebookExtractor().extract(
+        'https://www.facebook.com/example/posts/654321',
+      );
+
+      expect(result.galleryNotice, isNull);
+    });
+
+    test('stays quiet when the gallery was read in full', () async {
+      ExtractorHttp.getOverride = (_, _) async =>
+          http.Response(fixture('facebook_image.html'), 200);
+      ExtractorHttp.postOverride = (_, _, _) async =>
+          http.Response(fixture('facebook_fallback.json'), 200);
+
+      final result = await const FacebookExtractor().extract(
+        'https://www.facebook.com/example/posts/654321',
+      );
+
+      expect(result.galleryNotice, isNull);
+      expect(result.qualities.where((option) => option.isImage), hasLength(4));
+    });
   });
 
   test('Facebook keeps video and photos from a mixed public post', () async {

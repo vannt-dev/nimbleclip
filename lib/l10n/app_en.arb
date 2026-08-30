@@ -209,4 +209,6 @@
   "invalidVideoUrl": "Enter a valid video URL using http or https.",
   "unableToAnalyze": "This link could not be analyzed."
   ,"externalServicesDisabled": "External extraction services are disabled in Settings. Enable them to download this post."
+  ,"galleryMayBeIncomplete": "Only the cover photo could be read. Turn external services on in Settings to check for the rest."
+  ,"galleryCheckUnavailable": "Only the cover photo could be read, and the service that lists the rest did not answer. This post may hold more."
 }
