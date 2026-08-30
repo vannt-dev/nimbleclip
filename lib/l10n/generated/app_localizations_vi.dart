@@ -641,4 +641,10 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get galleryCheckUnavailable =>
       'Chỉ đọc được ảnh bìa, và dịch vụ liệt kê các ảnh còn lại không phản hồi. Bài này có thể còn ảnh khác.';
+
+  @override
+  String get copyLink => 'Sao chép liên kết';
+
+  @override
+  String get linkCopied => 'Đã sao chép liên kết';
 }

@@ -642,4 +642,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get galleryCheckUnavailable =>
       'Only the cover photo could be read, and the service that lists the rest did not answer. This post may hold more.';
+
+  @override
+  String get copyLink => 'Copy link';
+
+  @override
+  String get linkCopied => 'Link copied';
 }
