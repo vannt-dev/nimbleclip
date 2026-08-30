@@ -575,6 +575,53 @@ void main() {
       ),
     );
 
+    testWidgets('the notice lays out on a phone in both locales', (
+      tester,
+    ) async {
+      // The 800px default surface is wider than any phone and would not show
+      // an overflow. Vietnamese matters here: its wording for both notices is
+      // longer than the English, and this line sits in a row beside an icon.
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 2.75;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      for (final notice in GalleryNotice.values) {
+        for (final locale in const [Locale('en'), Locale('vi')]) {
+          await tester.pumpWidget(
+            MaterialApp(
+              locale: locale,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Scaffold(
+                body: SingleChildScrollView(
+                  child: VideoResultCard(
+                    metadata: VideoMetadata(
+                      id: 'post',
+                      originalUrl: 'https://example.com/post',
+                      title: 'A clip',
+                      author: 'Creator',
+                      coverUrl: '',
+                      platform: VideoPlatform.facebook,
+                      qualities: const [hd],
+                      galleryNotice: notice,
+                    ),
+                    selectedQuality: hd,
+                    onQualitySelected: (_) {},
+                    onDownload: (_) {},
+                    onPreview: () {},
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pump();
+
+          expect(tester.takeException(), isNull, reason: '$notice in $locale');
+        }
+      }
+    });
+
     testWidgets('a gallery notice is shown, and only when there is one', (
       tester,
     ) async {
