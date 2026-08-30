@@ -21,6 +21,12 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   turned off, or a service that did not answer — and says which of the two it
   is. A post that really holds one photo says nothing, and nothing becomes an
   error: whatever was extracted stays downloadable.
+- Fixed comment stickers being listed among a Facebook post's photos. A real
+  five-photo album came through as seven, the last two being the same sticker
+  at two sizes.
+- Fixed sharing a link into the app while the downloads tab was open leaving
+  the app on that tab. The link was analysed either way, out of sight, so the
+  share looked as though it had done nothing.
 
 ## [1.5.0] - 2026-08-28
 
