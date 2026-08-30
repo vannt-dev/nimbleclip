@@ -11,6 +11,16 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   the fallback service, and that step was reached only by a post permalink. A
   link copied from the Share action, such as `facebook.com/share/<token>/`,
   never redirects to one, so it was left with the single Open Graph image.
+- Fixed the same shortfall on a group post addressed as
+  `/groups/<id>/permalink/<id>/`. A group names its posts two ways and only
+  the other one was recognised.
+- Added a note on a Facebook result when it may be holding fewer photos than
+  the post does. One photo used to mean either "this post has one photo" or
+  "the service that lists the rest is unavailable", with no way to tell which.
+  The note appears only when the shortfall is knowable — external services
+  turned off, or a service that did not answer — and says which of the two it
+  is. A post that really holds one photo says nothing, and nothing becomes an
+  error: whatever was extracted stays downloadable.
 
 ## [1.5.0] - 2026-08-28
 
