@@ -27,6 +27,10 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 - Fixed sharing a link into the app while the downloads tab was open leaving
   the app on that tab. The link was analysed either way, out of sight, so the
   share looked as though it had done nothing.
+- Changed the recent links section to stay folded away until it is opened, its
+  heading carrying the count. Five entries laid out flat sat between the link
+  field and the result. Each entry also gains a copy button, which the section
+  previously had no way to do at all.
 
 ## [1.5.0] - 2026-08-28
 
