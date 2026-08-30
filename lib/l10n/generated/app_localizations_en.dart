@@ -634,4 +634,12 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get externalServicesDisabled =>
       'External extraction services are disabled in Settings. Enable them to download this post.';
+
+  @override
+  String get galleryMayBeIncomplete =>
+      'Only the cover photo could be read. Turn external services on in Settings to check for the rest.';
+
+  @override
+  String get galleryCheckUnavailable =>
+      'Only the cover photo could be read, and the service that lists the rest did not answer. This post may hold more.';
 }

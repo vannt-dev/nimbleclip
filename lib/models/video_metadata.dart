@@ -1,3 +1,4 @@
+import 'gallery_notice.dart';
 import 'quality_descriptor.dart';
 import 'video_platform.dart';
 
@@ -126,6 +127,12 @@ class VideoMetadata {
   final int? commentCount;
   final int? shareCount;
 
+  /// Why this result may hold fewer photos than the post does; null when the
+  /// count is trustworthy. Deliberately absent from toJson: it describes this
+  /// extraction attempt, not the media, so a stored one would still be
+  /// claiming a gap long after the cause of it had gone.
+  final GalleryNotice? galleryNotice;
+
   const VideoMetadata({
     required this.id,
     required this.originalUrl,
@@ -141,6 +148,7 @@ class VideoMetadata {
     this.likeCount,
     this.commentCount,
     this.shareCount,
+    this.galleryNotice,
   });
 
   /// Highest video option, then an image, then audio. Extractors hand back

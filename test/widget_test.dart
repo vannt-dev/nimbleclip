@@ -8,6 +8,8 @@ import 'package:nimble_clip/l10n/generated/app_localizations.dart';
 import 'package:nimble_clip/models/quality_descriptor.dart';
 import 'package:nimble_clip/core/utils/formatters.dart';
 import 'package:nimble_clip/main.dart';
+import 'package:nimble_clip/l10n/gallery_notice_text.dart';
+import 'package:nimble_clip/models/gallery_notice.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/models/download_task.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
@@ -572,6 +574,42 @@ void main() {
         ),
       ),
     );
+
+    testWidgets('a gallery notice is shown, and only when there is one', (
+      tester,
+    ) async {
+      const withoutNotice = VideoMetadata(
+        id: 'post',
+        originalUrl: 'https://example.com/post',
+        title: 'A clip',
+        author: 'Creator',
+        coverUrl: '',
+        platform: VideoPlatform.facebook,
+        qualities: [hd],
+      );
+      const withNotice = VideoMetadata(
+        id: 'post',
+        originalUrl: 'https://example.com/post',
+        title: 'A clip',
+        author: 'Creator',
+        coverUrl: '',
+        platform: VideoPlatform.facebook,
+        qualities: [hd],
+        galleryNotice: GalleryNotice.galleryCheckUnavailable,
+      );
+      final expected = describeGalleryNotice(
+        GalleryNotice.galleryCheckUnavailable,
+        lookupAppLocalizations(const Locale('en')),
+      );
+
+      await tester.pumpWidget(host(withoutNotice));
+      await tester.pump();
+      expect(find.text(expected), findsNothing);
+
+      await tester.pumpWidget(host(withNotice));
+      await tester.pump();
+      expect(find.text(expected), findsOneWidget);
+    });
 
     testWidgets('switching to the audio tab selects an audio option', (
       tester,
