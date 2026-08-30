@@ -53,6 +53,11 @@ class FacebookExtractor extends BaseVideoExtractor {
     r'(?:[?&]|&amp;)ctp=s(?:16|24|32|40|48|50|60|64)x',
   );
   static final RegExp _avatarBucket = RegExp(r'/t\d+(?:\.\d+)?-1/');
+  // Stickers live in their own bucket. The fallback service returns the ones
+  // used in a post's comments alongside the photos, and they are neither
+  // avatars nor externally hosted, so nothing else here excluded them. Seen on
+  // a real album, where two comment stickers followed the five actual photos.
+  static final RegExp _stickerBucket = RegExp(r'/t39\.1997-');
   static final RegExp _imageExtension = RegExp(r'\.(?:jpe?g|png|webp|gif)$');
 
   // The Share action emits `/share/<token>/` and `/share/p/<token>/` for a
@@ -287,7 +292,7 @@ class FacebookExtractor extends BaseVideoExtractor {
     // Facebook reserves the `-1` CDN buckets for profile/avatar images. Post
     // photos use content buckets such as t39.30808-6 and t1.6435-9.
     final path = uri.path.toLowerCase();
-    if (_avatarBucket.hasMatch(path)) {
+    if (_avatarBucket.hasMatch(path) || _stickerBucket.hasMatch(path)) {
       return false;
     }
     return _imageExtension.hasMatch(path);
