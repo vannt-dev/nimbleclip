@@ -146,6 +146,10 @@ void main() {
         UrlHelper.isShortLink('https://facebook.com/share/p/Post123/?x=1'),
         isTrue,
       );
+      expect(
+        UrlHelper.isShortLink('https://www.facebook.com/share/1CYGwgPahk/'),
+        isTrue,
+      );
       expect(UrlHelper.isShortLink('https://vm.tiktok.com/ZM1/'), isTrue);
       expect(
         UrlHelper.isShortLink('https://www.tiktok.com/@u/video/1'),
