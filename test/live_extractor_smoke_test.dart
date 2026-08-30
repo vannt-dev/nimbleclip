@@ -17,6 +17,15 @@ void main() {
       url: 'https://www.facebook.com/cebuanafinance/posts/662287040177856/',
       minimumMedia: 2,
     ),
+    // A share link is the shape a person actually copies, and it reaches the
+    // gallery by a different route than the permalink above: it never
+    // redirects, so the fallback has to accept the `/share/` URL as it stands.
+    // The permalink case passed throughout the window where this one returned
+    // a single photo, which is why it is listed separately.
+    'Facebook gallery from a share link': (
+      url: 'https://www.facebook.com/share/1CYGwgPahk/',
+      minimumMedia: 2,
+    ),
     'X gallery': (
       url: 'https://x.com/SpaceX/status/2000459900460347480',
       minimumMedia: 2,
