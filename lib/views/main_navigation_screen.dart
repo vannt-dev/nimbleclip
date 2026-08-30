@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
 import '../l10n/l10n.dart';
 import '../providers/download_provider.dart';
+import '../providers/shared_intent_provider.dart';
 import 'downloads/downloads_screen.dart';
 import 'home/home_screen.dart';
 import 'settings/settings_screen.dart';
@@ -36,9 +37,29 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     ];
   }
 
+  /// Brings the home tab forward when a share arrives.
+  ///
+  /// `IndexedStack` keeps every tab built, so the home screen consumes and
+  /// analyses a shared link whether or not it is the one on screen. Without
+  /// this the reader stayed on the tab they were already on — watching an
+  /// unchanged downloads list — while the result appeared behind it.
+  ///
+  /// The text is only observed here, never consumed: the home screen owns
+  /// that, and taking it would leave nothing to analyse.
+  void _showHomeForSharedLink() {
+    if (_currentIndex == 0) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _currentIndex == 0) return;
+      _selectTab(0);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (context.watch<SharedIntentProvider>().pendingText != null) {
+      _showHomeForSharedLink();
+    }
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Container(
