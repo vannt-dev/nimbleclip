@@ -1147,6 +1147,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Only the cover photo could be read, and the service that lists the rest did not answer. This post may hold more.'**
   String get galleryCheckUnavailable;
+
+  /// No description provided for @copyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get copyLink;
+
+  /// No description provided for @linkCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Link copied'**
+  String get linkCopied;
 }
 
 class _AppLocalizationsDelegate
