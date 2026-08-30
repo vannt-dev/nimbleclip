@@ -12,7 +12,6 @@ import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/providers/download_provider.dart';
 import 'package:nimble_clip/providers/settings_provider.dart';
 import 'package:nimble_clip/services/download_history_repository.dart';
-import 'package:nimble_clip/services/download_service.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/views/downloads/downloads_screen.dart';
 import 'package:nimble_clip/views/downloads/widgets/active_download_card.dart';
@@ -20,33 +19,7 @@ import 'package:nimble_clip/views/home/media_picker_screen.dart';
 import 'package:nimble_clip/views/player/video_player_screen.dart';
 import 'package:nimble_clip/views/settings/settings_screen.dart';
 
-/// Keeps the real native gateway — and its process-wide update stream — out of
-/// widget tests.
-class _InertDownloadService implements DownloadGateway {
-  bool disposed = false;
-
-  @override
-  Future<void> startDownload({
-    required DownloadTask task,
-    required DownloadProgressCallback onProgress,
-    required void Function(DownloadTask task, String filePath) onComplete,
-    required void Function(DownloadTask task, String error) onError,
-    required AppLocalizations l10n,
-    bool autoSaveToGallery = true,
-  }) async {}
-
-  @override
-  void cancelDownload(String taskId) {}
-
-  @override
-  bool pauseDownload(String taskId) => false;
-
-  @override
-  bool isRunning(String taskId) => false;
-
-  @override
-  void dispose() => disposed = true;
-}
+import 'support/inert_download_service.dart';
 
 /// Serves a fixed history so a screen can be rendered with real tasks in it.
 class _SeededHistoryRepository implements DownloadHistoryRepository {
@@ -155,7 +128,7 @@ void main() {
     testWidgets('shows the empty state when nothing has been downloaded', (
       tester,
     ) async {
-      final gateway = _InertDownloadService();
+      final gateway = InertDownloadService();
       await tester.pumpWidget(
         _host(
           DownloadsScreen(onNavigateHome: () {}),
@@ -208,7 +181,7 @@ void main() {
             ChangeNotifierProvider(create: (_) => SettingsProvider()),
             ChangeNotifierProvider(
               create: (_) => DownloadProvider(
-                downloadService: _InertDownloadService(),
+                downloadService: InertDownloadService(),
                 historyRepository: _SeededHistoryRepository(tasks),
               ),
             ),
@@ -225,7 +198,7 @@ void main() {
     });
 
     testWidgets('disposing the provider releases the gateway', (tester) async {
-      final gateway = _InertDownloadService();
+      final gateway = InertDownloadService();
       await tester.pumpWidget(
         _host(
           DownloadsScreen(onNavigateHome: () {}),
@@ -266,7 +239,7 @@ void main() {
             ChangeNotifierProvider(create: (_) => SettingsProvider()),
             ChangeNotifierProvider(
               create: (_) =>
-                  DownloadProvider(downloadService: _InertDownloadService()),
+                  DownloadProvider(downloadService: InertDownloadService()),
             ),
           ],
         ),
@@ -290,7 +263,7 @@ void main() {
             ChangeNotifierProvider.value(value: settings),
             ChangeNotifierProvider(
               create: (_) =>
-                  DownloadProvider(downloadService: _InertDownloadService()),
+                  DownloadProvider(downloadService: InertDownloadService()),
             ),
           ],
         ),
