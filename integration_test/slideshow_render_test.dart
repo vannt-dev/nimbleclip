@@ -58,6 +58,11 @@ void main() {
     final file = File(result!['filePath'] as String);
     expect(file.existsSync(), isTrue);
     expect(file.lengthSync(), greaterThan(10000));
+    // The ceiling is the assertion that discriminates, not the floor. Three
+    // near-static frames encode to roughly 75 KB; frames of garbage YUV are
+    // noise and saturate the bitrate cap (1080 * 1920 * 4 bps over 3 s, about
+    // 3 MB). Anything approaching that means the conversion is broken.
+    expect(file.lengthSync(), lessThan(750000));
     expect(result['audioSkipped'], isTrue);
 
     // A non-empty file is not enough: an MP4 with a broken moov box passes a
@@ -75,11 +80,87 @@ void main() {
     expect(probe['durationMs'] as int, greaterThan(2500));
     expect(probe['durationMs'] as int, lessThan(3600));
 
+    // Decoding the container proves the file is well formed; it says nothing
+    // about the picture. A red/blue swap, a U/V mix-up, a row-stride error or
+    // an all-black frame each still yield a valid 1080x1920 / 3 s / video-only
+    // MP4. The ARGB-to-I420 conversion and the plane writes are hand rolled,
+    // so read the colours back.
+    for (var i = 0; i < sizes.length; i++) {
+      // Mid-way through each image's second, clear of any boundary frame.
+      final atMs = i * 1000 + 400;
+      final frame = await channel.invokeMapMethod<String, dynamic>(
+        'frameColorAt',
+        {'path': file.path, 'atMs': atMs},
+      );
+      expect(frame, isNotNull, reason: 'no frame decoded at ${atMs}ms');
+      final expected = colors[i] & 0xFFFFFF;
+      for (final point in ['center', 'topLeft', 'bottomRight']) {
+        // Every fixture is a solid colour, so a correct frame is that colour
+        // everywhere: the blurred cover and the fitted image agree. Requiring
+        // the corners to match the centre is what catches a stride error,
+        // which skews the image rather than discolouring it.
+        expectColorNear(
+          frame![point] as int,
+          expected,
+          reason: '$point of the frame at ${atMs}ms',
+        );
+      }
+    }
+
     await file.delete();
     for (final path in paths) {
       await File(path).delete();
     }
   });
+
+  test(
+    'a full-resolution phone photo renders without exhausting memory',
+    () async {
+      // 4032x3024 is what a modern phone camera produces, and it is the case a
+      // per-axis downsample guard misses entirely: the short axis (3024) is
+      // already under the frame's long one (1920), so a guard joining the two
+      // axes with `&&` never fires and the decode allocates ~46 MB of
+      // ARGB_8888. The budget is on total pixels for exactly this reason.
+      final dir = await getTemporaryDirectory();
+      final big = File('${dir.path}/big.png');
+      await big.writeAsBytes(await _solidPng(4032, 3024, 0xFFFFB300));
+      final out = '${dir.path}/big.mp4';
+
+      final result = await channel.invokeMapMethod<String, dynamic>('render', {
+        'imagePaths': [big.path],
+        'audioPath': null,
+        'perImageMs': 500,
+        'width': 1080,
+        'height': 1920,
+        'outputPath': out,
+      });
+
+      final file = File(result!['filePath'] as String);
+      expect(file.existsSync(), isTrue);
+      // Landscape into portrait: the fitted image letterboxes, so the centre is
+      // the photo itself and the corners are the blurred cover behind it. Both
+      // come from the same solid source, so both must read as that colour --
+      // which also proves the downsampled decode still produced the picture and
+      // not a blank or truncated bitmap.
+      final frame = await channel.invokeMapMethod<String, dynamic>(
+        'frameColorAt',
+        {'path': file.path, 'atMs': 200},
+      );
+      expectColorNear(
+        frame!['center'] as int,
+        0xFFB300,
+        reason: 'centre of the downsampled photo',
+      );
+      expectColorNear(
+        frame['topLeft'] as int,
+        0xFFB300,
+        reason: 'blurred cover behind the downsampled photo',
+      );
+
+      await file.delete();
+      await big.delete();
+    },
+  );
 
   test('an unreadable image fails with encode_failed', () async {
     final dir = await getTemporaryDirectory();
@@ -107,6 +188,26 @@ void main() {
 
     await bogus.delete();
   });
+}
+
+/// Asserts an RGB value survived the round trip through BT.601 and 4:2:0
+/// chroma subsampling.
+///
+/// The tolerance covers the conversion's own rounding — measured deltas are
+/// two to four per channel — while staying far below the tens-to-hundreds a
+/// channel swap or a chroma mix-up produces.
+void expectColorNear(int actual, int expected, {required String reason}) {
+  const tolerance = 12;
+  String hex(int value) => '#${value.toRadixString(16).padLeft(6, '0')}';
+  for (final shift in [16, 8, 0]) {
+    final channel = ['red', 'green', 'blue'][[16, 8, 0].indexOf(shift)];
+    expect(
+      (actual >> shift) & 0xFF,
+      closeTo((expected >> shift) & 0xFF, tolerance),
+      reason:
+          '$channel of $reason: got ${hex(actual)}, expected ${hex(expected)}',
+    );
+  }
 }
 
 /// Builds a solid-colour PNG through `dart:ui` so the test needs no image
