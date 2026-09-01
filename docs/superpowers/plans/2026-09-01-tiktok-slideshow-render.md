@@ -1087,7 +1087,29 @@ Everything below stays exactly as it is. `_renderSlideshows` fetches assets into
 
 - [ ] **Step 4: Write the Android renderer**
 
-`MethodChannelSlideshowRenderer` invokes `render` on `com.vannt.nimbleclip/slideshow`, maps `PlatformException` codes to `SlideshowFailureKind`, and reports `isSupported => true`. `slideshow_renderer.dart` conditionally exports it for `dart.library.io` on Android and the stub elsewhere, mirroring `platform_file.dart`.
+`MethodChannelSlideshowRenderer` invokes `render` on `com.vannt.nimbleclip/slideshow`, maps `PlatformException` codes to `SlideshowFailureKind`, and converts `perImage` (a `Duration`) to the channel's `perImageMs` integer — the interface keeps `Duration` because that is the idiomatic Dart type; the channel boundary is where units get flattened.
+
+**`isSupported` MUST be gated on a runtime `Platform.isAndroid` check.** A Dart conditional import selects on which `dart:*` library exists, and `dart.library.io` is true on **both** Android and iOS — there is no `dart.library.android`. Pointing the native branch at this file therefore makes iOS import it too. Without the runtime gate, iOS would report a renderer it does not have, offer the option in the UI, and fail at the channel call:
+
+```dart
+  @override
+  bool get isSupported => !kIsWeb && Platform.isAndroid;
+```
+
+Add a test that pins this, so the gate cannot be quietly dropped:
+
+```dart
+  test('the channel renderer claims support only on Android', () {
+    // Guards the seam: dart.library.io covers iOS as well, so the import
+    // cannot exclude it — only this runtime check can.
+    expect(
+      const MethodChannelSlideshowRenderer().isSupported,
+      Platform.isAndroid,
+    );
+  });
+```
+
+`slideshow_renderer.dart` conditionally exports this file for `dart.library.io` and the stub for Web, mirroring `platform_file.dart`. While editing that seam, correct the doc comment in `slideshow_renderer_stub.dart` that describes Task 10 as a pure retarget — it omits the runtime gate and would mislead the next reader.
 
 - [ ] **Step 5: Run to verify pass, and the whole Dart suite**
 
