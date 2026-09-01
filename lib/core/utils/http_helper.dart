@@ -210,7 +210,14 @@ class ExtractorHttp {
   /// URL on the response. In a browser the redirect chain is opaque, so the
   /// proxy's `/resolve` endpoint reports it instead. Returns [url] unchanged if
   /// resolution fails — callers should treat that as "not a short link".
-  static Future<String> resolveRedirects(
+  ///
+  /// Expanding the link on a native platform downloads the destination page in
+  /// full, so [page] carries that response for a caller whose next act is to
+  /// fetch the very same URL. It is null whenever the body cannot stand in for
+  /// a fresh request: on Web, where the proxy reports the URL and never
+  /// fetches the page, and for an empty or failed response, which tells the
+  /// caller nothing that re-requesting would not.
+  static Future<({String url, http.Response? page})> resolveRedirects(
     String url, {
     Duration timeout = const Duration(seconds: 10),
   }) async {
@@ -219,10 +226,13 @@ class ExtractorHttp {
         final response = await _client
             .get(CorsHelper.resolveUri(url))
             .timeout(timeout);
-        if (response.statusCode != 200) return url;
+        if (response.statusCode != 200) return (url: url, page: null);
         final json = jsonDecode(response.body) as Map<String, dynamic>;
         final resolved = json['url']?.toString();
-        return (resolved != null && resolved.isNotEmpty) ? resolved : url;
+        return (
+          url: (resolved != null && resolved.isNotEmpty) ? resolved : url,
+          page: null,
+        );
       }
 
       // Keep redirect handling deterministic in extractor fixture tests while
@@ -232,9 +242,13 @@ class ExtractorHttp {
       final response = override != null
           ? await override(uri, buildHeaders())
           : await _client.get(uri, headers: buildHeaders()).timeout(timeout);
-      return response.request?.url.toString() ?? url;
+      final usable = response.statusCode < 400 && response.body.isNotEmpty;
+      return (
+        url: response.request?.url.toString() ?? url,
+        page: usable ? response : null,
+      );
     } catch (_) {
-      return url;
+      return (url: url, page: null);
     }
   }
 }

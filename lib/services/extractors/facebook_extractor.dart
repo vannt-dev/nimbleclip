@@ -1,3 +1,5 @@
+import 'package:http/http.dart' as http;
+
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/http_helper.dart';
 import '../../core/utils/media_format_helper.dart';
@@ -79,8 +81,14 @@ class FacebookExtractor extends BaseVideoExtractor {
   @override
   Future<VideoMetadata> extract(String url) async {
     var cleanUrl = url.trim();
+    // Expanding the link downloads the page it lands on, and the first
+    // strategy below asks for that same URL. Carry the response across rather
+    // than fetch the page twice.
+    http.Response? resolvedPage;
     if (UrlHelper.isShortLink(cleanUrl)) {
-      cleanUrl = await ExtractorHttp.resolveRedirects(cleanUrl);
+      final resolved = await ExtractorHttp.resolveRedirects(cleanUrl);
+      cleanUrl = resolved.url;
+      resolvedPage = resolved.page;
     }
 
     VideoMetadata? imageFallback;
@@ -104,7 +112,7 @@ class FacebookExtractor extends BaseVideoExtractor {
     }
 
     // Strategy 1: the watch page itself.
-    var result = await _fromPage(cleanUrl, cleanUrl);
+    var result = await _fromPage(cleanUrl, cleanUrl, cached: resolvedPage);
     final pageVideo = accept(result);
     if (pageVideo != null) {
       return _withPostPhotoFallback(pageVideo, cleanUrl);
@@ -307,10 +315,12 @@ class FacebookExtractor extends BaseVideoExtractor {
     String pageUrl,
     String originalUrl, {
     String userAgent = AppConstants.defaultUserAgent,
+    http.Response? cached,
   }) async {
     final String html;
     try {
-      final response = await ExtractorHttp.get(pageUrl, userAgent: userAgent);
+      final response =
+          cached ?? await ExtractorHttp.get(pageUrl, userAgent: userAgent);
       if (response.statusCode >= 400) return null;
       html = response.body;
     } catch (_) {

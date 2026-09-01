@@ -184,7 +184,7 @@ class InstagramExtractor extends BaseVideoExtractor {
     if (shortcode == null &&
         storyId == null &&
         UrlHelper.isShortLink(cleanUrl)) {
-      cleanUrl = await ExtractorHttp.resolveRedirects(cleanUrl);
+      cleanUrl = (await ExtractorHttp.resolveRedirects(cleanUrl)).url;
       shortcode = _extractShortcode(cleanUrl);
       storyId = _storyId(cleanUrl);
     }

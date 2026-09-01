@@ -169,6 +169,37 @@ void main() {
     expect(result.qualities.every((option) => !option.isImage), isTrue);
   });
 
+  // Expanding a share link already downloads the page it points at, and the
+  // first extraction strategy then asked for that very same URL again — two
+  // full page downloads to read one page. The redirect above keeps its second
+  // request because the response modelling it carries no body; a response that
+  // does carry one is used as it stands.
+  test('Facebook reuses the page the share link already fetched', () async {
+    final requestedPaths = <String>[];
+    ExtractorHttp.getOverride = (uri, _) async {
+      requestedPaths.add(uri.path);
+      if (uri.path == '/share/r/Reuse/') {
+        return http.Response(
+          fixture('facebook.html'),
+          200,
+          request: http.Request(
+            'GET',
+            Uri.parse('https://www.facebook.com/reel/999999/'),
+          ),
+        );
+      }
+      return http.Response(fixture('facebook.html'), 200);
+    };
+
+    final result = await const FacebookExtractor().extract(
+      'https://www.facebook.com/share/r/Reuse/',
+    );
+
+    expect(requestedPaths, ['/share/r/Reuse/']);
+    expect(result.originalUrl, 'https://www.facebook.com/reel/999999/');
+    expect(result.qualities, hasLength(2));
+  });
+
   test(
     'Facebook reads an Open Graph video from a share landing page',
     () async {
