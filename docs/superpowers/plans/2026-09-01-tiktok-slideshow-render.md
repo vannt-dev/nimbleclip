@@ -1011,14 +1011,30 @@ Expected: FAIL — `audioSkipped` is hardcoded true.
 
 - [ ] **Step 3: Implement the transcode**
 
-Inside `encode`, after the video track is written and before the muxer stops:
+**Ordering correction — the audio stage runs FIRST, not last.** An earlier draft of this
+plan said to add the AAC track after the video track had been written. `MediaMuxer` cannot
+do that: every track must be added before `start()`, and no track can be added afterwards.
+Task 8 also currently calls `muxer.start()` as soon as the video format arrives, which has
+to change for the same reason.
 
-1. `MediaExtractor.setDataSource(audioPath)`, select the first `audio/` track.
-2. Decode it with `MediaCodec.createDecoderByType(mime)` into PCM.
-3. Encode that PCM with `MediaCodec.createEncoderByType("audio/mp4a-latm")` at 44.1kHz stereo, 128kbps.
-4. Add the AAC track to the muxer and write the encoded buffers, stopping at `min(audioDuration, videoDuration)`.
+The working order is:
 
-Wrap the whole audio stage in `try/catch (Exception)`. On any failure: log, leave the video track alone, and return `audioSkipped = true`. **The video must already be fully written before the audio stage begins**, so a failure there can never corrupt the picture.
+1. **Transcode the audio to AAC before the muxer is started**, buffering the encoded packets
+   and keeping the output `MediaFormat`:
+   - `MediaExtractor.setDataSource(audioPath)`, select the first `audio/` track;
+   - decode with `MediaCodec.createDecoderByType(mime)` into PCM;
+   - encode that PCM with `MediaCodec.createEncoderByType("audio/mp4a-latm")` at 44.1kHz
+     stereo, 128kbps.
+2. Wrap that whole stage in `try/catch (Throwable)`. On any failure — including a missing or
+   undecodable file — set `audioSkipped = true` and carry on with no audio track at all.
+   A silent slideshow is usable; a failed render is not.
+3. Defer `muxer.start()` until every track that is going to exist has been added: the video
+   track always, the audio track only when step 1 succeeded.
+4. Write the video frames as today, interleaving the buffered audio packets, and stop the
+   audio at `min(audioDuration, videoDuration)`.
+
+Because the audio work happens before a single frame is muxed, a failure in it cannot
+corrupt the picture — which is the property the original ordering was reaching for.
 
 - [ ] **Step 4: Run to verify pass**
 
