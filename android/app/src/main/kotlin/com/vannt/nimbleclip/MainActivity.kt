@@ -12,6 +12,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.EventChannel
+import java.io.IOException
 
 class MainActivity : FlutterActivity() {
     private var pendingSharedText: String? = null
@@ -123,6 +124,61 @@ class MainActivity : FlutterActivity() {
                 result.error("media_query_failed", error.message, null)
             }
         }
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.vannt.nimbleclip/slideshow",
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "render", "probe" -> {
+                    // A slideshow encode runs for seconds; on the platform
+                    // thread that freezes the UI and trips the ANR watchdog.
+                    // The MethodChannel.Result must still be completed on the
+                    // main thread, hence the runOnUiThread hand-back.
+                    Thread {
+                        try {
+                            val encoder = SlideshowEncoder()
+                            val payload: Any = if (call.method == "probe") {
+                                encoder.probe(call.argument<String>("path")!!)
+                            } else {
+                                val encoded = encoder.encode(
+                                    SlideshowEncoder.Request(
+                                        imagePaths = call.argument<List<String>>("imagePaths").orEmpty(),
+                                        audioPath = call.argument<String>("audioPath"),
+                                        perImageMs = call.argument<Int>("perImageMs") ?: 3000,
+                                        width = call.argument<Int>("width") ?: 1080,
+                                        height = call.argument<Int>("height") ?: 1920,
+                                        outputPath = call.argument<String>("outputPath")!!,
+                                    ),
+                                )
+                                mapOf(
+                                    "filePath" to encoded.filePath,
+                                    "audioSkipped" to encoded.audioSkipped,
+                                )
+                            }
+                            runOnUiThread { result.success(payload) }
+                        } catch (error: Exception) {
+                            val code = if (isOutOfSpace(error)) "out_of_space" else "encode_failed"
+                            runOnUiThread { result.error(code, error.message, null) }
+                        }
+                    }.start()
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    /// A full disk surfaces as an IOException from the muxer rather than a
+    /// distinct type, so the message is the only thing left to match on.
+    private fun isOutOfSpace(error: Throwable?): Boolean {
+        var current = error
+        while (current != null) {
+            if (current is IOException) {
+                val message = current.message.orEmpty().lowercase()
+                if (message.contains("space") || message.contains("enospc")) return true
+            }
+            current = current.cause
+        }
+        return false
     }
 
     override fun onNewIntent(intent: Intent) {
