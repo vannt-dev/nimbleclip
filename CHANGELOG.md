@@ -6,6 +6,19 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- Fixed every Facebook reel and share link failing outright. Facebook began
+  answering 400 to a request that claims a browser User-Agent but omits the
+  `Sec-Fetch-*` headers a browser always sends on a top-level navigation, so
+  `/reel/<id>/`, `/share/r/<token>/` and `/share/p/<token>/` were refused
+  before the redirect to the post could even happen, and every extraction
+  strategy came back empty. Page requests now carry those headers; the JSON
+  calls to the fallback service and the HEAD probe for a direct media file,
+  which are not navigations, do not.
+- Fixed, as a side effect of the same change, Instagram's embed-player
+  strategy coming back without its `contextJSON` payload. Instagram was
+  serving a different, larger page to a request that omitted the navigation
+  headers; the payload is there on all three repeats once they are sent.
+
 ## [1.5.1] - 2026-08-30
 
 - Fixed a shared Facebook album link returning only its first photo. Facebook

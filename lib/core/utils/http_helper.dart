@@ -46,13 +46,26 @@ class ExtractorHttp {
     headOverride = null;
   }
 
+  /// Facebook answers 400 to a page request that claims a browser User-Agent
+  /// but omits the `Sec-Fetch-*` headers a browser always sends on a top-level
+  /// navigation, which also swallows the redirect a `/share/…` link depends
+  /// on. Sending them makes the request self-consistent. Observed on
+  /// `/share/r/`, `/share/p/` and `/reel/`, all 400 without and 200 with.
+  static const Map<String, String> _navigationHeaders = {
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Dest': 'document',
+  };
+
   static Map<String, String> buildHeaders({
     String userAgent = AppConstants.defaultUserAgent,
     Map<String, String>? extra,
+    bool navigation = true,
   }) {
     final headers = <String, String>{
       'Accept': '*/*',
       'Accept-Language': 'en-US,en;q=0.9',
+      if (navigation) ..._navigationHeaders,
       ...?extra,
     };
 
@@ -88,8 +101,14 @@ class ExtractorHttp {
     Map<String, String>? headers,
     Duration timeout = defaultTimeout,
   }) {
+    // A HEAD probe is not a navigation — no browser ever sends one — and its
+    // only reader is the Content-Type of a possible direct media file.
     final uri = Uri.parse(CorsHelper.wrap(url));
-    final requestHeaders = buildHeaders(userAgent: userAgent, extra: headers);
+    final requestHeaders = buildHeaders(
+      userAgent: userAgent,
+      extra: headers,
+      navigation: false,
+    );
     final override = headOverride;
     if (override != null) return override(uri, requestHeaders);
     return _client.head(uri, headers: requestHeaders).timeout(timeout);
@@ -103,7 +122,12 @@ class ExtractorHttp {
     Duration timeout = defaultTimeout,
   }) {
     final uri = Uri.parse(CorsHelper.wrap(url));
-    final requestHeaders = buildHeaders(userAgent: userAgent, extra: headers);
+    // The POST targets a JSON API, not a document navigation.
+    final requestHeaders = buildHeaders(
+      userAgent: userAgent,
+      extra: headers,
+      navigation: false,
+    );
     final override = postOverride;
     if (override != null) return override(uri, requestHeaders, body);
     return _client
