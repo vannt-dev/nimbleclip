@@ -188,6 +188,9 @@ class VideoMetadata {
   VideoQualityOption? get bestQuality {
     if (qualities.isEmpty) return null;
     for (final quality in qualities) {
+      // A slideshow is not a file yet. Preferring it here would move a photo
+      // post's default selection off its photos and onto the video tab.
+      if (quality.needsRendering) continue;
       if (!quality.isAudioOnly && !quality.isImage) return quality;
     }
     for (final quality in qualities) {
