@@ -244,9 +244,10 @@ void main() {
       label: SlideshowVideo(1),
       source: SlideshowSource(imageUrls: ['https://cdn/1.jpg']),
     );
-    expect(
-      QualityHelper.rankOf(video) > QualityHelper.rankOf(slideshow),
-      isTrue,
-    );
+    // Pinned to the exact tier, not a comparison: without the guard in rankOf,
+    // 'Slideshow' parses to no height and falls back to rank 1, which would
+    // still satisfy a `>` check against a 720p video and hide the regression.
+    expect(QualityHelper.rankOf(slideshow), 0);
+    expect(QualityHelper.rankOf(video), 720);
   });
 }
