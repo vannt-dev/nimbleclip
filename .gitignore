@@ -50,3 +50,6 @@ app.*.map.json
 
 # Integration-test fixtures (downloaded on demand)
 tool/.fixtures/
+
+# Subagent-driven development scratch workspace
+.superpowers/
