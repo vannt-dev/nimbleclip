@@ -97,6 +97,36 @@ void main() {
     expect(images.map((option) => (option.label as ImageIndex).index), [1, 2]);
   });
 
+  test('TikTok offers one rendered slideshow for a photo post', () async {
+    ExtractorHttp.postOverride = (_, _, _) async =>
+        http.Response(fixture('tiktok_images.json'), 200);
+
+    final result = await const TikTokExtractor().extract(
+      'https://www.tiktok.com/@u/photo/1',
+    );
+
+    final rendered = result.qualities.where((o) => o.needsRendering).toList();
+    expect(rendered, hasLength(1));
+    expect(rendered.single.format, 'mp4');
+    expect(rendered.single.slideshow!.imageUrls, hasLength(2));
+    // Relative CDN paths must already be absolute by the time they are handed
+    // to the renderer, which has no idea what TikWM's host is.
+    expect(rendered.single.slideshow!.imageUrls.last, startsWith('http'));
+    expect(rendered.single.slideshow!.audioUrl, isNotNull);
+    expect((rendered.single.label as SlideshowVideo).imageCount, 2);
+  });
+
+  test('TikTok offers no slideshow for a video post', () async {
+    ExtractorHttp.postOverride = (_, _, _) async =>
+        http.Response(fixture('tiktok.json'), 200);
+
+    final result = await const TikTokExtractor().extract(
+      'https://www.tiktok.com/@u/video/1',
+    );
+
+    expect(result.qualities.where((o) => o.needsRendering), isEmpty);
+  });
+
   test('X parses and sorts the FxTwitter fixture', () async {
     ExtractorHttp.getOverride = (_, _) async =>
         http.Response(fixture('twitter.json'), 200);

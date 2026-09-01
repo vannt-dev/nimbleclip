@@ -6,6 +6,7 @@ import '../../core/utils/media_format_helper.dart';
 import '../../core/utils/external_service_policy.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../models/quality_descriptor.dart';
+import '../../models/slideshow_source.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -97,6 +98,31 @@ class TikTokExtractor extends BaseVideoExtractor {
       );
     }
 
+    final music = data['music']?.toString();
+
+    // A photo post has no video upstream: TikWM's play/hdplay/wmplay fields
+    // are empty for an album. The images are all there is, so offer to render
+    // them into one, the way the post itself is presented on TikTok.
+    if (images.isNotEmpty) {
+      final imageUrls = [
+        for (final image in images)
+          if ((image?.toString() ?? '').isNotEmpty) _absolute(image.toString()),
+      ];
+      qualities.add(
+        VideoQualityOption.slideshow(
+          id: 'tt_slideshow_$id',
+          mediaId: 'tt_slideshow_$id',
+          label: SlideshowVideo(imageUrls.length),
+          source: SlideshowSource(
+            imageUrls: imageUrls,
+            audioUrl: music != null && music.isNotEmpty
+                ? _absolute(music)
+                : null,
+          ),
+        ),
+      );
+    }
+
     final hdPlay = data['hdplay']?.toString();
     if (images.isEmpty && hdPlay != null && hdPlay.isNotEmpty) {
       qualities.add(
@@ -145,7 +171,6 @@ class TikTokExtractor extends BaseVideoExtractor {
       );
     }
 
-    final music = data['music']?.toString();
     if (music != null && music.isNotEmpty) {
       final musicInfo = data['music_info'] as Map<String, dynamic>? ?? {};
       final musicTitle = musicInfo['title']?.toString();
