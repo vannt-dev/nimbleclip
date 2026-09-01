@@ -12,6 +12,12 @@ enum ExtractionFailureKind {
   linkAccessFailed,
 
   facebookNoVideo,
+
+  /// Facebook gates the post as 18+, which no anonymous request can pass.
+  /// Distinct from [facebookNoVideo] because the post may well be public, and
+  /// telling the user to check that it is wastes their time.
+  facebookAgeRestricted,
+
   genericNoVideo,
   instagramInvalidPost,
   instagramLoginRequired,

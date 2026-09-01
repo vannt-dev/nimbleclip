@@ -618,6 +618,10 @@ class AppLocalizationsVi extends AppLocalizations {
       'Không lấy được nội dung từ bài Facebook này. Hãy đảm bảo bài viết ở chế độ công khai; bài riêng tư và nhóm kín cần đăng nhập.';
 
   @override
+  String get facebookAgeRestricted =>
+      'Facebook giới hạn bài này cho người trên 18 tuổi và chỉ trả nội dung cho tài khoản đã đăng nhập. Bài vẫn có thể đang công khai mà vẫn bị giữ lại, nên chế độ hiển thị không phải là nguyên nhân.';
+
+  @override
   String get highQuality720 => 'HD 720p (Chất lượng cao)';
 
   @override

@@ -1106,6 +1106,12 @@ abstract class AppLocalizations {
   /// **'Could not extract media from this Facebook post. Make sure it is public; private posts and closed groups require a login.'**
   String get facebookNoVideo;
 
+  /// No description provided for @facebookAgeRestricted.
+  ///
+  /// In en, this message translates to:
+  /// **'Facebook restricts this post to viewers over 18 and serves it only to someone logged in. The post can be public and still be withheld, so its visibility is not the problem.'**
+  String get facebookAgeRestricted;
+
   /// No description provided for @highQuality720.
   ///
   /// In en, this message translates to:

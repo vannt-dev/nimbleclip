@@ -200,6 +200,33 @@ void main() {
     expect(result.qualities, hasLength(2));
   });
 
+  // A reel can be public and still serve an anonymous visitor nothing, because
+  // Facebook gates it as 18+. Reporting that as "make sure the post is public"
+  // sends the user to check the one thing that is already fine. The route name
+  // is the only signal in the document — the sentence a reader sees is drawn
+  // by script and never appears in the HTML.
+  test('Facebook tells an age-gated reel apart from a private one', () async {
+    ExtractorHttp.getOverride = (_, _) async => http.Response(
+      '<html><body><script>'
+      '{"__crn":"comet.fbweb.CometAgeInappropriateLoggedOutErrorRoute"}'
+      '</script></body></html>',
+      200,
+    );
+
+    await expectLater(
+      const FacebookExtractor().extract(
+        'https://www.facebook.com/reel/1831368848220203/',
+      ),
+      throwsA(
+        isA<ExtractionException>().having(
+          (error) => error.failure.kind,
+          'failure kind',
+          ExtractionFailureKind.facebookAgeRestricted,
+        ),
+      ),
+    );
+  });
+
   test(
     'Facebook reads an Open Graph video from a share landing page',
     () async {

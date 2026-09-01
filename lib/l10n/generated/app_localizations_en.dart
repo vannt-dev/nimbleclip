@@ -620,6 +620,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not extract media from this Facebook post. Make sure it is public; private posts and closed groups require a login.';
 
   @override
+  String get facebookAgeRestricted =>
+      'Facebook restricts this post to viewers over 18 and serves it only to someone logged in. The post can be public and still be withheld, so its visibility is not the problem.';
+
+  @override
   String get highQuality720 => 'HD 720p (High quality)';
 
   @override

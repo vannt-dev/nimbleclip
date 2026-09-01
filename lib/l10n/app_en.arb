@@ -204,6 +204,7 @@
   "genericNoVideo": "No video was found at this link. Check the URL or paste a direct .mp4 file link.",
   "embeddedVideo": "Embedded video (Web)",
   "facebookNoVideo": "Could not extract media from this Facebook post. Make sure it is public; private posts and closed groups require a login.",
+  "facebookAgeRestricted": "Facebook restricts this post to viewers over 18 and serves it only to someone logged in. The post can be public and still be withheld, so its visibility is not the problem.",
   "highQuality720": "HD 720p (High quality)",
   "standardQuality480": "SD 480p (Standard)",
   "invalidVideoUrl": "Enter a valid video URL using http or https.",
