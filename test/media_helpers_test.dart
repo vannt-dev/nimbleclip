@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nimble_clip/core/utils/media_format_helper.dart';
 import 'package:nimble_clip/core/utils/media_url_helper.dart';
 import 'package:nimble_clip/models/quality_descriptor.dart';
+import 'package:nimble_clip/models/slideshow_source.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 
@@ -83,5 +84,31 @@ void main() {
     expect(metadata([image, audio, video]).bestQuality, same(video));
     expect(metadata([audio, image]).bestQuality, same(image));
     expect(metadata([audio]).bestQuality, same(audio));
+  });
+
+  test('bestQuality skips a slideshow, which is not a file yet', () {
+    VideoMetadata metadata(List<VideoQualityOption> qualities) => VideoMetadata(
+      id: 'post',
+      originalUrl: 'https://example.com/post',
+      title: 'Post',
+      author: 'Author',
+      coverUrl: '',
+      platform: VideoPlatform.tiktok,
+      qualities: qualities,
+    );
+
+    const image = VideoQualityOption.image(
+      id: 'image',
+      label: ImageIndex(1),
+      format: 'jpg',
+      downloadUrl: 'https://cdn.example/image.jpg',
+    );
+    const slideshow = VideoQualityOption.slideshow(
+      id: 'slideshow',
+      label: SlideshowVideo(1),
+      source: SlideshowSource(imageUrls: ['https://cdn.example/image.jpg']),
+    );
+
+    expect(metadata([image, slideshow]).bestQuality, same(image));
   });
 }

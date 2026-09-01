@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nimble_clip/core/utils/quality_helper.dart';
 import 'package:nimble_clip/models/quality_descriptor.dart';
+import 'package:nimble_clip/models/slideshow_source.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
+import 'package:nimble_clip/models/video_platform.dart';
 
 VideoQualityOption option(
   String quality, {
@@ -184,5 +186,67 @@ void main() {
     test('returns null for an empty list', () {
       expect(QualityHelper.bestMatch(const [], 'Highest'), isNull);
     });
+  });
+
+  test('a slideshow never becomes the default selection', () {
+    const image = VideoQualityOption.image(
+      id: 'i1',
+      label: ImageIndex(1),
+      format: 'jpg',
+      downloadUrl: 'https://cdn/1.jpg',
+    );
+    const slideshow = VideoQualityOption.slideshow(
+      id: 's1',
+      label: SlideshowVideo(1),
+      source: SlideshowSource(imageUrls: ['https://cdn/1.jpg']),
+    );
+    final best = QualityHelper.bestMatch([image, slideshow], 'Highest');
+    expect(best!.isImage, isTrue);
+  });
+
+  test('bestQuality skips a slideshow and still reports the image', () {
+    // Guards the default selection: bestQuality feeds selectedQuality in
+    // video_extractor_provider, so a slideshow winning here would move a photo
+    // post's default onto the video tab.
+    const image = VideoQualityOption.image(
+      id: 'i1',
+      label: ImageIndex(1),
+      format: 'jpg',
+      downloadUrl: 'https://cdn/1.jpg',
+    );
+    const slideshow = VideoQualityOption.slideshow(
+      id: 's1',
+      label: SlideshowVideo(1),
+      source: SlideshowSource(imageUrls: ['https://cdn/1.jpg']),
+    );
+    final metadata = VideoMetadata(
+      id: 'p',
+      originalUrl: 'https://tiktok.com/@u/photo/1',
+      title: 'photo post',
+      author: 'someone',
+      coverUrl: '',
+      platform: VideoPlatform.tiktok,
+      qualities: const [image, slideshow],
+    );
+    expect(metadata.bestQuality, same(image));
+  });
+
+  test('a slideshow does not outrank a real video', () {
+    const video = VideoQualityOption.video(
+      id: 'v',
+      label: OriginalMp4(),
+      quality: '720p',
+      format: 'mp4',
+      downloadUrl: 'https://cdn/v.mp4',
+    );
+    const slideshow = VideoQualityOption.slideshow(
+      id: 's1',
+      label: SlideshowVideo(1),
+      source: SlideshowSource(imageUrls: ['https://cdn/1.jpg']),
+    );
+    expect(
+      QualityHelper.rankOf(video) > QualityHelper.rankOf(slideshow),
+      isTrue,
+    );
   });
 }
