@@ -635,6 +635,11 @@ class AppLocalizationsVi extends AppLocalizations {
   String get unableToAnalyze => 'Không thể phân tích liên kết này.';
 
   @override
+  String slideshowLabel(int count) {
+    return 'Video từ ảnh ($count ảnh)';
+  }
+
+  @override
   String get externalServicesDisabled =>
       'Dịch vụ trích xuất bên ngoài đang bị tắt trong Cài đặt. Hãy bật để tải bài này.';
 

@@ -1136,6 +1136,12 @@ abstract class AppLocalizations {
   /// **'This link could not be analyzed.'**
   String get unableToAnalyze;
 
+  /// A video rendered on the device from a photo post's images
+  ///
+  /// In en, this message translates to:
+  /// **'Slideshow video ({count} images)'**
+  String slideshowLabel(int count);
+
   /// No description provided for @externalServicesDisabled.
   ///
   /// In en, this message translates to:

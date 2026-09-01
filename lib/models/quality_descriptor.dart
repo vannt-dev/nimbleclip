@@ -75,6 +75,14 @@ class WatermarkedVideo extends QualityDescriptor {
   final bool watermarked;
 }
 
+/// A video that does not exist yet: it is rendered on the device from the
+/// post's own images. [imageCount] is what tells the reader how long it will
+/// be before anything plays.
+class SlideshowVideo extends QualityDescriptor {
+  const SlideshowVideo(this.imageCount);
+  final int imageCount;
+}
+
 /// A stream distinguished from its siblings by bitrate rather than resolution.
 class VideoBitrate extends QualityDescriptor {
   const VideoBitrate(this.quality, this.kbps);
@@ -117,6 +125,7 @@ String qualityDescriptorToken(QualityDescriptor descriptor) {
     WatermarkedVideo(:final quality, :final watermarked) =>
       'watermarked:$quality:$watermarked',
     VideoBitrate(:final quality, :final kbps) => 'bitrate:$quality:$kbps',
+    SlideshowVideo(:final imageCount) => 'slideshow:$imageCount',
     LiteralLabel(:final text) => text,
   };
 }

@@ -173,6 +173,7 @@
   "standardQuality480": "SD 480p (Tiêu chuẩn)",
   "invalidVideoUrl": "Vui lòng nhập URL video hợp lệ sử dụng http hoặc https.",
   "unableToAnalyze": "Không thể phân tích liên kết này."
+  ,"slideshowLabel": "Video từ ảnh ({count} ảnh)"
   ,"externalServicesDisabled": "Dịch vụ trích xuất bên ngoài đang bị tắt trong Cài đặt. Hãy bật để tải bài này."
   ,"galleryMayBeIncomplete": "Chỉ đọc được ảnh bìa. Bật dịch vụ bên ngoài trong Cài đặt để tìm nốt những ảnh còn lại."
   ,"galleryCheckUnavailable": "Chỉ đọc được ảnh bìa, và dịch vụ liệt kê các ảnh còn lại không phản hồi. Bài này có thể còn ảnh khác."

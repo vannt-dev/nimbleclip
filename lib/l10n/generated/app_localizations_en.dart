@@ -636,6 +636,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get unableToAnalyze => 'This link could not be analyzed.';
 
   @override
+  String slideshowLabel(int count) {
+    return 'Slideshow video ($count images)';
+  }
+
+  @override
   String get externalServicesDisabled =>
       'External extraction services are disabled in Settings. Enable them to download this post.';
 
