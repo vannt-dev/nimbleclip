@@ -20,6 +20,7 @@ const _all = <QualityDescriptor>[
   WatermarkedVideo('720p', watermarked: false),
   WatermarkedVideo('720p', watermarked: true),
   VideoBitrate('480p', 832),
+  SlideshowVideo(5),
   LiteralLabel('carried over'),
 ];
 
@@ -86,5 +87,16 @@ void main() {
       describeQuality(const Hd720(), en),
       isNot(describeQuality(const Hd720(), vi)),
     );
+  });
+
+  test('a slideshow descriptor names itself with its image count', () {
+    expect(
+      describeQuality(const SlideshowVideo(5), en),
+      'Slideshow video (5 images)',
+    );
+  });
+
+  test('a slideshow descriptor round-trips through its token', () {
+    expect(qualityDescriptorToken(const SlideshowVideo(5)), 'slideshow:5');
   });
 }

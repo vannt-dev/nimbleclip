@@ -29,6 +29,7 @@ String describeQuality(QualityDescriptor descriptor, AppLocalizations l10n) {
       quality,
       kbps,
     ),
+    SlideshowVideo(:final imageCount) => l10n.slideshowLabel(imageCount),
     LiteralLabel(:final text) => text,
   };
 }
