@@ -6,6 +6,12 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- Added a distinct message for a Facebook post Facebook gates as 18+. Such a
+  post can be public and still be withheld from anyone not logged in, so the
+  old wording — "make sure it is public" — sent the reader to check the one
+  thing that was already fine. The gate is recognised by the route Facebook
+  names in the document; the sentence a reader sees is drawn by script and
+  never reaches the HTML.
 - Fixed every Facebook reel and share link failing outright. Facebook began
   answering 400 to a request that claims a browser User-Agent but omits the
   `Sec-Fetch-*` headers a browser always sends on a top-level navigation, so

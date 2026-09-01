@@ -62,6 +62,12 @@ class FacebookExtractor extends BaseVideoExtractor {
   static final RegExp _stickerBucket = RegExp(r'/t39\.1997-');
   static final RegExp _imageExtension = RegExp(r'\.(?:jpe?g|png|webp|gif)$');
 
+  // Facebook names the route it served rather than the reason a reader sees:
+  // the "18+" sentence is drawn by script and never reaches the document.
+  // Measured across a public post, a watch page and the logged-out home page,
+  // none of which mention it, against an age-gated reel, which does 16 times.
+  static final RegExp _ageGate = RegExp('CometAgeInappropriate');
+
   // The Share action emits `/share/<token>/` and `/share/p/<token>/` for a
   // post. Neither redirects to the permalink for an anonymous request, so the
   // share link itself is what reaches the gallery fallback. `/share/r/` and
@@ -92,6 +98,10 @@ class FacebookExtractor extends BaseVideoExtractor {
     }
 
     VideoMetadata? imageFallback;
+    // Any strategy may be the one that lands on the gate, so the answer is
+    // remembered across all three rather than read off the last page tried.
+    var ageGated = false;
+    void markAgeGated() => ageGated = true;
 
     VideoMetadata? accept(VideoMetadata? candidate) {
       if (candidate == null) return null;
@@ -112,7 +122,12 @@ class FacebookExtractor extends BaseVideoExtractor {
     }
 
     // Strategy 1: the watch page itself.
-    var result = await _fromPage(cleanUrl, cleanUrl, cached: resolvedPage);
+    var result = await _fromPage(
+      cleanUrl,
+      cleanUrl,
+      cached: resolvedPage,
+      onAgeGate: markAgeGated,
+    );
     final pageVideo = accept(result);
     if (pageVideo != null) {
       return _withPostPhotoFallback(pageVideo, cleanUrl);
@@ -123,7 +138,7 @@ class FacebookExtractor extends BaseVideoExtractor {
     // interstitial than the full watch page.
     final embedUrl =
         'https://www.facebook.com/plugins/video.php?href=${Uri.encodeComponent(cleanUrl)}';
-    result = await _fromPage(embedUrl, cleanUrl);
+    result = await _fromPage(embedUrl, cleanUrl, onAgeGate: markAgeGated);
     final embedVideo = accept(result);
     if (embedVideo != null) {
       return _withPostPhotoFallback(embedVideo, cleanUrl);
@@ -137,19 +152,30 @@ class FacebookExtractor extends BaseVideoExtractor {
     result = await _fromPage(
       mobileUrl,
       cleanUrl,
-
       userAgent: AppConstants.mobileUserAgent,
+      onAgeGate: markAgeGated,
     );
     final mobileVideo = accept(result);
     if (mobileVideo != null) {
       return _withPostPhotoFallback(mobileVideo, cleanUrl);
     }
 
+    // An age gate withholds the media however public the post is, so saying
+    // "make sure it is public" would send the reader to check the one thing
+    // that is already fine.
+    final failure = ExtractionFailure(
+      ageGated
+          ? ExtractionFailureKind.facebookAgeRestricted
+          : ExtractionFailureKind.facebookNoVideo,
+    );
+
     if (imageFallback != null) {
       if (_isKnownVideoLink(cleanUrl)) {
         throw ExtractionException(
-          const ExtractionFailure(ExtractionFailureKind.facebookNoVideo),
-          diagnosticCode: 'facebook_video_not_exposed',
+          failure,
+          diagnosticCode: ageGated
+              ? 'facebook_age_gated'
+              : 'facebook_video_not_exposed',
           attemptedStrategies: const ['page', 'embed', 'mobile'],
         );
       }
@@ -157,8 +183,10 @@ class FacebookExtractor extends BaseVideoExtractor {
     }
 
     throw ExtractionException(
-      const ExtractionFailure(ExtractionFailureKind.facebookNoVideo),
-      diagnosticCode: 'facebook_no_public_media',
+      failure,
+      diagnosticCode: ageGated
+          ? 'facebook_age_gated'
+          : 'facebook_no_public_media',
       attemptedStrategies: const ['page', 'embed', 'mobile'],
     );
   }
@@ -316,6 +344,7 @@ class FacebookExtractor extends BaseVideoExtractor {
     String originalUrl, {
     String userAgent = AppConstants.defaultUserAgent,
     http.Response? cached,
+    void Function()? onAgeGate,
   }) async {
     final String html;
     try {
@@ -326,6 +355,8 @@ class FacebookExtractor extends BaseVideoExtractor {
     } catch (_) {
       return null;
     }
+
+    if (_ageGate.hasMatch(html)) onAgeGate?.call();
 
     final hdUrl = _firstMatch(html, _hdPatterns);
     final sdUrl = _firstMatch(html, _sdPatterns);

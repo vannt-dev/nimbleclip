@@ -19,6 +19,7 @@ String describeExtractionFailure(
       detail ?? '',
     ),
     ExtractionFailureKind.facebookNoVideo => l10n.facebookNoVideo,
+    ExtractionFailureKind.facebookAgeRestricted => l10n.facebookAgeRestricted,
     ExtractionFailureKind.genericNoVideo => l10n.genericNoVideo,
     ExtractionFailureKind.instagramInvalidPost => l10n.instagramInvalidPost,
     ExtractionFailureKind.instagramLoginRequired => l10n.instagramLoginRequired,
