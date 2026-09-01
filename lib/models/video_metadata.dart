@@ -1,5 +1,6 @@
 import 'gallery_notice.dart';
 import 'quality_descriptor.dart';
+import 'slideshow_source.dart';
 import 'video_platform.dart';
 
 enum MediaKind { video, audio, image }
@@ -19,6 +20,10 @@ class VideoQualityOption {
   /// When omitted, all video options are treated as variants of one video.
   final String? mediaId;
 
+  /// Set only on an option that must be rendered on the device before there
+  /// is a file. Null for everything that is fetched from a URL.
+  final SlideshowSource? slideshow;
+
   const VideoQualityOption({
     required this.id,
     required this.label,
@@ -30,7 +35,12 @@ class VideoQualityOption {
     this.kind = MediaKind.video,
     this.headers,
     this.mediaId,
-  });
+    this.slideshow,
+    bool checked = true,
+  }) : assert(
+         !checked || downloadUrl != '' || slideshow != null,
+         'An option with no download URL must carry a SlideshowSource.',
+       );
 
   const VideoQualityOption.image({
     required this.id,
@@ -42,6 +52,7 @@ class VideoQualityOption {
     this.sizeBytes,
     this.headers,
     this.mediaId,
+    this.slideshow,
   }) : kind = MediaKind.image;
 
   const VideoQualityOption.video({
@@ -54,6 +65,7 @@ class VideoQualityOption {
     this.sizeBytes,
     this.headers,
     this.mediaId,
+    this.slideshow,
   }) : kind = MediaKind.video;
 
   const VideoQualityOption.audio({
@@ -66,10 +78,29 @@ class VideoQualityOption {
     this.sizeBytes,
     this.headers,
     this.mediaId,
+    this.slideshow,
   }) : kind = MediaKind.audio;
+
+  /// A video the device will render from [source]. [downloadUrl] is empty
+  /// because there is nothing to fetch; `needsRendering` is what callers
+  /// branch on.
+  const VideoQualityOption.slideshow({
+    required this.id,
+    required this.label,
+    required SlideshowSource source,
+    this.quality = 'Slideshow',
+    this.format = 'mp4',
+    this.thumbnailUrl,
+    this.mediaId,
+  }) : kind = MediaKind.video,
+       downloadUrl = '',
+       sizeBytes = null,
+       headers = null,
+       slideshow = source;
 
   bool get isAudioOnly => kind == MediaKind.audio;
   bool get isImage => kind == MediaKind.image;
+  bool get needsRendering => slideshow != null;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -108,6 +139,7 @@ class VideoQualityOption {
           (k, v) => MapEntry(k, v.toString()),
         ),
         mediaId: json['mediaId'] as String?,
+        checked: false,
       );
 }
 
