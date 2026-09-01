@@ -403,11 +403,21 @@ This is the task the constraint hangs on. A photo post today defaults to an imag
 
 **Files:**
 - Modify: `lib/core/utils/quality_helper.dart`
+- Modify: `lib/models/video_metadata.dart:156-165` (`bestQuality`)
 - Test: `test/quality_helper_test.dart` (add cases)
+- Test: `test/media_helpers_test.dart` (add one case; do not edit the existing ones)
 
 **Interfaces:**
 - Consumes: `needsRendering` from Task 3
-- Produces: `QualityHelper.rankOf` returns 0 for a slideshow; `bestMatch` excludes it from `videoOnly`
+- Produces: `QualityHelper.rankOf` returns 0 for a slideshow; `bestMatch` excludes it from `videoOnly`; `VideoMetadata.bestQuality` skips it
+
+**`bestQuality` has its own logic and must be patched too.** It does not call
+`QualityHelper` at all — it returns the first option that is
+`!isAudioOnly && !isImage`, and a slideshow is `MediaKind.video`, so it would
+be returned ahead of the images. It feeds `selectedQuality` in
+`video_extractor_provider.dart:80,210,297`, which is the app's default
+selection: leaving it unpatched flips a photo post to the video tab, the exact
+regression this feature must not cause.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -428,6 +438,33 @@ Append to `test/quality_helper_test.dart`:
     );
     final best = QualityHelper.bestMatch([image, slideshow], 'Highest');
     expect(best!.isImage, isTrue);
+  });
+
+  test('bestQuality skips a slideshow and still reports the image', () {
+    // Guards the default selection: bestQuality feeds selectedQuality in
+    // video_extractor_provider, so a slideshow winning here would move a photo
+    // post's default onto the video tab.
+    const image = VideoQualityOption.image(
+      id: 'i1',
+      label: ImageIndex(1),
+      format: 'jpg',
+      downloadUrl: 'https://cdn/1.jpg',
+    );
+    const slideshow = VideoQualityOption.slideshow(
+      id: 's1',
+      label: SlideshowVideo(1),
+      source: SlideshowSource(imageUrls: ['https://cdn/1.jpg']),
+    );
+    final metadata = VideoMetadata(
+      id: 'p',
+      originalUrl: 'https://tiktok.com/@u/photo/1',
+      title: 'photo post',
+      author: 'someone',
+      coverUrl: '',
+      platform: VideoPlatform.tiktok,
+      qualities: const [image, slideshow],
+    );
+    expect(metadata.bestQuality, same(image));
   });
 
   test('a slideshow does not outrank a real video', () {
@@ -471,10 +508,25 @@ In `bestMatch`, extend the existing filter — add the term, do not rewrite the 
         .toList();
 ```
 
+In `lib/models/video_metadata.dart`, add the same term to `bestQuality`'s first
+loop and leave the two loops below it alone:
+
+```dart
+  VideoQualityOption? get bestQuality {
+    if (qualities.isEmpty) return null;
+    for (final quality in qualities) {
+      // A slideshow is not a file yet. Preferring it here would move a photo
+      // post's default selection off its photos and onto the video tab.
+      if (quality.needsRendering) continue;
+      if (!quality.isAudioOnly && !quality.isImage) return quality;
+    }
+    ...
+```
+
 - [ ] **Step 4: Run to verify pass, and that the baseline held**
 
-Run: `flutter test test/quality_helper_test.dart test/slideshow_baseline_test.dart test/extractor_fixture_test.dart`
-Expected: PASS, all three, with no edits to any pre-existing test.
+Run: `flutter test test/quality_helper_test.dart test/media_helpers_test.dart test/slideshow_baseline_test.dart test/extractor_fixture_test.dart`
+Expected: PASS, all four, with no edits to any pre-existing test. `media_helpers_test.dart` is included because it owns the existing `bestQuality` cases — they must still pass untouched.
 
 - [ ] **Step 5: Commit**
 
