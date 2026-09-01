@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-09-01
+
 - Added a distinct message for a Facebook post Facebook gates as 18+. Such a
   post can be public and still be withheld from anyone not logged in, so the
   old wording — "make sure it is public" — sent the reader to check the one
