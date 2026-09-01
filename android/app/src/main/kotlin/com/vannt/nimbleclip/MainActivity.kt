@@ -129,7 +129,7 @@ class MainActivity : FlutterActivity() {
             "com.vannt.nimbleclip/slideshow",
         ).setMethodCallHandler { call, result ->
             when (call.method) {
-                "render", "probe" -> {
+                "render", "probe", "frameColorAt" -> {
                     // A slideshow encode runs for seconds; on the platform
                     // thread that freezes the UI and trips the ANR watchdog.
                     // The MethodChannel.Result must still be completed on the
@@ -137,28 +137,39 @@ class MainActivity : FlutterActivity() {
                     Thread {
                         try {
                             val encoder = SlideshowEncoder()
-                            val payload: Any = if (call.method == "probe") {
-                                encoder.probe(call.argument<String>("path")!!)
-                            } else {
-                                val encoded = encoder.encode(
-                                    SlideshowEncoder.Request(
-                                        imagePaths = call.argument<List<String>>("imagePaths").orEmpty(),
-                                        audioPath = call.argument<String>("audioPath"),
-                                        perImageMs = call.argument<Int>("perImageMs") ?: 3000,
-                                        width = call.argument<Int>("width") ?: 1080,
-                                        height = call.argument<Int>("height") ?: 1920,
-                                        outputPath = call.argument<String>("outputPath")!!,
-                                    ),
+                            val payload: Any = when (call.method) {
+                                "probe" -> encoder.probe(call.argument<String>("path")!!)
+                                "frameColorAt" -> encoder.frameColorAt(
+                                    call.argument<String>("path")!!,
+                                    call.argument<Int>("atMs") ?: 0,
                                 )
-                                mapOf(
-                                    "filePath" to encoded.filePath,
-                                    "audioSkipped" to encoded.audioSkipped,
-                                )
+                                else -> {
+                                    val encoded = encoder.encode(
+                                        SlideshowEncoder.Request(
+                                            imagePaths = call.argument<List<String>>("imagePaths").orEmpty(),
+                                            audioPath = call.argument<String>("audioPath"),
+                                            perImageMs = call.argument<Int>("perImageMs") ?: 3000,
+                                            width = call.argument<Int>("width") ?: 1080,
+                                            height = call.argument<Int>("height") ?: 1920,
+                                            outputPath = call.argument<String>("outputPath")!!,
+                                        ),
+                                    )
+                                    mapOf(
+                                        "filePath" to encoded.filePath,
+                                        "audioSkipped" to encoded.audioSkipped,
+                                    )
+                                }
                             }
                             runOnUiThread { result.success(payload) }
-                        } catch (error: Exception) {
+                        } catch (error: Throwable) {
+                            // Throwable, not Exception: decoding a large image
+                            // can raise OutOfMemoryError, which is an Error. If
+                            // it escaped here it would kill this worker thread
+                            // with the Result never completed, crashing the app
+                            // and leaving the Dart future pending forever.
                             val code = if (isOutOfSpace(error)) "out_of_space" else "encode_failed"
-                            runOnUiThread { result.error(code, error.message, null) }
+                            val message = error.message ?: error.toString()
+                            runOnUiThread { result.error(code, message, null) }
                         }
                     }.start()
                 }
@@ -167,11 +178,19 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    /// A full disk surfaces as an IOException from the muxer rather than a
-    /// distinct type, so the message is the only thing left to match on.
+    /**
+     * A full disk surfaces as an IOException from the muxer rather than a
+     * distinct type, so the message is the only thing left to match on.
+     *
+     * The walk is bounded and remembers what it has seen: a self-referencing
+     * or mutually-referencing cause chain is legal, and some wrapping
+     * libraries produce one, which would spin this worker thread forever.
+     */
     private fun isOutOfSpace(error: Throwable?): Boolean {
+        val seen = java.util.Collections.newSetFromMap(java.util.IdentityHashMap<Throwable, Boolean>())
         var current = error
-        while (current != null) {
+        var depth = 0
+        while (current != null && depth++ < MAX_CAUSE_DEPTH && seen.add(current)) {
             if (current is IOException) {
                 val message = current.message.orEmpty().lowercase()
                 if (message.contains("space") || message.contains("enospc")) return true
@@ -201,6 +220,7 @@ class MainActivity : FlutterActivity() {
         private const val SHARE_SHORTCUT_ID = "share_link"
         private const val SHARE_TARGET_CATEGORY =
             "com.vannt.nimbleclip.category.SHARE_LINK"
+        private const val MAX_CAUSE_DEPTH = 32
     }
 
     private fun findMediaUri(fileName: String, isImage: Boolean): Uri? {

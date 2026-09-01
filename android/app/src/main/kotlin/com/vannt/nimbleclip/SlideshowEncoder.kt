@@ -18,8 +18,10 @@ import java.nio.ByteBuffer
 import kotlin.math.max
 import kotlin.math.min
 
-/// Raised for anything the caller can act on; the channel handler turns it
-/// into an `encode_failed` (or `out_of_space`) platform error.
+/**
+ * Raised for anything the caller can act on; the channel handler turns it
+ * into an `encode_failed` (or `out_of_space`) platform error.
+ */
 class SlideshowEncodeException(message: String, cause: Throwable? = null) :
     Exception(message, cause)
 
@@ -111,12 +113,13 @@ class SlideshowEncoder {
         return Result(filePath = output.absolutePath, audioSkipped = true)
     }
 
-    /// Reads back a finished file so callers can prove it is decodable rather
-    /// than merely present. Task 9 reuses this to assert the audio track.
+    /**
+     * Reads back a finished file so callers can prove it is decodable rather
+     * than merely present. Task 9 reuses this to assert the audio track.
+     */
     fun probe(path: String): Map<String, Any?> {
-        val retriever = MediaMetadataRetriever()
+        val retriever = openLocal(path)
         try {
-            retriever.setDataSource(path)
             fun read(key: Int) = retriever.extractMetadata(key)
             return mapOf(
                 "durationMs" to (read(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toIntOrNull() ?: 0),
@@ -133,6 +136,77 @@ class SlideshowEncoder {
         } finally {
             runCatching { retriever.release() }
         }
+    }
+
+    /**
+     * Decodes one frame of a finished file and reports the colour at three
+     * points on it.
+     *
+     * This exists so a test can prove the *picture*, not just the container.
+     * The ARGB-to-I420 conversion and the plane writes in [YuvFrame] are hand
+     * rolled: a red/blue swap, a U/V mix-up, a row-stride error or an
+     * all-black frame each still produce a perfectly well-formed MP4 of the
+     * right size, duration and track layout. Sampling the centre and two
+     * corners catches the colour faults, and requiring all three to agree on a
+     * uniform source catches the stride faults, which skew the image.
+     */
+    fun frameColorAt(path: String, atMs: Int): Map<String, Any?> {
+        val retriever = openLocal(path)
+        try {
+            val frame = retriever.getFrameAtTime(
+                atMs.toLong() * 1000L,
+                MediaMetadataRetriever.OPTION_CLOSEST,
+            ) ?: throw SlideshowEncodeException("no frame decoded at ${atMs}ms in $path")
+            try {
+                return mapOf(
+                    "width" to frame.width,
+                    "height" to frame.height,
+                    // Signed ints on the Dart side; masked to keep the channel
+                    // payload a plain unsigned ARGB value.
+                    "center" to (frame.getPixel(frame.width / 2, frame.height / 2) and 0xFFFFFF),
+                    "topLeft" to (frame.getPixel(4, 4) and 0xFFFFFF),
+                    "bottomRight" to
+                        (frame.getPixel(frame.width - 5, frame.height - 5) and 0xFFFFFF),
+                )
+            } finally {
+                frame.recycle()
+            }
+        } catch (error: SlideshowEncodeException) {
+            throw error
+        } catch (error: Exception) {
+            throw SlideshowEncodeException(
+                "could not decode a frame of $path: ${error.message}",
+                error,
+            )
+        } finally {
+            runCatching { retriever.release() }
+        }
+    }
+
+    /**
+     * Opens a retriever on a local file only.
+     *
+     * `setDataSource(String)` happily resolves an http(s) URL. This feature's
+     * Kotlin is specified never to touch the network — it receives local paths
+     * — so the guard makes that structural here the same way `decodeScaled`
+     * already does it for images, rather than depending on every caller.
+     */
+    private fun openLocal(path: String): MediaMetadataRetriever {
+        val file = File(path)
+        if (!file.isFile) {
+            throw SlideshowEncodeException("not a local file: $path")
+        }
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(file.absolutePath)
+        } catch (error: Exception) {
+            runCatching { retriever.release() }
+            throw SlideshowEncodeException(
+                "could not read back $path: ${error.message}",
+                error,
+            )
+        }
+        return retriever
     }
 
     private fun videoFormat(width: Int, height: Int): MediaFormat =
@@ -161,10 +235,16 @@ class SlideshowEncoder {
                         "the encoder did not expose a YUV input image",
                     )
                 frame.writeInto(image)
+                // Derived from the planes, not from width*height*3/2: an
+                // encoder that pads rows or aligns height writes more bytes
+                // than the nominal frame size, and a codec that honours the
+                // declared size would then see a truncated frame.
+                val declared = frame.bufferExtent(image)
+                val capacity = codec.getInputBuffer(index)?.capacity() ?: declared
                 codec.queueInputBuffer(
                     index,
                     0,
-                    frame.width * frame.height * 3 / 2,
+                    min(declared, capacity),
                     frameIndex * 1_000_000L / FRAME_RATE,
                     0,
                 )
@@ -200,8 +280,10 @@ class SlideshowEncoder {
         }
     }
 
-    /// Paints one image onto a [width]x[height] frame: a blurred copy scaled to
-    /// cover the whole canvas, then the image itself scaled to fit inside it.
+    /**
+     * Paints one image onto a [width]x[height] frame: a blurred copy scaled to
+     * cover the whole canvas, then the image itself scaled to fit inside it.
+     */
     private fun composeFrame(path: String, width: Int, height: Int): YuvFrame {
         val source = decodeScaled(path, width, height)
         try {
@@ -230,14 +312,7 @@ class SlideshowEncoder {
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
             throw SlideshowEncodeException("could not decode image: $path")
         }
-        // Never hold more than roughly twice the pixels the canvas can show;
-        // a photo post's originals can be far larger than the output frame.
-        var sample = 1
-        while (bounds.outWidth / (sample * 2) >= width * 2 &&
-            bounds.outHeight / (sample * 2) >= height * 2
-        ) {
-            sample *= 2
-        }
+        val sample = sampleSizeFor(bounds.outWidth, bounds.outHeight, width, height)
         val bitmap = BitmapFactory.decodeFile(
             path,
             BitmapFactory.Options().apply {
@@ -248,10 +323,42 @@ class SlideshowEncoder {
         return bitmap
     }
 
-    /// One blur path for every API level. `RenderEffect` needs a RenderNode or
-    /// a View and only exists on API 31+, which would leave the API 24-30 path
-    /// shipping untested; a downscale-then-upscale is uniform, free, and reads
-    /// as a blur at this size.
+    /**
+     * The smallest power-of-two `inSampleSize` that brings a source down to a
+     * total-pixel budget.
+     *
+     * Budgeting *area* rather than comparing each axis is the whole point: a
+     * per-axis test joined with `&&` never fires for a landscape source against
+     * a portrait frame, because the source's short axis is already under the
+     * frame's long one. A 4032x3024 phone photo would sail through such a test
+     * at full size and cost ~48 MB of ARGB_8888.
+     *
+     * The budget is twice the canvas's pixel count. Since each step quarters
+     * the area, the decoded source keeps at least half the canvas's pixels,
+     * which is comfortably more than a letterboxed fit ever draws.
+     */
+    private fun sampleSizeFor(
+        sourceWidth: Int,
+        sourceHeight: Int,
+        width: Int,
+        height: Int,
+    ): Int {
+        val budget = 2L * width * height
+        var sample = 1
+        while (sample < MAX_SAMPLE_SIZE &&
+            (sourceWidth.toLong() / sample) * (sourceHeight.toLong() / sample) > budget
+        ) {
+            sample *= 2
+        }
+        return sample
+    }
+
+    /**
+     * One blur path for every API level. `RenderEffect` needs a RenderNode or
+     * a View and only exists on API 31+, which would leave the API 24-30 path
+     * shipping untested; a downscale-then-upscale is uniform, free, and reads
+     * as a blur at this size.
+     */
     private fun drawBlurredCover(canvas: Canvas, source: Bitmap, width: Int, height: Int) {
         val smallWidth = max(1, width / BLUR_DIVISOR)
         val smallHeight = max(1, height / BLUR_DIVISOR)
@@ -293,8 +400,10 @@ class SlideshowEncoder {
         )
     }
 
-    /// The centred crop of [source] whose aspect ratio matches the destination,
-    /// i.e. the region a "cover" scale would leave visible.
+    /**
+     * The centred crop of [source] whose aspect ratio matches the destination,
+     * i.e. the region a "cover" scale would leave visible.
+     */
     private fun coverSourceRect(source: Bitmap, width: Int, height: Int): Rect {
         val scale = max(
             width.toFloat() / source.width,
@@ -435,6 +544,26 @@ class SlideshowEncoder {
             writeChroma(image.planes[2], chromaV)
         }
 
+        /**
+         * How many bytes of the input buffer this frame actually spans.
+         *
+         * Rows may be padded, so the extent is driven by `rowStride`. In a
+         * semi-planar buffer the two chroma planes are the same memory
+         * interleaved, so their extent is counted once rather than twice.
+         */
+        fun bufferExtent(image: Image): Int {
+            val luma = image.planes[0]
+            val chroma = image.planes[1]
+            val lumaBytes = luma.rowStride * height
+            val chromaRows = height / 2
+            val chromaBytes = if (chroma.pixelStride > 1) {
+                chroma.rowStride * chromaRows
+            } else {
+                chroma.rowStride * chromaRows + image.planes[2].rowStride * chromaRows
+            }
+            return lumaBytes + chromaBytes
+        }
+
         private fun writeLuma(plane: Image.Plane) {
             val buffer = plane.buffer
             val rowStride = plane.rowStride
@@ -488,5 +617,6 @@ class SlideshowEncoder {
         const val BLUR_DIVISOR = 16
         const val TIMEOUT_US = 10_000L
         const val MAX_STALLED_ATTEMPTS = 500
+        const val MAX_SAMPLE_SIZE = 1 shl 12
     }
 }
