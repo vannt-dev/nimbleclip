@@ -36,7 +36,7 @@ class TwitterExtractor extends BaseVideoExtractor {
 
     // A t.co link carries no tweet id — it has to be expanded first.
     if (tweetId == null && UrlHelper.isShortLink(cleanUrl)) {
-      cleanUrl = await ExtractorHttp.resolveRedirects(cleanUrl);
+      cleanUrl = (await ExtractorHttp.resolveRedirects(cleanUrl)).url;
       tweetId = _extractTweetId(cleanUrl);
     }
 

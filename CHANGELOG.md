@@ -18,6 +18,12 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   strategy coming back without its `contextJSON` payload. Instagram was
   serving a different, larger page to a request that omitted the navigation
   headers; the payload is there on all three repeats once they are sent.
+- Stopped a Facebook share link downloading the page it points at twice.
+  Expanding the link already fetched that page in full, and the first
+  extraction strategy then asked for the very same URL again — measured at
+  roughly 64 KB and 0.8 s of pure duplication per link. The expansion now
+  hands the response on, and only when it can stand in for a fresh request:
+  a body that is empty, or a response that failed, is still refetched.
 
 ## [1.5.1] - 2026-08-30
 
