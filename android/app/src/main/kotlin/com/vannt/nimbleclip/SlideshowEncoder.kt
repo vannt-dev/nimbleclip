@@ -7,9 +7,11 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
+import android.media.AudioFormat
 import android.media.Image
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
+import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.media.MediaMuxer
@@ -26,10 +28,19 @@ class SlideshowEncodeException(message: String, cause: Throwable? = null) :
     Exception(message, cause)
 
 /**
- * Renders a list of local image files into a single H.264/MP4 clip.
+ * Renders a list of local image files into a single H.264/MP4 clip, with the
+ * post's music transcoded to AAC alongside it when one is supplied.
  *
- * Picture only: audio is Task 9's job, so [Result.audioSkipped] is always
- * true and [Request.audioPath] is accepted but ignored.
+ * The audio stage runs to completion *before* the muxer is started, because
+ * `MediaMuxer` will not accept a track added after `start()`. Every encoded
+ * AAC packet is buffered along with the encoder's output `MediaFormat`; only
+ * then are the video and audio tracks added and the muxer started. The order
+ * also buys the failure property this feature needs: a music track that will
+ * not decode cannot corrupt the picture, because it fails before a single
+ * frame has been muxed. Any [Throwable] out of that stage — a missing file, an
+ * unsupported codec, an `OutOfMemoryError` — leaves the render producing a
+ * silent but valid MP4 with [Result.audioSkipped] set. A slideshow without
+ * music is usable; a failed render is not.
  *
  * Frames are fed as raw YUV through `queueInputBuffer` rather than through a
  * `createInputSurface()` Canvas. An encoder input surface is a hardware
@@ -59,10 +70,19 @@ class SlideshowEncoder {
         val width = evenLength(request.width)
         val height = evenLength(request.height)
         val framesPerImage = max(1, request.perImageMs * FRAME_RATE / 1000)
+        // The picture's length is known up front, so the audio can be trimmed
+        // to it while it is being transcoded rather than after. That is what
+        // bounds the buffered packets: a four-minute song behind a six-second
+        // slideshow costs six seconds of AAC, not four minutes of it.
+        val videoDurationUs =
+            request.imagePaths.size.toLong() * framesPerImage * 1_000_000L / FRAME_RATE
 
         val output = File(request.outputPath)
         output.parentFile?.mkdirs()
         if (output.exists()) output.delete()
+
+        // Before the muxer exists, so nothing it has written can be at risk.
+        val audio = transcodeAudioOrNull(request.audioPath, videoDurationUs)
 
         var codec: MediaCodec? = null
         var muxer: MediaMuxer? = null
@@ -78,7 +98,7 @@ class SlideshowEncoder {
             codec.start()
             muxer = MediaMuxer(output.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
 
-            val sink = MuxerSink(codec, muxer)
+            val sink = MuxerSink(codec, muxer, audio)
             var frameIndex = 0L
             for (path in request.imagePaths) {
                 val frame = composeFrame(path, width, height)
@@ -110,7 +130,7 @@ class SlideshowEncoder {
         if (!output.exists() || output.length() == 0L) {
             throw SlideshowEncodeException("the encoder produced no output file")
         }
-        return Result(filePath = output.absolutePath, audioSkipped = true)
+        return Result(filePath = output.absolutePath, audioSkipped = audio == null)
     }
 
     /**
@@ -432,19 +452,344 @@ class SlideshowEncoder {
         return value - (value % 2)
     }
 
+    /** One encoded AAC access unit, held until the muxer is ready for it. */
+    private class AudioPacket(
+        val data: ByteArray,
+        val presentationTimeUs: Long,
+        val flags: Int,
+    )
+
+    /** The whole music track, encoded and waiting for a muxer to accept it. */
+    private class EncodedAudio(val format: MediaFormat, val packets: List<AudioPacket>)
+
     /**
-     * Collects encoder output and writes it to the muxer.
+     * Transcodes the post's music, or returns null if it cannot be used.
      *
-     * The muxer's track can only be added once the encoder has emitted its
+     * Null is a normal outcome, not an error: no path given, a path that is not
+     * a file, a container with no audio track, a codec the device does not
+     * have, a decoder that chokes on the bytes. Every one of them ends the same
+     * way — a silent slideshow that still renders. [Throwable] rather than
+     * [Exception] is caught for the same reason the channel handler does it: a
+     * decoder handed a malformed header can raise an `Error`, and letting one
+     * escape here would fail a render that has a perfectly good picture
+     * available.
+     */
+    private fun transcodeAudioOrNull(audioPath: String?, limitUs: Long): EncodedAudio? {
+        if (audioPath.isNullOrBlank()) return null
+        return try {
+            transcodeAudio(audioPath, limitUs)
+        } catch (error: Throwable) {
+            null
+        }
+    }
+
+    /**
+     * Decodes [audioPath] to PCM and re-encodes it as AAC-LC, trimmed to
+     * [limitUs].
+     *
+     * TikWM serves MP3 and `MediaMuxer` will not put MP3 in an MP4, so a
+     * transcode is unavoidable. Both codecs are driven from one loop rather
+     * than decoding fully and then encoding: a decode-then-encode would hold
+     * the entire PCM stream — about 10 MB per minute at 44.1 kHz stereo —
+     * where this holds only what the encoder has not yet consumed.
+     *
+     * The output format is taken from the *decoder*, not fixed at 44.1 kHz
+     * stereo. `MediaCodec` neither resamples nor remixes, so declaring a rate
+     * the decoder is not producing does not convert the audio — it just
+     * mislabels it, and the music plays back at the wrong speed. Whatever the
+     * source turns out to be is what gets encoded, at [AUDIO_BIT_RATE].
+     */
+    private fun transcodeAudio(audioPath: String, limitUs: Long): EncodedAudio {
+        val file = File(audioPath)
+        // Same guard as openLocal: setDataSource(String) resolves http(s) URLs
+        // and this feature's Kotlin never touches the network.
+        if (!file.isFile) {
+            throw SlideshowEncodeException("audio file not found: $audioPath")
+        }
+        val extractor = MediaExtractor()
+        var decoder: MediaCodec? = null
+        var encoder: MediaCodec? = null
+        try {
+            extractor.setDataSource(file.absolutePath)
+            val track = firstAudioTrack(extractor)
+            val sourceFormat = extractor.getTrackFormat(track)
+            val sourceMime = sourceFormat.getString(MediaFormat.KEY_MIME)
+                ?: throw SlideshowEncodeException("audio track has no mime type")
+            extractor.selectTrack(track)
+            val activeDecoder = MediaCodec.createDecoderByType(sourceMime)
+            decoder = activeDecoder
+            activeDecoder.configure(sourceFormat, null, null, 0)
+            activeDecoder.start()
+
+            val packets = ArrayList<AudioPacket>()
+            val decoderInfo = MediaCodec.BufferInfo()
+            val encoderInfo = MediaCodec.BufferInfo()
+            // Decoded PCM the encoder has not swallowed yet. Partially consumed
+            // from the head, because an encoder input buffer is rarely the same
+            // size as a decoder output buffer.
+            val pending = ArrayDeque<ByteBuffer>()
+            var encoderFormat: MediaFormat? = null
+            var bytesPerSecond = 0L
+            var bytesFed = 0L
+            var extractorDone = false
+            var decoderDone = false
+            var encoderInputDone = false
+            var encoderDone = false
+            var idleRounds = 0
+
+            while (!encoderDone) {
+                var progressed = false
+
+                if (!extractorDone) {
+                    val index = activeDecoder.dequeueInputBuffer(TIMEOUT_US)
+                    if (index >= 0) {
+                        progressed = true
+                        val buffer = activeDecoder.getInputBuffer(index)
+                            ?: throw SlideshowEncodeException("no audio decoder input buffer")
+                        val size = extractor.readSampleData(buffer, 0)
+                        if (size < 0) {
+                            activeDecoder.queueInputBuffer(
+                                index,
+                                0,
+                                0,
+                                0,
+                                MediaCodec.BUFFER_FLAG_END_OF_STREAM,
+                            )
+                            extractorDone = true
+                        } else {
+                            activeDecoder.queueInputBuffer(index, 0, size, extractor.sampleTime, 0)
+                            extractor.advance()
+                        }
+                    }
+                }
+
+                if (!decoderDone && pending.size < MAX_PENDING_PCM_CHUNKS) {
+                    when (val index = activeDecoder.dequeueOutputBuffer(decoderInfo, TIMEOUT_US)) {
+                        MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
+                        MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                            progressed = true
+                            if (encoder == null) {
+                                val pcm = activeDecoder.outputFormat
+                                encoder = createAudioEncoder(pcm)
+                                bytesPerSecond = pcmBytesPerSecond(pcm)
+                            }
+                        }
+                        else -> if (index >= 0) {
+                            progressed = true
+                            val buffer = activeDecoder.getOutputBuffer(index)
+                            if (buffer != null && decoderInfo.size > 0) {
+                                val copy = ByteArray(decoderInfo.size)
+                                buffer.position(decoderInfo.offset)
+                                buffer.limit(decoderInfo.offset + decoderInfo.size)
+                                buffer.get(copy)
+                                pending.addLast(ByteBuffer.wrap(copy))
+                            }
+                            val eos =
+                                decoderInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
+                            activeDecoder.releaseOutputBuffer(index, false)
+                            if (eos) decoderDone = true
+                        }
+                    }
+                }
+
+                if (decoderDone && encoder == null) {
+                    throw SlideshowEncodeException("the audio decoder produced no output format")
+                }
+
+                val activeEncoder = encoder
+                if (activeEncoder != null &&
+                    !encoderInputDone &&
+                    (pending.isNotEmpty() || decoderDone)
+                ) {
+                    val index = activeEncoder.dequeueInputBuffer(TIMEOUT_US)
+                    if (index >= 0) {
+                        progressed = true
+                        val input = activeEncoder.getInputBuffer(index)
+                            ?: throw SlideshowEncodeException("no audio encoder input buffer")
+                        input.clear()
+                        var written = 0
+                        while (pending.isNotEmpty() && input.hasRemaining()) {
+                            val head = pending.first()
+                            val take = min(head.remaining(), input.remaining())
+                            val slice = head.slice()
+                            slice.limit(take)
+                            input.put(slice)
+                            head.position(head.position() + take)
+                            written += take
+                            if (!head.hasRemaining()) pending.removeFirst()
+                        }
+                        // Timestamps come from the byte count rather than from
+                        // the decoder's own, which the encoder requires to be
+                        // monotonic and which a seek-free straight read makes
+                        // exact anyway.
+                        val presentationTimeUs = bytesToUs(bytesFed, bytesPerSecond)
+                        if (written == 0 && decoderDone) {
+                            activeEncoder.queueInputBuffer(
+                                index,
+                                0,
+                                0,
+                                presentationTimeUs,
+                                MediaCodec.BUFFER_FLAG_END_OF_STREAM,
+                            )
+                            encoderInputDone = true
+                        } else {
+                            activeEncoder.queueInputBuffer(
+                                index,
+                                0,
+                                written,
+                                presentationTimeUs,
+                                0,
+                            )
+                            bytesFed += written
+                            if (bytesToUs(bytesFed, bytesPerSecond) >= limitUs) {
+                                // The music outlasts the pictures; stop reading
+                                // it and let the next round close the encoder.
+                                extractorDone = true
+                                decoderDone = true
+                                pending.clear()
+                            }
+                        }
+                    }
+                }
+
+                if (activeEncoder != null) {
+                    when (val index = activeEncoder.dequeueOutputBuffer(encoderInfo, TIMEOUT_US)) {
+                        MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
+                        MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                            progressed = true
+                            encoderFormat = activeEncoder.outputFormat
+                        }
+                        else -> if (index >= 0) {
+                            progressed = true
+                            val buffer = activeEncoder.getOutputBuffer(index)
+                            // As with the video track: the codec-config buffer
+                            // is the ASC, which the muxer already has from the
+                            // output format.
+                            val isConfig =
+                                encoderInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0
+                            if (buffer != null && !isConfig && encoderInfo.size > 0) {
+                                val data = ByteArray(encoderInfo.size)
+                                buffer.position(encoderInfo.offset)
+                                buffer.limit(encoderInfo.offset + encoderInfo.size)
+                                buffer.get(data)
+                                packets.add(
+                                    AudioPacket(
+                                        data = data,
+                                        presentationTimeUs = encoderInfo.presentationTimeUs,
+                                        // Every AAC access unit is a sync
+                                        // sample; the END_OF_STREAM bit must
+                                        // not reach the muxer.
+                                        flags = MediaCodec.BUFFER_FLAG_KEY_FRAME,
+                                    ),
+                                )
+                            }
+                            val eos =
+                                encoderInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
+                            activeEncoder.releaseOutputBuffer(index, false)
+                            if (eos) encoderDone = true
+                        }
+                    }
+                }
+
+                if (progressed) {
+                    idleRounds = 0
+                } else if (++idleRounds > MAX_STALLED_ATTEMPTS) {
+                    throw SlideshowEncodeException("the audio transcode stalled")
+                }
+            }
+
+            val format = encoderFormat
+                ?: throw SlideshowEncodeException("the audio encoder produced no output format")
+            if (packets.isEmpty()) {
+                throw SlideshowEncodeException("the audio encoder produced no packets")
+            }
+            return EncodedAudio(format, packets)
+        } finally {
+            runCatching { decoder?.stop() }
+            runCatching { decoder?.release() }
+            runCatching { encoder?.stop() }
+            runCatching { encoder?.release() }
+            runCatching { extractor.release() }
+        }
+    }
+
+    private fun firstAudioTrack(extractor: MediaExtractor): Int {
+        for (index in 0 until extractor.trackCount) {
+            val mime = extractor.getTrackFormat(index).getString(MediaFormat.KEY_MIME).orEmpty()
+            if (mime.startsWith("audio/")) return index
+        }
+        throw SlideshowEncodeException("no audio track to transcode")
+    }
+
+    /**
+     * Configures an AAC-LC encoder to match the PCM the decoder is producing.
+     *
+     * The decoder's rate and channel count are carried straight through. A
+     * PCM encoding other than 16-bit is rejected rather than fed through: the
+     * encoder would read float samples as shorts and emit noise, which is a
+     * far worse outcome than the silent fallback.
+     */
+    private fun createAudioEncoder(pcmFormat: MediaFormat): MediaCodec {
+        if (pcmFormat.containsKey(MediaFormat.KEY_PCM_ENCODING) &&
+            pcmFormat.getInteger(MediaFormat.KEY_PCM_ENCODING) != AudioFormat.ENCODING_PCM_16BIT
+        ) {
+            throw SlideshowEncodeException("the audio decoder produced non 16-bit PCM")
+        }
+        val sampleRate = pcmFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+        val channelCount = pcmFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+        val format = MediaFormat.createAudioFormat(AUDIO_MIME, sampleRate, channelCount).apply {
+            setInteger(
+                MediaFormat.KEY_AAC_PROFILE,
+                MediaCodecInfo.CodecProfileLevel.AACObjectLC,
+            )
+            setInteger(MediaFormat.KEY_BIT_RATE, AUDIO_BIT_RATE)
+            setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, AUDIO_MAX_INPUT_SIZE)
+        }
+        val encoder = MediaCodec.createEncoderByType(AUDIO_MIME)
+        try {
+            encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            encoder.start()
+        } catch (error: Throwable) {
+            runCatching { encoder.release() }
+            throw error
+        }
+        return encoder
+    }
+
+    private fun pcmBytesPerSecond(pcmFormat: MediaFormat): Long {
+        val sampleRate = pcmFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE).toLong()
+        val channelCount = pcmFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT).toLong()
+        val bytes = sampleRate * channelCount * 2L
+        if (bytes <= 0L) {
+            throw SlideshowEncodeException("the audio decoder reported an empty PCM format")
+        }
+        return bytes
+    }
+
+    private fun bytesToUs(bytes: Long, bytesPerSecond: Long): Long =
+        if (bytesPerSecond <= 0L) 0L else bytes * 1_000_000L / bytesPerSecond
+
+    /**
+     * Collects video-encoder output and writes it to the muxer, interleaving
+     * the already-encoded audio packets as it goes.
+     *
+     * The video track can only be added once the encoder has emitted its
      * output format, which happens after the first frames are queued — hence
-     * the deferred `addTrack`/`start` rather than doing it up front.
+     * the deferred `addTrack` rather than doing it up front. `start()` waits
+     * for that same moment because `MediaMuxer` refuses a track added after
+     * it: both tracks go in together, which is only possible because [audio]
+     * was fully transcoded before this sink was built.
      */
     private class MuxerSink(
         private val codec: MediaCodec,
         private val muxer: MediaMuxer,
+        private val audio: EncodedAudio?,
     ) {
         private val info = MediaCodec.BufferInfo()
+        private val audioInfo = MediaCodec.BufferInfo()
         private var trackIndex = -1
+        private var audioTrackIndex = -1
+        private var nextAudioPacket = 0
         private var started = false
 
         fun drain(endOfStream: Boolean) {
@@ -463,7 +808,12 @@ class SlideshowEncoder {
                         if (started) {
                             throw SlideshowEncodeException("the encoder changed format twice")
                         }
+                        // Every track this file will ever have, added before
+                        // start() and never after it.
                         trackIndex = muxer.addTrack(codec.outputFormat)
+                        if (audio != null) {
+                            audioTrackIndex = muxer.addTrack(audio.format)
+                        }
                         muxer.start()
                         started = true
                     }
@@ -471,7 +821,12 @@ class SlideshowEncoder {
                         if (index < 0) continue
                         idleRounds = 0
                         writeSample(index)
-                        if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) return
+                        if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
+                            // The picture is done; anything of the music left
+                            // over belongs at the tail.
+                            writeAudioUpTo(Long.MAX_VALUE)
+                            return
+                        }
                     }
                 }
             }
@@ -483,11 +838,28 @@ class SlideshowEncoder {
             // took from the output format; writing it again corrupts the track.
             val isConfig = info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0
             if (buffer != null && !isConfig && info.size > 0 && started) {
+                // Keeping the two tracks roughly in step as they are written
+                // is what lets a player stream the result instead of seeking
+                // back and forth between one long run of audio and one of
+                // video.
+                writeAudioUpTo(info.presentationTimeUs)
                 buffer.position(info.offset)
                 buffer.limit(info.offset + info.size)
                 muxer.writeSampleData(trackIndex, buffer, info)
             }
             codec.releaseOutputBuffer(index, false)
+        }
+
+        private fun writeAudioUpTo(presentationTimeUs: Long) {
+            if (audio == null || !started) return
+            while (nextAudioPacket < audio.packets.size) {
+                val packet = audio.packets[nextAudioPacket]
+                if (packet.presentationTimeUs > presentationTimeUs) return
+                val buffer = ByteBuffer.wrap(packet.data)
+                audioInfo.set(0, packet.data.size, packet.presentationTimeUs, packet.flags)
+                muxer.writeSampleData(audioTrackIndex, buffer, audioInfo)
+                nextAudioPacket++
+            }
         }
     }
 
@@ -618,5 +990,16 @@ class SlideshowEncoder {
         const val TIMEOUT_US = 10_000L
         const val MAX_STALLED_ATTEMPTS = 500
         const val MAX_SAMPLE_SIZE = 1 shl 12
+        const val AUDIO_MIME = "audio/mp4a-latm"
+        const val AUDIO_BIT_RATE = 128_000
+        const val AUDIO_MAX_INPUT_SIZE = 1 shl 16
+
+        /**
+         * How much decoded PCM may sit ahead of the AAC encoder before the
+         * decoder is left to wait. Small on purpose: the queue exists to
+         * absorb the mismatch between one decoder buffer and one encoder
+         * buffer, not to hold the song.
+         */
+        const val MAX_PENDING_PCM_CHUNKS = 8
     }
 }
