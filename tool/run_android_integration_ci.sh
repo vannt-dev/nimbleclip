@@ -33,4 +33,7 @@ if ! curl --fail --silent http://127.0.0.1:8097/health |
   exit 1
 fi
 
-flutter test integration_test/android_storage_test.dart -d emulator-5554
+flutter test \
+  integration_test/android_storage_test.dart \
+  integration_test/slideshow_render_test.dart \
+  -d emulator-5554

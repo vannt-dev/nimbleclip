@@ -6,6 +6,22 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- Added a slideshow option to TikTok photo posts on Android: the post's images
+  and its music are rendered on the device into one 1080x1920 MP4, three
+  seconds an image, instead of arriving as a folder of pictures and a separate
+  audio file. The option carries no download URL — there is nothing to fetch —
+  so it is split off ahead of the download queue and rendered instead, and the
+  finished file enters history as a file that already exists.
+- The music is transcoded to AAC before a single frame is muxed, because
+  `MediaMuxer` refuses both MP3 in an MP4 and any track added after the file
+  has been started. A track that will not decode therefore cannot damage the
+  picture: the render carries on and produces a silent video with a note on it,
+  since a slideshow without music is usable and a failed one is not.
+- The option is offered only where it can actually run. The renderer's own
+  runtime check is what decides — a Dart conditional import cannot tell Android
+  from iOS, since both have `dart.library.io` — so iOS, desktop and Web see no
+  slideshow row at all rather than one that fails when tapped.
+
 ## [1.5.2] - 2026-09-01
 
 - Added a distinct message for a Facebook post Facebook gates as 18+. Such a
