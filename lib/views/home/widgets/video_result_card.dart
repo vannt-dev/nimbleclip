@@ -6,6 +6,7 @@ import '../../../l10n/gallery_notice_text.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/gallery_notice.dart';
 import '../../../models/video_metadata.dart';
+import '../../../services/slideshow/slideshow_renderer.dart';
 import '../media_picker_screen.dart';
 import 'result_media_tabs.dart';
 import 'result_metadata_summary.dart';
@@ -19,6 +20,11 @@ class VideoResultCard extends StatefulWidget {
   final ValueChanged<List<VideoQualityOption>> onDownload;
   final VoidCallback onPreview;
 
+  /// Decides whether a slideshow option is offered at all. Injected rather
+  /// than looked up globally so a widget test can say which platform it is
+  /// standing in for; null means the real one for this platform.
+  final SlideshowRenderer? slideshowRenderer;
+
   const VideoResultCard({
     super.key,
     required this.metadata,
@@ -26,6 +32,7 @@ class VideoResultCard extends StatefulWidget {
     required this.onQualitySelected,
     required this.onDownload,
     required this.onPreview,
+    this.slideshowRenderer,
   });
 
   @override
@@ -37,14 +44,30 @@ class _VideoResultCardState extends State<VideoResultCard> {
   final Set<String> _selectedImageIds = {};
   final Set<String> _selectedVideoIds = {};
 
+  late final SlideshowRenderer _slideshowRenderer =
+      widget.slideshowRenderer ?? createSlideshowRenderer();
+
+  /// The options this device can actually act on.
+  ///
+  /// A slideshow is the one option that is not a URL waiting to be fetched: it
+  /// has to be encoded here, and where there is no encoder — Web, iOS, desktop
+  /// — offering it buys the user a failed download and nothing else. Filtered
+  /// once, at the source, so the rows, the selection and the download button
+  /// cannot disagree about what is on offer.
+  List<VideoQualityOption> get _availableQualities => widget.metadata.qualities
+      .where(
+        (option) => !option.needsRendering || _slideshowRenderer.isSupported,
+      )
+      .toList();
+
   List<VideoQualityOption> get _imageOptions =>
-      widget.metadata.qualities.where((option) => option.isImage).toList();
+      _availableQualities.where((option) => option.isImage).toList();
 
   /// One entry per video, whatever qualities it is offered at.
   List<VideoQualityOption> get _videoEntries {
     final seen = <String>{};
     return [
-      for (final option in widget.metadata.qualities)
+      for (final option in _availableQualities)
         if (!option.isAudioOnly && !option.isImage)
           if (seen.add(MediaSelectionHelper.videoKeyOf(option))) option,
     ];
@@ -128,15 +151,16 @@ class _VideoResultCardState extends State<VideoResultCard> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final meta = widget.metadata;
 
-    final videoOptions = meta.qualities
+    final available = _availableQualities;
+    final videoOptions = available
         .where((q) => !q.isAudioOnly && !q.isImage)
         .toList();
     final imageOptions = _imageOptions;
-    final audioOptions = meta.qualities.where((q) => q.isAudioOnly).toList();
+    final audioOptions = available.where((q) => q.isAudioOnly).toList();
     final currentOptions = _selectedTab == 0 ? videoOptions : audioOptions;
     final videoEntries = _videoEntries;
     final selectedDownloads = MediaSelectionHelper.downloads(
-      options: meta.qualities,
+      options: available,
       selectedQuality: widget.selectedQuality,
       selectedImageIds: _selectedImageIds,
       selectedVideoIds: _selectedVideoIds,
