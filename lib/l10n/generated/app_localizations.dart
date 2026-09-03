@@ -1171,6 +1171,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Link copied'**
   String get linkCopied;
+
+  /// No description provided for @slideshowMusicUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The music could not be added, so this slideshow is silent.'**
+  String get slideshowMusicUnavailable;
+
+  /// No description provided for @slideshowRenderFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'This slideshow could not be rendered on this device.'**
+  String get slideshowRenderFailed;
+
+  /// No description provided for @slideshowOutOfSpace.
+  ///
+  /// In en, this message translates to:
+  /// **'There is not enough free space to render this slideshow.'**
+  String get slideshowOutOfSpace;
 }
 
 class _AppLocalizationsDelegate

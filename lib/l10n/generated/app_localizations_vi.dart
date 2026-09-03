@@ -656,4 +656,16 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get linkCopied => 'Đã sao chép liên kết';
+
+  @override
+  String get slideshowMusicUnavailable =>
+      'Không thêm được nhạc, nên video từ ảnh này không có tiếng.';
+
+  @override
+  String get slideshowRenderFailed =>
+      'Không dựng được video từ ảnh trên thiết bị này.';
+
+  @override
+  String get slideshowOutOfSpace =>
+      'Không đủ dung lượng trống để dựng video từ ảnh này.';
 }

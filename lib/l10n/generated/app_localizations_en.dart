@@ -657,4 +657,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get linkCopied => 'Link copied';
+
+  @override
+  String get slideshowMusicUnavailable =>
+      'The music could not be added, so this slideshow is silent.';
+
+  @override
+  String get slideshowRenderFailed =>
+      'This slideshow could not be rendered on this device.';
+
+  @override
+  String get slideshowOutOfSpace =>
+      'There is not enough free space to render this slideshow.';
 }
