@@ -393,6 +393,16 @@ Future<List<int>> _fetchFixture() async {
   }
 }
 
+/// Returns the bytes the image cache holds after the widget decodes the
+/// fixture.
+///
+/// Deliberately no `imageBuilder`: with one, `CachedNetworkImage` throws away
+/// the widget `OctoImage` built and hands the callback its raw provider, so the
+/// `ResizeImage` that implements `memCacheWidth` is lost and a second,
+/// full-resolution copy gets decoded alongside the thumbnail. That made this
+/// measurement the sum of both, and whether it exceeded the limit depended on
+/// which decode landed first. The app never passes `imageBuilder`, so measuring
+/// without one is both stable and what production actually does.
 Future<int> _measureDecodedImageBytes(
   WidgetTester tester, {
   required String cacheKey,
@@ -405,7 +415,6 @@ Future<int> _measureDecodedImageBytes(
     ..clear()
     ..clearLiveImages();
 
-  var loaded = false;
   await tester.pumpWidget(
     MaterialApp(
       home: Center(
@@ -416,20 +425,23 @@ Future<int> _measureDecodedImageBytes(
             imageUrl: '$fixtureHost/large.png?$cacheKey',
             fit: BoxFit.cover,
             memCacheWidth: memCacheWidth,
-            imageBuilder: (context, provider) {
-              loaded = true;
-              return Image(image: provider, fit: BoxFit.cover);
-            },
           ),
         ),
       ),
     ),
   );
 
-  for (var attempt = 0; attempt < 100 && !loaded; attempt++) {
+  for (
+    var attempt = 0;
+    attempt < 100 && cache.currentSizeBytes == 0;
+    attempt++
+  ) {
     await tester.pump(const Duration(milliseconds: 100));
   }
-  expect(loaded, isTrue, reason: 'fixture image did not finish decoding');
-  await tester.pump();
+  expect(
+    cache.currentSizeBytes,
+    greaterThan(0),
+    reason: 'fixture image did not finish decoding',
+  );
   return cache.currentSizeBytes;
 }
