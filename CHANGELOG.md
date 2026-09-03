@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-09-03
+
 - Added a slideshow option to TikTok photo posts on Android: the post's images
   and its music are rendered on the device into one 1080x1920 MP4, three
   seconds an image, instead of arriving as a folder of pictures and a separate
@@ -21,6 +23,19 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   runtime check is what decides — a Dart conditional import cannot tell Android
   from iOS, since both have `dart.library.io` — so iOS, desktop and Web see no
   slideshow row at all rather than one that fails when tapped.
+- A slideshow render now reports its progress and can be cancelled. The encode
+  runs outside the download queue, so neither the progress bar nor the Cancel
+  button reached it: a render showed nothing for its whole duration and then
+  jumped to done, and cancelling appeared to work before the finished encode
+  overwrote the row back to completed. The encoder reports once per image and
+  checks for a cancellation between images, so a tap stops it within one image
+  and leaves no half-written file behind.
+- Fixed a slideshow retried after the app restarted being fetched instead of
+  re-rendered. The source a render was built from is held in memory while a
+  failed task is written to history, so on the next launch Retry fell through
+  to the download path with an empty URL. The retry now re-extracts the post to
+  recover the source.
+- Upgraded `chewie` and `video_player_android` to their latest patch releases.
 
 ## [1.5.2] - 2026-09-01
 
