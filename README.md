@@ -36,6 +36,11 @@ management, local playback, and gallery export.
   left out individually. The grid builds only the cells on screen, so a story
   highlight holding a hundred clips costs no more to open than one holding
   ten.
+- Renders a TikTok photo post into a single MP4 on the device, images in
+  order with the post's music, so it can be shared as a video rather than as a
+  folder of pictures. Android only for now: the encode runs on the platform's
+  own codecs, and the option is hidden everywhere else rather than offered and
+  failed.
 - Uses one shared download queue with a configurable limit of one to five
   concurrent transfers, so separate batches cannot overload the device or
   network.
