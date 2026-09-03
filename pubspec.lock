@@ -77,10 +77,10 @@ packages:
     dependency: "direct main"
     description:
       name: chewie
-      sha256: c4f98e07e5796cbea032c1574fb0c8a560a93970324009d203735ef5eaa9439e
+      sha256: f820be323680855cc839a2c601ea06d7b982bc03ab09461dacf1e6a754328954
       url: "https://pub.dev"
     source: hosted
-    version: "1.16.1"
+    version: "1.16.2"
   clock:
     dependency: transitive
     description:
@@ -869,10 +869,10 @@ packages:
     dependency: transitive
     description:
       name: video_player_android
-      sha256: "39cf6b79ead3e5b339a8a27651359bde5ed47f753b4c3d0c0942db033591f5ba"
+      sha256: d27054dea34d748a44f06d433a57005d2aac69944485b0abbaed3303dbcfa3f1
       url: "https://pub.dev"
     source: hosted
-    version: "2.12.1"
+    version: "2.12.2"
   video_player_avfoundation:
     dependency: transitive
     description:
