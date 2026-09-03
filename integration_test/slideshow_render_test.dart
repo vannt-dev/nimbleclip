@@ -188,6 +188,188 @@ void main() {
 
     await bogus.delete();
   });
+
+  test('a slideshow with music carries an audio track', () async {
+    final dir = await getTemporaryDirectory();
+    final paths = await writeFixtures(dir);
+    final song = File('${dir.path}/song.mp3');
+    // Four seconds against three of pictures, so the trim to the video's
+    // length is exercised rather than the song simply running out first.
+    await song.writeAsBytes(_silentMp3(seconds: 4));
+    final out = '${dir.path}/with_music.mp4';
+
+    final result = await channel.invokeMapMethod<String, dynamic>('render', {
+      'imagePaths': paths,
+      'audioPath': song.path,
+      'perImageMs': 1000,
+      'width': 1080,
+      'height': 1920,
+      'outputPath': out,
+    });
+
+    expect(result!['audioSkipped'], isFalse);
+    final file = File(result['filePath'] as String);
+    expect(file.existsSync(), isTrue);
+
+    final probe = await channel.invokeMapMethod<String, dynamic>('probe', {
+      'path': file.path,
+    });
+    expect(probe!['hasAudio'], isTrue);
+    // The picture has to survive the second track: a muxer started before both
+    // tracks were added, or an audio packet written against the video track,
+    // both yield a file that still opens.
+    expect(probe['hasVideo'], isTrue);
+    expect(probe['width'], 1080);
+    expect(probe['height'], 1920);
+    // The music is a second longer than the slideshow. If the trim were
+    // missing the container would report four seconds, not three.
+    expect(probe['durationMs'] as int, greaterThan(2500));
+    expect(probe['durationMs'] as int, lessThan(3600));
+
+    final frame = await channel.invokeMapMethod<String, dynamic>(
+      'frameColorAt',
+      {'path': file.path, 'atMs': 1400},
+    );
+    expectColorNear(
+      frame!['center'] as int,
+      colors[1] & 0xFFFFFF,
+      reason: 'centre of the second image once music is muxed alongside it',
+    );
+
+    await file.delete();
+    await song.delete();
+    for (final path in paths) {
+      await File(path).delete();
+    }
+  });
+
+  test('a corrupt track yields a silent video, not a failure', () async {
+    final dir = await getTemporaryDirectory();
+    final paths = await writeFixtures(dir);
+    final song = File('${dir.path}/corrupt.mp3');
+    // Bytes that genuinely fail to decode, not merely a wrong extension: a
+    // missing file and a malformed one take different paths through the
+    // transcode, and the fallback has to hold for both.
+    await song.writeAsBytes(_corruptAudioBytes());
+    final out = '${dir.path}/corrupt_music.mp4';
+
+    final result = await channel.invokeMapMethod<String, dynamic>('render', {
+      'imagePaths': paths,
+      'audioPath': song.path,
+      'perImageMs': 1000,
+      'width': 1080,
+      'height': 1920,
+      'outputPath': out,
+    });
+
+    // The render must not fail. A slideshow without music is usable; an
+    // exception here would lose the whole thing over the soundtrack.
+    expect(result!['audioSkipped'], isTrue);
+    final file = File(result['filePath'] as String);
+    expect(file.existsSync(), isTrue);
+
+    final probe = await channel.invokeMapMethod<String, dynamic>('probe', {
+      'path': file.path,
+    });
+    expect(probe!['hasAudio'], isFalse);
+    expect(probe['hasVideo'], isTrue);
+    expect(probe['durationMs'] as int, greaterThan(2500));
+
+    // A half-written audio stage must leave the picture untouched, which is
+    // the whole reason the transcode runs before the muxer is started.
+    final frame = await channel.invokeMapMethod<String, dynamic>(
+      'frameColorAt',
+      {'path': file.path, 'atMs': 2400},
+    );
+    expectColorNear(
+      frame!['center'] as int,
+      colors[2] & 0xFFFFFF,
+      reason: 'centre of the third image after the audio stage gave up',
+    );
+
+    await file.delete();
+    await song.delete();
+    for (final path in paths) {
+      await File(path).delete();
+    }
+  });
+
+  test('a missing audio file yields a silent video, not a failure', () async {
+    final dir = await getTemporaryDirectory();
+    final paths = await writeFixtures(dir);
+    final missing = '${dir.path}/no_such_song.mp3';
+    final absent = File(missing);
+    if (absent.existsSync()) absent.deleteSync();
+    final out = '${dir.path}/missing_music.mp4';
+
+    final result = await channel.invokeMapMethod<String, dynamic>('render', {
+      'imagePaths': paths,
+      'audioPath': missing,
+      'perImageMs': 1000,
+      'width': 1080,
+      'height': 1920,
+      'outputPath': out,
+    });
+
+    expect(result!['audioSkipped'], isTrue);
+    final file = File(result['filePath'] as String);
+    expect(file.existsSync(), isTrue);
+
+    final probe = await channel.invokeMapMethod<String, dynamic>('probe', {
+      'path': file.path,
+    });
+    expect(probe!['hasAudio'], isFalse);
+    expect(probe['hasVideo'], isTrue);
+    expect(probe['durationMs'] as int, greaterThan(2500));
+
+    await file.delete();
+    for (final path in paths) {
+      await File(path).delete();
+    }
+  });
+}
+
+/// Builds a real MPEG-1 Layer III file: 44.1 kHz, stereo, 128 kbps — the shape
+/// TikWM serves.
+///
+/// Synthesised rather than committed as a binary because the alternative
+/// needs an MP3 encoder on the machine running the tests, and neither ffmpeg
+/// nor lame is a dependency of this repo.
+///
+/// The audio is silence, which the format expresses exactly: with the whole
+/// side-info block zeroed, `part2_3_length` is zero for both granules, so each
+/// frame carries no scalefactors and no Huffman data and the decoder emits
+/// zero samples. The bytes are still a genuine MP3 — the platform's own MP3
+/// decoder parses the headers, produces PCM and drives the AAC encoder, which
+/// is the path under test. What the samples contain is not: no assertion here
+/// reads the waveform back.
+Uint8List _silentMp3({required int seconds}) {
+  // MPEG-1 Layer III, no CRC, 128 kbps, 44100 Hz, stereo.
+  const header = <int>[0xFF, 0xFB, 0x90, 0x00];
+  // floor(144 * bitrate / sampleRate), with no padding byte.
+  const frameBytes = 417;
+  // One Layer III frame is 1152 samples.
+  final frames = (seconds * 44100 / 1152).ceil();
+  final bytes = Uint8List(frames * frameBytes);
+  for (var frame = 0; frame < frames; frame++) {
+    bytes.setRange(frame * frameBytes, frame * frameBytes + 4, header);
+    // Side info and main data stay zero.
+  }
+  return bytes;
+}
+
+/// Bytes that no audio decoder can make sense of.
+///
+/// Deliberately not random: a run that fails has to be reproducible. Also
+/// deliberately free of an 0xFF 0xE0 sync pattern, so the failure is the
+/// extractor finding no audio track at all rather than a decoder that limps
+/// along on one accidental frame.
+Uint8List _corruptAudioBytes() {
+  final bytes = Uint8List(8192);
+  for (var i = 0; i < bytes.length; i++) {
+    bytes[i] = (i * 37 + 11) % 251;
+  }
+  return bytes;
 }
 
 /// Asserts an RGB value survived the round trip through BT.601 and 4:2:0
