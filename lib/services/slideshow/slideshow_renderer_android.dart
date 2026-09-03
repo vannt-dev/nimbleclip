@@ -14,6 +14,30 @@ class MethodChannelSlideshowRenderer implements SlideshowRenderer {
     'com.vannt.nimbleclip/slideshow',
   );
 
+  /// Progress listeners by render id.
+  ///
+  /// Static because the channel is: Kotlin reports progress by calling back on
+  /// the same channel, and a handler can only be installed once per channel
+  /// per isolate. Keyed by id rather than held as a single field so a stale
+  /// event from a finished render cannot drive a later one's bar.
+  static final Map<String, void Function(double)> _listeners = {};
+  static bool _handlerInstalled = false;
+
+  static void _installHandler() {
+    if (_handlerInstalled) return;
+    _handlerInstalled = true;
+    _channel.setMethodCallHandler((call) async {
+      if (call.method != 'progress') return null;
+      final arguments = call.arguments;
+      if (arguments is! Map) return null;
+      final id = arguments['renderId'] as String?;
+      final progress = (arguments['progress'] as num?)?.toDouble();
+      if (id == null || progress == null) return null;
+      _listeners[id]?.call(progress.clamp(0.0, 1.0));
+      return null;
+    });
+  }
+
   /// Only Android has the encoder.
   ///
   /// The runtime check is load-bearing, not belt-and-braces. A conditional
@@ -33,12 +57,22 @@ class MethodChannelSlideshowRenderer implements SlideshowRenderer {
     required int width,
     required int height,
     required String outputPath,
+    String? renderId,
+    void Function(double progress)? onProgress,
   }) async {
     if (!isSupported) {
       throw const SlideshowException(SlideshowFailureKind.encoderUnavailable);
     }
     if (imagePaths.isEmpty) {
       throw const SlideshowException(SlideshowFailureKind.noImages);
+    }
+
+    // Kotlin needs an id whether or not the caller wanted one, so a cancel can
+    // always name a target.
+    final id = renderId ?? 'render_${DateTime.now().microsecondsSinceEpoch}';
+    if (onProgress != null) {
+      _installHandler();
+      _listeners[id] = onProgress;
     }
 
     final Map<String, dynamic>? result;
@@ -52,6 +86,7 @@ class MethodChannelSlideshowRenderer implements SlideshowRenderer {
         'width': width,
         'height': height,
         'outputPath': outputPath,
+        'renderId': id,
       });
     } on PlatformException catch (error) {
       throw SlideshowException(_kindFor(error.code), detail: error.message);
@@ -62,6 +97,9 @@ class MethodChannelSlideshowRenderer implements SlideshowRenderer {
         SlideshowFailureKind.encoderUnavailable,
         detail: error.message,
       );
+    } finally {
+      // Whatever happened, no later event may reach this caller's callback.
+      _listeners.remove(id);
     }
 
     final filePath = result?['filePath'] as String?;
@@ -77,11 +115,26 @@ class MethodChannelSlideshowRenderer implements SlideshowRenderer {
     );
   }
 
-  /// The channel raises exactly two codes today. Everything else — including a
-  /// code a future build adds — is an encode failure, which is what the caller
+  @override
+  Future<void> cancel(String renderId) async {
+    if (!isSupported) return;
+    _listeners.remove(renderId);
+    try {
+      await _channel.invokeMethod<void>('cancel', {'renderId': renderId});
+    } on PlatformException {
+      // The render finished on its own between the tap and this call. Its own
+      // result is the truth; there is nothing left to stop.
+    } on MissingPluginException {
+      // Same reasoning as in render: an older build without the channel.
+    }
+  }
+
+  /// The channel raises three codes today. Everything else — including a code
+  /// a future build adds — is an encode failure, which is what the caller
   /// would do with an unknown one anyway.
   SlideshowFailureKind _kindFor(String code) => switch (code) {
     'out_of_space' => SlideshowFailureKind.outOfSpace,
+    'cancelled' => SlideshowFailureKind.cancelled,
     _ => SlideshowFailureKind.encodeFailed,
   };
 }

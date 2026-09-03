@@ -33,6 +33,10 @@ abstract interface class SlideshowRenderer {
   /// [audioPath] is provided the renderer attempts to mux it in as the
   /// soundtrack.
   ///
+  /// [onProgress] is called with a fraction from 0 to 1 as the encode
+  /// advances. [renderId] names this render so [cancel] can address it; both
+  /// are optional so a caller that wants neither can leave them out.
+  ///
   /// Throws a [SlideshowException] on failure.
   Future<SlideshowResult> render({
     required List<String> imagePaths,
@@ -41,7 +45,17 @@ abstract interface class SlideshowRenderer {
     required int width,
     required int height,
     required String outputPath,
+    String? renderId,
+    void Function(double progress)? onProgress,
   });
+
+  /// Asks the render started under [renderId] to stop.
+  ///
+  /// The in-flight [render] future then completes with a
+  /// [SlideshowFailureKind.cancelled] exception. Cancelling an id that is not
+  /// running is a no-op, not an error: the render may have finished between
+  /// the user's tap and this call.
+  Future<void> cancel(String renderId);
 }
 
 /// Creates the renderer for the current platform.

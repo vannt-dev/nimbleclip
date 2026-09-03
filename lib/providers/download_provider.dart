@@ -63,6 +63,10 @@ class DownloadProvider extends ChangeNotifier {
   /// render is just a file, and a failed one is redone from the post.
   final Map<String, SlideshowSource> _slideshowSources = {};
 
+  /// Ids of renders currently running, so `cancelTask` knows which tasks the
+  /// download queue cannot speak for.
+  final Set<String> _slideshowRenders = {};
+
   late final ExtractorRegistry _extractorRegistry;
   final Uuid _uuid = const Uuid();
   late final Future<void> _historyReady;
@@ -402,6 +406,7 @@ class DownloadProvider extends ChangeNotifier {
   ) async {
     Directory? workspace;
     String? outputPath;
+    _slideshowRenders.add(task.id);
     try {
       final downloadDir = await _storageService.getDownloadDirectory();
       if (downloadDir == null) {
@@ -421,6 +426,14 @@ class DownloadProvider extends ChangeNotifier {
         width: source.width,
         height: source.height,
         outputPath: outputPath,
+        renderId: task.id,
+        onProgress: (fraction) {
+          // Only while it is still running: a cancel already moved the task on,
+          // and a late event would drag its bar back up.
+          if (task.status != DownloadStatus.downloading) return;
+          task.progress = fraction;
+          task.notifyProgressChanged();
+        },
       );
       task
         ..filePath = result.filePath
@@ -433,16 +446,24 @@ class DownloadProvider extends ChangeNotifier {
             ? l10n.slideshowMusicUnavailable
             : null;
     } catch (error) {
+      // A cancel is the user's own decision, already recorded on the task by
+      // cancelTask. Overwriting it with `failed` would report their choice back
+      // to them as an error.
+      final cancelled =
+          task.status == DownloadStatus.cancelled ||
+          (error is SlideshowException &&
+              error.kind == SlideshowFailureKind.cancelled);
       task
-        ..status = DownloadStatus.failed
+        ..status = cancelled ? DownloadStatus.cancelled : DownloadStatus.failed
         ..progress = 0
         ..filePath = null
-        ..errorMessage = _slideshowFailureText(error, l10n);
+        ..errorMessage = cancelled ? null : _slideshowFailureText(error, l10n);
       // A partial file would show up in the list as a playable download.
       if (outputPath != null) {
         await _fileActions.delete(outputPath).catchError((_) {});
       }
     } finally {
+      _slideshowRenders.remove(task.id);
       // Images and music are megabytes apiece; one leaked scratch directory per
       // render fills the cache up silently.
       if (workspace != null) {
@@ -527,6 +548,13 @@ class DownloadProvider extends ChangeNotifier {
 
   void cancelTask(String taskId) {
     _queue.removeWhere((queued) => queued.task.id == taskId);
+    // A render never entered the queue and the download gateway has never
+    // heard of it, so neither line below can stop one. Only the renderer can,
+    // and it has to be told before the status is set: the render's own catch
+    // reads that status to tell a cancel apart from a failure.
+    if (_slideshowRenders.contains(taskId)) {
+      unawaited(_slideshowRenderer.cancel(taskId));
+    }
     _downloadService.cancelDownload(taskId);
     final task = _findTask(taskId);
     if (task == null) return;

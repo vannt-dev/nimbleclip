@@ -17,6 +17,7 @@ import android.media.MediaMetadataRetriever
 import android.media.MediaMuxer
 import java.io.File
 import java.nio.ByteBuffer
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
 import kotlin.math.min
 
@@ -26,6 +27,16 @@ import kotlin.math.min
  */
 class SlideshowEncodeException(message: String, cause: Throwable? = null) :
     Exception(message, cause)
+
+/**
+ * Raised when [SlideshowEncoder.cancel] was called for a render still running.
+ *
+ * A distinct type rather than a flag on [SlideshowEncodeException] because the
+ * channel handler has to tell the two apart: a failure is reported to the user,
+ * a cancellation is the user's own instruction coming back.
+ */
+class SlideshowCancelledException(renderId: String) :
+    Exception("slideshow render cancelled: $renderId")
 
 /**
  * Renders a list of local image files into a single H.264/MP4 clip, with the
@@ -57,11 +68,20 @@ class SlideshowEncoder {
         val width: Int,
         val height: Int,
         val outputPath: String,
+        /** Names this render so [cancel] can address it. */
+        val renderId: String = "",
     )
 
     data class Result(val filePath: String, val audioSkipped: Boolean)
 
-    fun encode(request: Request): Result {
+    /**
+     * Encodes [request], reporting progress from 0 to 1 through [onProgress].
+     *
+     * The callback runs on the calling thread, once per image plus once at the
+     * end, which is coarse on purpose: a per-frame callback would cross the
+     * channel thirty times a second for a bar that cannot show that detail.
+     */
+    fun encode(request: Request, onProgress: (Double) -> Unit = {}): Result {
         if (request.imagePaths.isEmpty()) {
             throw SlideshowEncodeException("no images to render")
         }
@@ -84,6 +104,11 @@ class SlideshowEncoder {
         // Before the muxer exists, so nothing it has written can be at risk.
         val audio = transcodeAudioOrNull(request.audioPath, videoDurationUs)
 
+        // The audio stage is the longest thing that happens before a frame is
+        // drawn, so the first report belongs after it rather than at zero.
+        throwIfCancelled(request.renderId)
+        onProgress(0.0)
+
         var codec: MediaCodec? = null
         var muxer: MediaMuxer? = null
         var succeeded = false
@@ -100,19 +125,31 @@ class SlideshowEncoder {
 
             val sink = MuxerSink(codec, muxer, audio)
             var frameIndex = 0L
-            for (path in request.imagePaths) {
+            for ((imageIndex, path) in request.imagePaths.withIndex()) {
+                // Between images rather than between frames: an image is the
+                // smallest unit that can be abandoned without leaving the codec
+                // mid-buffer, and it bounds the wait after a tap to one image.
+                throwIfCancelled(request.renderId)
                 val frame = composeFrame(path, width, height)
                 repeat(framesPerImage) {
                     submitFrame(codec, frame, frameIndex, sink)
                     frameIndex++
                 }
+                // Stops short of 1.0: the muxer has still to write the moov box,
+                // and a bar sitting full through that reads as a hang.
+                onProgress(
+                    (imageIndex + 1).toDouble() / request.imagePaths.size * 0.95,
+                )
             }
             if (frameIndex == 0L) {
                 throw SlideshowEncodeException("no frames were produced")
             }
+            throwIfCancelled(request.renderId)
             signalEndOfStream(codec, frameIndex, sink)
             sink.drain(endOfStream = true)
             succeeded = true
+        } catch (error: SlideshowCancelledException) {
+            throw error
         } catch (error: SlideshowEncodeException) {
             throw error
         } catch (error: Exception) {
@@ -125,12 +162,20 @@ class SlideshowEncoder {
             runCatching { muxer?.stop() }
             runCatching { muxer?.release() }
             if (!succeeded) runCatching { output.delete() }
+            // Whether it finished, failed or was cancelled, this id is done.
+            // Leaving it set would cancel the next render that reused it.
+            clearCancellation(request.renderId)
         }
 
         if (!output.exists() || output.length() == 0L) {
             throw SlideshowEncodeException("the encoder produced no output file")
         }
+        onProgress(1.0)
         return Result(filePath = output.absolutePath, audioSkipped = audio == null)
+    }
+
+    private fun throwIfCancelled(renderId: String) {
+        if (isCancelled(renderId)) throw SlideshowCancelledException(renderId)
     }
 
     /**
@@ -983,7 +1028,34 @@ class SlideshowEncoder {
         }
     }
 
-    private companion object {
+    companion object {
+        /**
+         * Ids asked to stop, held statically because a cancel arrives on a
+         * different channel call — and therefore a different [SlideshowEncoder]
+         * instance — from the render it is stopping.
+         *
+         * Concurrent because the two touch it from different threads: the
+         * render runs on its own worker, the cancel on the platform thread.
+         */
+        private val cancelledRenders: MutableSet<String> =
+            ConcurrentHashMap.newKeySet()
+
+        /**
+         * Marks [renderId] for cancellation. Harmless for an id that is not
+         * running: every encode clears its own id when it finishes, so no stale
+         * entry survives to cancel a later render that reused the id.
+         */
+        fun cancel(renderId: String) {
+            if (renderId.isNotEmpty()) cancelledRenders.add(renderId)
+        }
+
+        private fun isCancelled(renderId: String): Boolean =
+            renderId.isNotEmpty() && cancelledRenders.contains(renderId)
+
+        private fun clearCancellation(renderId: String) {
+            if (renderId.isNotEmpty()) cancelledRenders.remove(renderId)
+        }
+
         const val MIME_TYPE = "video/avc"
         const val FRAME_RATE = 30
         const val BLUR_DIVISOR = 16
