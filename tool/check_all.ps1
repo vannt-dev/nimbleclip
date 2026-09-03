@@ -92,6 +92,7 @@ try {
     Write-Host '3/7 Checking Node.js syntax...' -ForegroundColor Cyan
     Invoke-CheckedCommand 'node' @('--check', 'server.js')
     Invoke-CheckedCommand 'node' @('--check', 'tool/fixture_server.js')
+    Invoke-CheckedCommand 'node' @('--check', 'tool/summarize_live_extractors.js')
 
     Write-Host '4/7 Running Flutter tests...' -ForegroundColor Cyan
     Invoke-CheckedCommand 'flutter' @('test')
@@ -112,7 +113,11 @@ try {
     }
 
     Write-Host '5/7 Running Node.js tests...' -ForegroundColor Cyan
-    Invoke-CheckedCommand 'node' @('--test', 'test/server_test.js')
+    Invoke-CheckedCommand 'node' @(
+        '--test',
+        'test/server_test.js',
+        'test/live_extractor_summary_test.js'
+    )
 
     if ($SkipWebBuild) {
         Write-Host '6/7 Skipping the release Web build.' -ForegroundColor DarkGray

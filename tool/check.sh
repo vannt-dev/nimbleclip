@@ -27,6 +27,7 @@ if [ "$mode" = "commit" ] || [ "$mode" = "all" ]; then
   echo "Checking Node.js syntax..."
   node --check server.js
   node --check tool/fixture_server.js
+  node --check tool/summarize_live_extractors.js
 fi
 
 if [ "$mode" = "push" ] || [ "$mode" = "all" ]; then
@@ -34,7 +35,7 @@ if [ "$mode" = "push" ] || [ "$mode" = "all" ]; then
   flutter test
 
   echo "Running Node.js tests..."
-  node --test test/server_test.js
+  node --test test/server_test.js test/live_extractor_summary_test.js
 
   echo "Building the release Web bundle..."
   flutter build web --release --no-wasm-dry-run

@@ -112,7 +112,8 @@ jobs:
           flutter test
           node --check server.js
           node --check tool/fixture_server.js
-          node --test test/server_test.js
+          node --check tool/summarize_live_extractors.js
+          node --test test/server_test.js test/live_extractor_summary_test.js
 
       - name: Build Android and Web releases
         env:

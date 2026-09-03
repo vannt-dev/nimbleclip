@@ -185,7 +185,8 @@ The equivalent individual commands are:
 flutter analyze
 flutter test
 node --check server.js
-node --test test/server_test.js
+node --check tool/summarize_live_extractors.js
+node --test test/server_test.js test/live_extractor_summary_test.js
 ```
 
 ### Run the app

@@ -24,14 +24,38 @@ jobs:
           flutter-version: '3.47.0'
           channel: stable
           cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
       - run: flutter pub get
       - name: Check public extractor fixtures
         id: smoke
         continue-on-error: true
-        run: flutter test test/live_extractor_smoke_test.dart --dart-define=RUN_LIVE_EXTRACTOR_TESTS=true
+        run: |
+          flutter test test/live_extractor_smoke_test.dart \
+            --dart-define=RUN_LIVE_EXTRACTOR_TESTS=true \
+            --file-reporter json:live-extractors.json
+      # Which check failed, and with what, is the whole signal: a
+      # `tiktokServiceStatus` means the upstream service answered non-200, while
+      # a `tiktokInvalidData` carries that service's own message and so means it
+      # answered and refused. Reporting only "checks failed" made six
+      # consecutive days look identical.
+      - name: Summarise the run
+        id: summary
+        if: always()
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          test -f live-extractors.json || : > live-extractors.json
+          node tool/summarize_live_extractors.js \
+            live-extractors.json "$RUN_URL" --github-output
       - name: Open or update health issue
         if: steps.smoke.outcome == 'failure'
         uses: actions/github-script@v8
+        # Through the environment, never interpolated into the script: the
+        # failure text can carry a third party's own wording.
+        env:
+          SUMMARY: ${{ steps.summary.outputs.markdown }}
         with:
           script: |
             const title = 'Live extractor health check is failing';
@@ -41,7 +65,7 @@ jobs:
               state: 'open',
               labels: 'extractor-health'
             });
-            const body = `Scheduled public extractor checks failed.\n\nRun: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = process.env.SUMMARY;
             if (data.length) {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
@@ -67,6 +91,38 @@ jobs:
                 title,
                 body,
                 labels: ['extractor-health']
+              });
+            }
+      # Closing on green is what makes the open issue mean something: how long
+      # it has been open is how long the outage has lasted, with no counter to
+      # keep. `checked` guards it — a suite that skipped every case also reports
+      # success, and a run that verified nothing must not close anything.
+      - name: Close the health issue once the checks pass
+        if: steps.smoke.outcome == 'success' && steps.summary.outputs.checked == 'true'
+        uses: actions/github-script@v8
+        env:
+          SUMMARY: ${{ steps.summary.outputs.markdown }}
+        with:
+          script: |
+            const {data} = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'extractor-health'
+            });
+            for (const issue of data) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: process.env.SUMMARY
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'completed'
               });
             }
       - name: Fail workflow when smoke tests fail

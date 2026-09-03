@@ -74,8 +74,9 @@ jobs:
           node-version: 22
       - run: node --check server.js
       - run: node --check tool/fixture_server.js
+      - run: node --check tool/summarize_live_extractors.js
       - run: sh -n tool/check.sh tool/run_android_integration_ci.sh
-      - run: node --test test/server_test.js
+      - run: node --test test/server_test.js test/live_extractor_summary_test.js
 
   android:
     name: Android integration tests
