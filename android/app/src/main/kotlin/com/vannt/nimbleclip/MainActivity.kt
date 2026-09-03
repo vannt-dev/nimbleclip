@@ -124,11 +124,19 @@ class MainActivity : FlutterActivity() {
                 result.error("media_query_failed", error.message, null)
             }
         }
-        MethodChannel(
+        val slideshowChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "com.vannt.nimbleclip/slideshow",
-        ).setMethodCallHandler { call, result ->
+        )
+        slideshowChannel.setMethodCallHandler { call, result ->
             when (call.method) {
+                // Answered on the platform thread: it only sets a flag, and a
+                // cancel that queued behind the render it is cancelling would
+                // never arrive in time to stop anything.
+                "cancel" -> {
+                    SlideshowEncoder.cancel(call.argument<String>("renderId").orEmpty())
+                    result.success(null)
+                }
                 "render", "probe", "frameColorAt" -> {
                     // A slideshow encode runs for seconds; on the platform
                     // thread that freezes the UI and trips the ANR watchdog.
@@ -144,6 +152,7 @@ class MainActivity : FlutterActivity() {
                                     call.argument<Int>("atMs") ?: 0,
                                 )
                                 else -> {
+                                    val renderId = call.argument<String>("renderId").orEmpty()
                                     val encoded = encoder.encode(
                                         SlideshowEncoder.Request(
                                             imagePaths = call.argument<List<String>>("imagePaths").orEmpty(),
@@ -152,8 +161,22 @@ class MainActivity : FlutterActivity() {
                                             width = call.argument<Int>("width") ?: 1080,
                                             height = call.argument<Int>("height") ?: 1920,
                                             outputPath = call.argument<String>("outputPath")!!,
+                                            renderId = renderId,
                                         ),
-                                    )
+                                    ) { progress ->
+                                        // Dart may only be addressed from the
+                                        // main thread; this callback arrives on
+                                        // the encode worker.
+                                        runOnUiThread {
+                                            slideshowChannel.invokeMethod(
+                                                "progress",
+                                                mapOf(
+                                                    "renderId" to renderId,
+                                                    "progress" to progress,
+                                                ),
+                                            )
+                                        }
+                                    }
                                     mapOf(
                                         "filePath" to encoded.filePath,
                                         "audioSkipped" to encoded.audioSkipped,
@@ -167,7 +190,11 @@ class MainActivity : FlutterActivity() {
                             // it escaped here it would kill this worker thread
                             // with the Result never completed, crashing the app
                             // and leaving the Dart future pending forever.
-                            val code = if (isOutOfSpace(error)) "out_of_space" else "encode_failed"
+                            val code = when {
+                                error is SlideshowCancelledException -> "cancelled"
+                                isOutOfSpace(error) -> "out_of_space"
+                                else -> "encode_failed"
+                            }
                             val message = error.message ?: error.toString()
                             runOnUiThread { result.error(code, message, null) }
                         }

@@ -20,9 +20,15 @@ class UnsupportedSlideshowRenderer implements SlideshowRenderer {
     required int width,
     required int height,
     required String outputPath,
+    String? renderId,
+    void Function(double progress)? onProgress,
   }) async {
     throw const SlideshowException(SlideshowFailureKind.encoderUnavailable);
   }
+
+  /// Nothing can be running, so there is nothing to stop.
+  @override
+  Future<void> cancel(String renderId) async {}
 }
 
 SlideshowRenderer createSlideshowRenderer() =>

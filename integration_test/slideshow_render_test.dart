@@ -294,6 +294,107 @@ void main() {
     }
   });
 
+  test('a render reports progress that only ever advances', () async {
+    final dir = await getTemporaryDirectory();
+    final paths = await writeFixtures(dir);
+    final out = '${dir.path}/progress.mp4';
+    final reported = <double>[];
+
+    channel.setMethodCallHandler((call) async {
+      if (call.method != 'progress') return null;
+      final arguments = (call.arguments as Map).cast<String, dynamic>();
+      expect(arguments['renderId'], 'progress-render');
+      reported.add((arguments['progress'] as num).toDouble());
+      return null;
+    });
+    addTearDown(() => channel.setMethodCallHandler(null));
+
+    final result = await channel.invokeMapMethod<String, dynamic>('render', {
+      'imagePaths': paths,
+      'audioPath': null,
+      'perImageMs': 1000,
+      'width': 1080,
+      'height': 1920,
+      'outputPath': out,
+      'renderId': 'progress-render',
+    });
+
+    expect(File(result!['filePath'] as String).existsSync(), isTrue);
+    // One per image at least, so a three-image post is not a single jump.
+    // The leading report is 0.0 on purpose — it marks the moment the audio
+    // transcode ends and the encode begins — so what proves the bar actually
+    // moves is a value strictly between the ends, not the first one.
+    expect(reported.length, greaterThanOrEqualTo(3));
+    expect(reported.any((p) => p > 0 && p < 1), isTrue);
+    expect(reported.last, closeTo(1.0, 0.001));
+    // A bar that goes backwards reads as a stall and then a restart.
+    for (var i = 1; i < reported.length; i++) {
+      expect(
+        reported[i],
+        greaterThanOrEqualTo(reported[i - 1]),
+        reason: 'progress went backwards at index $i: $reported',
+      );
+    }
+
+    await File(result['filePath'] as String).delete();
+    for (final path in paths) {
+      await File(path).delete();
+    }
+  });
+
+  test('a cancelled render fails with cancelled and writes no file', () async {
+    final dir = await getTemporaryDirectory();
+    // Enough frames that the cancel lands mid-encode rather than after it.
+    final paths = <String>[];
+    for (var i = 0; i < 3; i++) {
+      paths.addAll(await writeFixtures(dir));
+    }
+    final out = '${dir.path}/cancelled.mp4';
+    final previous = File(out);
+    if (previous.existsSync()) previous.deleteSync();
+
+    channel.setMethodCallHandler((call) async {
+      if (call.method != 'progress') return null;
+      final arguments = (call.arguments as Map).cast<String, dynamic>();
+      // Cancel as soon as the encode is genuinely under way.
+      if ((arguments['progress'] as num) > 0) {
+        await channel.invokeMethod<void>('cancel', {
+          'renderId': 'cancel-render',
+        });
+      }
+      return null;
+    });
+    addTearDown(() => channel.setMethodCallHandler(null));
+
+    await expectLater(
+      channel.invokeMapMethod<String, dynamic>('render', {
+        'imagePaths': paths,
+        'audioPath': null,
+        'perImageMs': 1000,
+        'width': 1080,
+        'height': 1920,
+        'outputPath': out,
+        'renderId': 'cancel-render',
+      }),
+      throwsA(
+        isA<PlatformException>().having((e) => e.code, 'code', 'cancelled'),
+      ),
+    );
+    // A half-encoded MP4 has no moov box and plays nowhere; it must not be
+    // left on disk looking like a download.
+    expect(File(out).existsSync(), isFalse);
+
+    for (final path in paths.toSet()) {
+      final file = File(path);
+      if (file.existsSync()) await file.delete();
+    }
+  });
+
+  test('cancelling an unknown render is not an error', () async {
+    // The user's tap can land after the encode has already finished.
+    await channel.invokeMethod<void>('cancel', {'renderId': 'never-started'});
+  });
+
   test('a missing audio file yields a silent video, not a failure', () async {
     final dir = await getTemporaryDirectory();
     final paths = await writeFixtures(dir);

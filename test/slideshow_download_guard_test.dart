@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -21,7 +22,12 @@ import 'support/inert_download_service.dart';
 /// Stands in for the platform encoder, so the download flow can be exercised
 /// without an emulator.
 class _FakeRenderer implements SlideshowRenderer {
-  _FakeRenderer({this.audioSkipped = false, this.failWith});
+  _FakeRenderer({
+    this.audioSkipped = false,
+    this.failWith,
+    this.reportProgress = const [],
+    this.blockUntilCancelled = false,
+  });
 
   @override
   bool get isSupported => true;
@@ -29,10 +35,25 @@ class _FakeRenderer implements SlideshowRenderer {
   final bool audioSkipped;
   final SlideshowFailureKind? failWith;
 
+  /// Progress fractions to hand back before finishing.
+  final List<double> reportProgress;
+
+  /// Waits for a cancel instead of returning, so the cancel path can be driven
+  /// deterministically rather than raced against a fast fake.
+  final bool blockUntilCancelled;
+
   int calls = 0;
+  final List<String> cancelledIds = [];
   List<String>? lastImagePaths;
   String? lastAudioPath;
   Duration? lastPerImage;
+  final Map<String, Completer<void>> _cancelled = {};
+
+  @override
+  Future<void> cancel(String renderId) async {
+    cancelledIds.add(renderId);
+    _cancelled[renderId]?.complete();
+  }
 
   @override
   Future<SlideshowResult> render({
@@ -42,6 +63,8 @@ class _FakeRenderer implements SlideshowRenderer {
     required int width,
     required int height,
     required String outputPath,
+    String? renderId,
+    void Function(double progress)? onProgress,
   }) async {
     calls++;
     lastImagePaths = imagePaths;
@@ -49,6 +72,15 @@ class _FakeRenderer implements SlideshowRenderer {
     lastPerImage = perImage;
     final failure = failWith;
     if (failure != null) throw SlideshowException(failure);
+    for (final fraction in reportProgress) {
+      onProgress?.call(fraction);
+      await Future<void>.delayed(Duration.zero);
+    }
+    if (blockUntilCancelled) {
+      final gate = _cancelled[renderId ?? ''] = Completer<void>();
+      await gate.future;
+      throw const SlideshowException(SlideshowFailureKind.cancelled);
+    }
     await File(outputPath).writeAsBytes(const [0, 1, 2, 3]);
     return SlideshowResult(filePath: outputPath, audioSkipped: audioSkipped);
   }
@@ -386,6 +418,60 @@ void main() {
       expect(downloader.allTasks.single.filePath, isNotNull);
     },
   );
+
+  test('a render reports its progress onto the task', () async {
+    // Without this the row sits at zero for the whole encode and then jumps to
+    // done, which on a long post is indistinguishable from a hang.
+    final renderer = _FakeRenderer(reportProgress: const [0.25, 0.5, 1.0]);
+    final downloader = provider(renderer);
+    final seen = <double>[];
+
+    await downloader.startNewDownloads(
+      metadata: _photoPostMetadata(),
+      qualities: const [_slideshowOption],
+      l10n: l10n,
+    );
+    await _waitUntil(() => downloader.allTasks.isNotEmpty);
+    downloader.allTasks.single.addListener(() {
+      seen.add(downloader.allTasks.single.progress);
+    });
+    await _waitUntil(
+      () =>
+          downloader.allTasks.any((t) => t.status == DownloadStatus.completed),
+    );
+
+    // Not every reported fraction: DownloadTask throttles progress
+    // notifications to one per 100ms on purpose, so asserting on the whole
+    // stream would be asserting against that throttle. What matters is that
+    // the bar moves somewhere between empty and done before the row flips.
+    expect(seen.any((progress) => progress > 0 && progress < 1), isTrue);
+    expect(downloader.allTasks.single.progress, 1.0);
+  });
+
+  test('cancelling a render stops it and leaves the task cancelled', () async {
+    // The encode runs outside the download queue, so the existing cancel path
+    // does not reach it: without a branch the render finishes anyway and
+    // overwrites `cancelled` with `completed`.
+    final renderer = _FakeRenderer(blockUntilCancelled: true);
+    final downloader = provider(renderer);
+
+    await downloader.startNewDownloads(
+      metadata: _photoPostMetadata(),
+      qualities: const [_slideshowOption],
+      l10n: l10n,
+    );
+    await _waitUntil(() => renderer.calls > 0);
+
+    final task = downloader.allTasks.single;
+    downloader.cancelTask(task.id);
+    await _settle();
+
+    expect(renderer.cancelledIds, contains(task.id));
+    expect(task.status, DownloadStatus.cancelled);
+    // A cancelled render must not leave a playable-looking half file behind.
+    expect(task.filePath, isNull);
+    expect(downloads.listSync(), isEmpty);
+  });
 }
 
 final _tiktokPhotoPost = File(
