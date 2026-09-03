@@ -345,4 +345,49 @@ void main() {
     expect(renderer.calls, greaterThan(1));
     expect(downloader.allTasks.any((t) => t.downloadUrl.isEmpty), isFalse);
   });
+
+  test(
+    'a slideshow retried after a restart renders rather than fetching',
+    () async {
+      // A failed task is persisted like any other and comes back on the next
+      // launch, but the source it was rendered from does not: that map lives in
+      // memory. Re-extraction is what has to close the gap, or the retry falls
+      // through to the URL path and queues an empty download.
+      ExtractorHttp.postOverride = (_, _, _) async =>
+          http.Response(_tiktokPhotoPost, 200);
+
+      storage.history = [
+        DownloadTask(
+          id: 'restored-slideshow',
+          videoId: 'tt-images-fixture',
+          title: 'Photo post',
+          author: 'Author',
+          thumbnailUrl: '',
+          downloadUrl: 'https://www.tiktok.com/@u/photo/1',
+          originalUrl: 'https://www.tiktok.com/@u/photo/1',
+          platform: VideoPlatform.tiktok,
+          sourceOptionId: 'tt_slideshow_tt-images-fixture',
+          qualityLabel: 'Slideshow video (2 images)',
+          format: 'mp4',
+          status: DownloadStatus.failed,
+          errorMessage: 'previously failed',
+        ).toJson(),
+      ];
+
+      final renderer = _FakeRenderer();
+      final downloader = provider(renderer);
+      await _waitUntil(() => downloader.allTasks.isNotEmpty);
+
+      await downloader.retryTask(downloader.allTasks.single, l10n: l10n);
+      await _settle();
+
+      expect(renderer.calls, 1);
+      expect(downloader.allTasks.single.status, DownloadStatus.completed);
+      expect(downloader.allTasks.single.filePath, isNotNull);
+    },
+  );
 }
+
+final _tiktokPhotoPost = File(
+  'test/fixtures/extractors/tiktok_images.json',
+).readAsStringSync();

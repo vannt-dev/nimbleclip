@@ -371,6 +371,24 @@ class DownloadProvider extends ChangeNotifier {
     }
   }
 
+  /// Clears the previous attempt off [task] and renders it again.
+  Future<void> _retrySlideshow(
+    DownloadTask task,
+    SlideshowSource source,
+    AppLocalizations l10n,
+  ) async {
+    if (task.filePath != null) {
+      await _fileActions.delete(task.filePath!);
+    }
+    task
+      ..status = DownloadStatus.downloading
+      ..progress = 0.0
+      ..errorMessage = null
+      ..filePath = null;
+    notifyListeners();
+    await _renderSlideshow(task, source, l10n);
+  }
+
   /// Fetches [source]'s assets, renders them into the download directory and
   /// records the result on [task].
   ///
@@ -554,21 +572,17 @@ class DownloadProvider extends ChangeNotifier {
     DownloadOptions options = const DownloadOptions(),
     required AppLocalizations l10n,
   }) async {
-    // A rendered task has no URL to re-fetch. Re-extracting it would hand back
-    // the slideshow option, whose downloadUrl is empty by construction, and the
+    // A rendered task has no URL to re-fetch. Re-extracting it hands back the
+    // slideshow option, whose downloadUrl is empty by construction, and the
     // queue below would then try to download nothing at all.
-    final slideshow = _slideshowSources[task.id];
-    if (slideshow != null) {
-      if (task.filePath != null) {
-        await _fileActions.delete(task.filePath!);
-      }
-      task
-        ..status = DownloadStatus.downloading
-        ..progress = 0.0
-        ..errorMessage = null
-        ..filePath = null;
-      notifyListeners();
-      await _renderSlideshow(task, slideshow, l10n);
+    //
+    // The remembered source is only a shortcut past that round trip. It cannot
+    // be the whole answer: the map lives in memory, while a failed task is
+    // persisted and comes back on the next launch, so a retry after a restart
+    // has to fall through to re-extraction — see `_retrySlideshow`.
+    final remembered = _slideshowSources[task.id];
+    if (remembered != null) {
+      await _retrySlideshow(task, remembered, l10n);
       return;
     }
 
@@ -584,6 +598,17 @@ class DownloadProvider extends ChangeNotifier {
     }
 
     final refreshedUrl = await _refreshDownloadUrl(task, l10n);
+
+    // Re-extraction is what makes a retry survive a restart: the option comes
+    // back with a live source, even though nothing about the stored task could
+    // have said how to render it.
+    final refreshedSlideshow = refreshedUrl?.slideshow;
+    if (refreshedSlideshow != null) {
+      _slideshowSources[task.id] = refreshedSlideshow;
+      await _retrySlideshow(task, refreshedSlideshow, l10n);
+      return;
+    }
+
     if (refreshedUrl != null) {
       final index = _tasks.indexWhere((t) => t.id == task.id);
       final refreshed = task.withRefreshedSource(
