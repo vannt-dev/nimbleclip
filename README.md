@@ -179,6 +179,11 @@ Pass current public Instagram examples when validating Instagram as well:
 The same live suite can be included in the all-in-one workflow with
 `-RunLiveExtractors` and the corresponding Instagram URL parameters.
 
+The scheduled `Live extractor health` workflow reports third-party failures in
+an `extractor-health` issue while keeping the workflow green when reporting
+succeeds. Once a run checks at least one extractor and they all pass, the
+workflow comments on and closes the open health issue.
+
 The equivalent individual commands are:
 
 ```bash

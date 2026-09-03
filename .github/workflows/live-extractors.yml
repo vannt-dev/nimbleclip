@@ -30,6 +30,9 @@ jobs:
       - run: flutter pub get
       - name: Check public extractor fixtures
         id: smoke
+        # The issue is the health signal. A third-party outage must not make
+        # the monitoring workflow itself look broken when it reported that
+        # outage successfully.
         continue-on-error: true
         run: |
           flutter test test/live_extractor_smoke_test.dart \
@@ -125,6 +128,3 @@ jobs:
                 state_reason: 'completed'
               });
             }
-      - name: Fail workflow when smoke tests fail
-        if: steps.smoke.outcome == 'failure'
-        run: exit 1
