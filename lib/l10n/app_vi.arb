@@ -179,4 +179,7 @@
   ,"galleryCheckUnavailable": "Chỉ đọc được ảnh bìa, và dịch vụ liệt kê các ảnh còn lại không phản hồi. Bài này có thể còn ảnh khác."
   ,"copyLink": "Sao chép liên kết"
   ,"linkCopied": "Đã sao chép liên kết"
+  ,"slideshowMusicUnavailable": "Không thêm được nhạc, nên video từ ảnh này không có tiếng."
+  ,"slideshowRenderFailed": "Không dựng được video từ ảnh trên thiết bị này."
+  ,"slideshowOutOfSpace": "Không đủ dung lượng trống để dựng video từ ảnh này."
 }

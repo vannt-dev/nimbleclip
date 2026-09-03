@@ -2,9 +2,10 @@ import 'slideshow_renderer.dart';
 
 /// Fallback renderer for platforms with no encoder implementation.
 ///
-/// Currently used on every platform; Task 10 adds an Android implementation
-/// and swaps the conditional export in `slideshow_renderer.dart` to select
-/// it, without needing to change this file.
+/// Selected on Web, which is the only place the conditional import in
+/// `slideshow_renderer.dart` can exclude: `dart.library.io` is true on iOS and
+/// desktop too, so those get `slideshow_renderer_android.dart` and are turned
+/// away by its runtime `Platform.isAndroid` check rather than by this file.
 class UnsupportedSlideshowRenderer implements SlideshowRenderer {
   const UnsupportedSlideshowRenderer();
 

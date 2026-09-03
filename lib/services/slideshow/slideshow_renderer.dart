@@ -1,5 +1,9 @@
+// `dart.library.io` is the only usable discriminator here, and it covers iOS
+// and desktop as well as Android. Selecting the native file for all of them is
+// deliberate: the runtime `Platform.isAndroid` gate inside it is what actually
+// narrows support, and it is the only thing that can.
 import 'slideshow_renderer_stub.dart'
-    if (dart.library.html) 'slideshow_renderer_stub.dart'
+    if (dart.library.io) 'slideshow_renderer_android.dart'
     as impl;
 
 export 'slideshow_failure.dart';

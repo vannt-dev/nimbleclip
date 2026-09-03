@@ -219,4 +219,7 @@
   ,"galleryCheckUnavailable": "Only the cover photo could be read, and the service that lists the rest did not answer. This post may hold more."
   ,"copyLink": "Copy link"
   ,"linkCopied": "Link copied"
+  ,"slideshowMusicUnavailable": "The music could not be added, so this slideshow is silent."
+  ,"slideshowRenderFailed": "This slideshow could not be rendered on this device."
+  ,"slideshowOutOfSpace": "There is not enough free space to render this slideshow."
 }

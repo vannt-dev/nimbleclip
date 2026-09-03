@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/utils/file_action_result.dart';
@@ -9,8 +11,11 @@ import '../l10n/quality_descriptor_text.dart';
 import '../core/utils/quality_helper.dart';
 import '../models/download_task.dart';
 import '../models/download_options.dart';
+import '../models/slideshow_source.dart';
 import '../models/video_metadata.dart';
 import '../services/download_service.dart';
+import '../services/slideshow/slideshow_asset_fetcher.dart';
+import '../services/slideshow/slideshow_renderer.dart';
 import '../services/background_download_service.dart';
 import '../services/download_history_repository.dart';
 import '../services/async_work_queue.dart';
@@ -25,11 +30,15 @@ class DownloadProvider extends ChangeNotifier {
     DownloadHistoryRepository? historyRepository,
     MediaFileActions? fileActions,
     ExtractorRegistry? extractorRegistry,
+    SlideshowRenderer? slideshowRenderer,
+    Future<Directory> Function()? slideshowWorkspace,
   }) : _downloadService = downloadService ?? createDefaultDownloadService(),
        _storageService = storageService ?? StorageService(),
        _historyRepository =
            historyRepository ?? SharedPreferencesDownloadHistoryRepository(),
-       _fileActions = fileActions ?? const PlatformMediaFileActions() {
+       _fileActions = fileActions ?? const PlatformMediaFileActions(),
+       _slideshowRenderer = slideshowRenderer ?? createSlideshowRenderer(),
+       _slideshowWorkspace = slideshowWorkspace ?? _defaultSlideshowWorkspace {
     _extractorRegistry = extractorRegistry ?? ExtractorRegistry();
     _queue = AsyncWorkQueue<_QueuedDownload>(
       worker: _executeQueued,
@@ -46,6 +55,14 @@ class DownloadProvider extends ChangeNotifier {
   final StorageService _storageService;
   final DownloadHistoryRepository _historyRepository;
   final MediaFileActions _fileActions;
+  final SlideshowRenderer _slideshowRenderer;
+  final Future<Directory> Function() _slideshowWorkspace;
+
+  /// The source a rendered task was built from, so a retry can render it again
+  /// rather than re-extracting it. In memory only: after a restart a finished
+  /// render is just a file, and a failed one is redone from the post.
+  final Map<String, SlideshowSource> _slideshowSources = {};
+
   late final ExtractorRegistry _extractorRegistry;
   final Uuid _uuid = const Uuid();
   late final Future<void> _historyReady;
@@ -262,6 +279,15 @@ class DownloadProvider extends ChangeNotifier {
     // starts immediately after launch.
     await _historyReady;
 
+    // A slideshow has no URL to fetch: it is rendered first, and the finished
+    // file enters history as a file that already exists. Splitting it off here
+    // keeps the URL path below untouched.
+    final renderable = qualities.where((q) => q.needsRendering).toList();
+    if (renderable.isNotEmpty) {
+      unawaited(_renderSlideshows(renderable, metadata, l10n));
+      qualities = qualities.where((q) => !q.needsRendering).toList();
+    }
+
     if (qualities.isEmpty) return [];
     final pendingQualities = qualities.where(
       (quality) => !_tasks.any(
@@ -305,6 +331,135 @@ class DownloadProvider extends ChangeNotifier {
       _queue.add(_QueuedDownload(task: task, l10n: l10n, options: options));
     }
     return tasks;
+  }
+
+  /// Renders each slideshow option in turn.
+  ///
+  /// Sequentially, not concurrently: a render holds a hardware encoder and the
+  /// decoded frames of a 1080x1920 canvas, and two at once is how a mid-range
+  /// device runs out of memory.
+  Future<void> _renderSlideshows(
+    List<VideoQualityOption> renderable,
+    VideoMetadata metadata,
+    AppLocalizations l10n,
+  ) async {
+    for (final quality in renderable) {
+      final source = quality.slideshow;
+      if (source == null) continue;
+      final task = DownloadTask(
+        id: _uuid.v4(),
+        videoId: metadata.id,
+        title: metadata.title,
+        author: metadata.author,
+        thumbnailUrl: metadata.coverUrl,
+        // The post is the closest thing a rendered file has to a source URL.
+        // An empty one here is exactly the shape that would 404 if anything
+        // ever fetched it, so the provenance goes in instead.
+        downloadUrl: metadata.originalUrl,
+        originalUrl: metadata.originalUrl,
+        platform: metadata.platform,
+        sourceOptionId: quality.id,
+        qualityLabel: describeQuality(quality.label, l10n),
+        format: quality.format,
+        kind: quality.kind,
+        status: DownloadStatus.downloading,
+      );
+      _slideshowSources[task.id] = source;
+      _tasks.insert(0, task);
+      notifyListeners();
+      await _renderSlideshow(task, source, l10n);
+    }
+  }
+
+  /// Fetches [source]'s assets, renders them into the download directory and
+  /// records the result on [task].
+  ///
+  /// Nothing here throws: a render is started without anyone awaiting it, so an
+  /// escaping error would surface as an unhandled asynchronous exception with
+  /// the task left stuck at `downloading` forever.
+  Future<void> _renderSlideshow(
+    DownloadTask task,
+    SlideshowSource source,
+    AppLocalizations l10n,
+  ) async {
+    Directory? workspace;
+    String? outputPath;
+    try {
+      final downloadDir = await _storageService.getDownloadDirectory();
+      if (downloadDir == null) {
+        throw const SlideshowException(SlideshowFailureKind.encoderUnavailable);
+      }
+      workspace = await _slideshowWorkspace();
+      final assets = await fetchSlideshowAssets(source, into: workspace);
+      // Rendered straight into its final home rather than moved there
+      // afterwards: the temp and download directories can sit on different
+      // filesystems, where a rename fails and a copy doubles the disk cost of
+      // a file the encoder is already writing whole.
+      outputPath = '$downloadDir/${_slideshowFileName(task)}';
+      final result = await _slideshowRenderer.render(
+        imagePaths: assets.imagePaths,
+        audioPath: assets.audioPath,
+        perImage: source.perImage,
+        width: source.width,
+        height: source.height,
+        outputPath: outputPath,
+      );
+      task
+        ..filePath = result.filePath
+        ..status = DownloadStatus.completed
+        ..progress = 1
+        ..completedAt = DateTime.now()
+        // Music that could not be transcoded is a note on a finished download,
+        // not a failure: the video is there and it plays.
+        ..errorMessage = result.audioSkipped
+            ? l10n.slideshowMusicUnavailable
+            : null;
+    } catch (error) {
+      task
+        ..status = DownloadStatus.failed
+        ..progress = 0
+        ..filePath = null
+        ..errorMessage = _slideshowFailureText(error, l10n);
+      // A partial file would show up in the list as a playable download.
+      if (outputPath != null) {
+        await _fileActions.delete(outputPath).catchError((_) {});
+      }
+    } finally {
+      // Images and music are megabytes apiece; one leaked scratch directory per
+      // render fills the cache up silently.
+      if (workspace != null) {
+        try {
+          if (workspace.existsSync()) workspace.deleteSync(recursive: true);
+        } catch (_) {
+          // A locked file is not worth failing a finished render over.
+        }
+      }
+    }
+    notifyListeners();
+    await _saveHistory(
+      receipt: task.status == DownloadStatus.completed ? task : null,
+    );
+  }
+
+  /// Mirrors the download services' naming so a rendered file sits alongside
+  /// fetched ones rather than standing out in the folder.
+  String _slideshowFileName(DownloadTask task) {
+    final compactId = task.id.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
+    final idPart = compactId.isEmpty
+        ? 'NimbleClip'
+        : compactId.substring(0, compactId.length.clamp(0, 12));
+    return '${task.platform.name}_$idPart.mp4';
+  }
+
+  String _slideshowFailureText(Object error, AppLocalizations l10n) {
+    if (error is SlideshowException) {
+      return switch (error.kind) {
+        SlideshowFailureKind.outOfSpace => l10n.slideshowOutOfSpace,
+        SlideshowFailureKind.fetchFailed => l10n.downloadFailed,
+        _ => l10n.slideshowRenderFailed,
+      };
+    }
+    return l10n.slideshowRenderFailed;
   }
 
   Future<void> _executeQueued(_QueuedDownload queued) =>
@@ -399,6 +554,24 @@ class DownloadProvider extends ChangeNotifier {
     DownloadOptions options = const DownloadOptions(),
     required AppLocalizations l10n,
   }) async {
+    // A rendered task has no URL to re-fetch. Re-extracting it would hand back
+    // the slideshow option, whose downloadUrl is empty by construction, and the
+    // queue below would then try to download nothing at all.
+    final slideshow = _slideshowSources[task.id];
+    if (slideshow != null) {
+      if (task.filePath != null) {
+        await _fileActions.delete(task.filePath!);
+      }
+      task
+        ..status = DownloadStatus.downloading
+        ..progress = 0.0
+        ..errorMessage = null
+        ..filePath = null;
+      notifyListeners();
+      await _renderSlideshow(task, slideshow, l10n);
+      return;
+    }
+
     task.status = DownloadStatus.queued;
     task.progress = 0.0;
     task.receivedBytes = 0;
@@ -603,6 +776,15 @@ class DownloadProvider extends ChangeNotifier {
     }
     return null;
   }
+}
+
+/// A fresh scratch directory under the OS temp directory, one per render, so
+/// two runs of the same post cannot read each other's half-written images.
+Future<Directory> _defaultSlideshowWorkspace() async {
+  final temp = await getTemporaryDirectory();
+  return Directory(
+    '${temp.path}/slideshow_${DateTime.now().microsecondsSinceEpoch}',
+  )..createSync(recursive: true);
 }
 
 class _QueuedDownload {
