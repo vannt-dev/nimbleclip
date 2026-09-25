@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:nimble_clip/core/utils/http_helper.dart';
 import 'package:nimble_clip/core/utils/quality_helper.dart';
 import 'package:nimble_clip/models/quality_descriptor.dart';
@@ -17,6 +18,7 @@ import 'package:nimble_clip/services/extractors/instagram_extractor.dart';
 import 'package:nimble_clip/services/extractors/tiktok_extractor.dart';
 import 'package:nimble_clip/services/extractors/twitter_extractor.dart';
 import 'package:nimble_clip/services/extractors/youtube_extractor.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt_lib;
 
 /// A post holding both photos and video must default to the video.
 ///
@@ -685,6 +687,90 @@ void main() {
     expect(result.title, 'YouTube fixture');
     expect(result.qualities, hasLength(2));
   });
+
+  // Every shape a person copies must come out as an ID the library accepts:
+  // the library parses URLs itself and rejects some of these outright.
+  test('YouTube reduces every copied link shape to a library-valid ID', () {
+    const cases = {
+      'https://www.youtube.com/watch?v=dQw4w9WgXcQ': 'dQw4w9WgXcQ',
+      'https://www.youtube.com/watch?feature=share&v=dQw4w9WgXcQ':
+          'dQw4w9WgXcQ',
+      'https://m.youtube.com/watch?v=dQw4w9WgXcQ&t=42s': 'dQw4w9WgXcQ',
+      'https://music.youtube.com/watch?v=dQw4w9WgXcQ&si=abc': 'dQw4w9WgXcQ',
+      'https://youtu.be/dQw4w9WgXcQ': 'dQw4w9WgXcQ',
+      'https://youtu.be/dQw4w9WgXcQ?si=odC7xSUW-rNQw5PZ&t=10': 'dQw4w9WgXcQ',
+      'https://youtube.com/shorts/uX_MyFPrkxA?si=odC7xSUW-rNQw5PZ':
+          'uX_MyFPrkxA',
+      'https://m.youtube.com/shorts/uX_MyFPrkxA?feature=share': 'uX_MyFPrkxA',
+      'https://www.youtube.com/shorts/uX_MyFPrkxA/': 'uX_MyFPrkxA',
+      'https://www.youtube.com/live/dQw4w9WgXcQ?si=abc': 'dQw4w9WgXcQ',
+      'https://www.youtube.com/embed/dQw4w9WgXcQ?start=5': 'dQw4w9WgXcQ',
+      'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ': 'dQw4w9WgXcQ',
+    };
+
+    cases.forEach((url, id) {
+      final parsed = YouTubeExtractor.videoIdFrom(url);
+      expect(parsed, id, reason: url);
+      expect(yt_lib.VideoId(parsed!).value, id, reason: url);
+    });
+    expect(YouTubeExtractor.videoIdFrom('https://www.youtube.com/'), isNull);
+  });
+
+  // Regression: a Shorts share link carries `?si=`, which the library's own
+  // Shorts pattern rejects before sending a single request. The native client
+  // must be handed the parsed ID, not the URL.
+  test(
+    'YouTube native client receives a Shorts share link as its ID',
+    () async {
+      final requested = <Uri>[];
+      ExtractorHttp.getOverride = (_, _) async =>
+          http.Response(fixture('youtube.html'), 200);
+
+      await YouTubeExtractor(
+        nativeHttpClient: MockClient((request) async {
+          requested.add(request.url);
+          return http.Response('', 404);
+        }),
+      ).extract('https://youtube.com/shorts/uX_MyFPrkxA?si=odC7xSUW-rNQw5PZ');
+
+      expect(
+        requested.map((uri) => uri.toString()),
+        contains(contains('uX_MyFPrkxA')),
+      );
+    },
+  );
+
+  // The watch-page fallback reports the last failure, which hid the native
+  // client's own error: the Shorts bug above surfaced as "no streams".
+  test(
+    'YouTube keeps the native client error when the fallback fails',
+    () async {
+      ExtractorHttp.getOverride = (_, _) async =>
+          http.Response('<html>no player here</html>', 200);
+
+      final failure = expectLater(
+        YouTubeExtractor(
+          nativeHttpClient: MockClient(
+            (_) async => throw http.ClientException('native offline'),
+          ),
+        ).extract('https://www.youtube.com/watch?v=dQw4w9WgXcQ'),
+        throwsA(
+          isA<ExtractionException>()
+              .having(
+                (e) => e.failure.kind,
+                'kind',
+                ExtractionFailureKind.youtubeNoPlayerData,
+              )
+              .having(
+                (e) => e.suppressedError,
+                'suppressedError',
+                allOf(contains('native-client'), contains('native offline')),
+              ),
+        ),
+      );
+      await failure;
+    },
+  );
 
   test('Generic extractor resolves Open Graph fixture URLs', () async {
     ExtractorHttp.getOverride = (_, _) async => http.Response(

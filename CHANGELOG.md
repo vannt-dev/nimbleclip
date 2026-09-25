@@ -6,6 +6,14 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- Fixed YouTube Shorts share links (`/shorts/<id>?si=...`) failing with "no
+  streams". The YouTube library's own Shorts pattern requires the ID to end
+  the URL, so it rejected every copied share link; the extractor now hands it
+  the parsed ID.
+- When a YouTube extraction fails, copied diagnostics now include the native
+  client's own error. It used to be discarded in favour of the fallback's
+  failure, which is how the Shorts bug above surfaced as "no streams".
+
 ## [1.6.0] - 2026-09-03
 
 - Added a slideshow option to TikTok photo posts on Android: the post's images

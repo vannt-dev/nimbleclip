@@ -15,9 +15,15 @@ import 'base_extractor.dart';
 import 'extraction_failure.dart';
 
 class YouTubeExtractor extends BaseVideoExtractor {
-  const YouTubeExtractor({this.useNativeClient = true});
+  const YouTubeExtractor({
+    this.useNativeClient = true,
+    @visibleForTesting this.nativeHttpClient,
+  });
 
   final bool useNativeClient;
+
+  /// Transport for the native client; `null` uses the library's default.
+  final http.Client? nativeHttpClient;
 
   @override
   VideoPlatform get platform => VideoPlatform.youtube;
@@ -30,31 +36,52 @@ class YouTubeExtractor extends BaseVideoExtractor {
     r'(?:youtu\.be/|youtube(?:-nocookie)?\.com/(?:embed/|v/|live/|shorts/|watch\?(?:.*&)?v=))([\w-]{11})',
   );
 
-  String? _extractVideoId(String url) =>
+  @visibleForTesting
+  static String? videoIdFrom(String url) =>
       _videoIdPattern.firstMatch(url)?.group(1);
 
   @override
   Future<VideoMetadata> extract(String url) async {
+    final videoId = videoIdFrom(url);
+
     // Native platforms get the real deal: youtube_explode_dart deciphers
     // signature-protected stream URLs, which plain HTML scraping cannot.
+    Object? nativeError;
     if (!kIsWeb && useNativeClient) {
-      final native = await _extractNative(url);
-      if (native != null) return native;
+      try {
+        // Hand the library the parsed ID, not the URL: its Shorts pattern
+        // requires the ID to end the string, so a copied share link such as
+        // `/shorts/<id>?si=...` is rejected as an invalid URL.
+        final native = await _extractNative(url, videoId ?? url);
+        if (native != null) return native;
+      } catch (e) {
+        // Fall through to the watch-page strategy, but keep the error: the
+        // fallback's own failure is what the user sees.
+        nativeError = e;
+      }
     }
 
-    final videoId = _extractVideoId(url);
-    if (videoId == null) {
-      throw ExtractionException(
-        const ExtractionFailure(ExtractionFailureKind.youtubeInvalidId),
-      );
+    try {
+      if (videoId == null) {
+        throw ExtractionException(
+          const ExtractionFailure(ExtractionFailureKind.youtubeInvalidId),
+        );
+      }
+      return await _extractFromWatchPage(url, videoId);
+    } on ExtractionException catch (e) {
+      if (nativeError == null) rethrow;
+      throw e.withSuppressedError('native-client: $nativeError');
     }
-    return _extractFromWatchPage(url, videoId);
   }
 
-  Future<VideoMetadata?> _extractNative(String url) async {
-    final yt = yt_lib.YoutubeExplode();
+  Future<VideoMetadata?> _extractNative(String url, String idOrUrl) async {
+    final yt = yt_lib.YoutubeExplode(
+      httpClient: nativeHttpClient == null
+          ? null
+          : yt_lib.YoutubeHttpClient(nativeHttpClient),
+    );
     try {
-      final video = await yt.videos.get(url);
+      final video = await yt.videos.get(idOrUrl);
       final manifest = await yt.videos.streamsClient.getManifest(video.id);
       final qualities = <VideoQualityOption>[];
 
@@ -105,9 +132,6 @@ class YouTubeExtractor extends BaseVideoExtractor {
         viewCount: video.engagement.viewCount,
         likeCount: video.engagement.likeCount,
       );
-    } catch (_) {
-      // Fall through to the watch-page strategy.
-      return null;
     } finally {
       yt.close();
     }
