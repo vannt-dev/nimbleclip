@@ -52,27 +52,37 @@ class TwitterExtractor extends BaseVideoExtractor {
       );
     }
 
-    final viaFx = await _fromFxTwitter(tweetId, cleanUrl);
+    final errors = StrategyErrors();
+    final viaFx = await _fromFxTwitter(tweetId, cleanUrl, errors);
     if (viaFx != null) return viaFx;
 
-    final viaVx = await _fromVxTwitter(tweetId, cleanUrl);
+    final viaVx = await _fromVxTwitter(tweetId, cleanUrl, errors);
     if (viaVx != null) return viaVx;
 
     throw ExtractionException(
       const ExtractionFailure(ExtractionFailureKind.xNoVideo),
+      suppressedError: errors.summary,
     );
   }
 
-  Future<VideoMetadata?> _fromFxTwitter(String tweetId, String url) async {
+  Future<VideoMetadata?> _fromFxTwitter(
+    String tweetId,
+    String url,
+    StrategyErrors errors,
+  ) async {
     final Map<String, dynamic> json;
     try {
       final response = await ExtractorHttp.getWithRetry(
         'https://api.fxtwitter.com/status/$tweetId',
         service: 'FxTwitter',
       );
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200) {
+        errors.addStatus('FxTwitter', response.statusCode);
+        return null;
+      }
       json = jsonDecode(response.body) as Map<String, dynamic>;
-    } catch (_) {
+    } catch (error) {
+      errors.add('FxTwitter', error);
       return null;
     }
 
@@ -200,7 +210,11 @@ class TwitterExtractor extends BaseVideoExtractor {
     );
   }
 
-  Future<VideoMetadata?> _fromVxTwitter(String tweetId, String url) async {
+  Future<VideoMetadata?> _fromVxTwitter(
+    String tweetId,
+    String url,
+    StrategyErrors errors,
+  ) async {
     final Map<String, dynamic> json;
     try {
       final response = await ExtractorHttp.getWithRetry(
@@ -208,9 +222,13 @@ class TwitterExtractor extends BaseVideoExtractor {
         service: 'VxTwitter',
         timeout: const Duration(seconds: 10),
       );
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200) {
+        errors.addStatus('VxTwitter', response.statusCode);
+        return null;
+      }
       json = jsonDecode(response.body) as Map<String, dynamic>;
-    } catch (_) {
+    } catch (error) {
+      errors.add('VxTwitter', error);
       return null;
     }
 

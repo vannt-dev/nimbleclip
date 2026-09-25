@@ -537,6 +537,10 @@ class AppLocalizationsVi extends AppLocalizations {
       'Không tìm thấy luồng tải nào cho video YouTube này.';
 
   @override
+  String get youtubeTemporarilyUnavailable =>
+      'YouTube đang tạm từ chối yêu cầu từ thiết bị này. Hãy đợi vài phút rồi thử lại.';
+
+  @override
   String get xInvalidPost =>
       'Không tìm thấy ID bài đăng trong liên kết X / Twitter. Hãy dùng link dạng x.com/<tài khoản>/status/<id>.';
 

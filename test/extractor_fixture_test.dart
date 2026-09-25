@@ -15,6 +15,7 @@ import 'package:nimble_clip/services/extractors/extraction_failure.dart';
 import 'package:nimble_clip/services/extractors/facebook_extractor.dart';
 import 'package:nimble_clip/services/extractors/generic_extractor.dart';
 import 'package:nimble_clip/services/extractors/instagram_extractor.dart';
+import 'package:nimble_clip/services/extractors/instagram_fallback_client.dart';
 import 'package:nimble_clip/services/extractors/tiktok_extractor.dart';
 import 'package:nimble_clip/services/extractors/twitter_extractor.dart';
 import 'package:nimble_clip/services/extractors/youtube_extractor.dart';
@@ -159,6 +160,96 @@ void main() {
     expect(result.qualities.where((option) => option.isImage), hasLength(2));
     expect(result.qualities.where((option) => !option.isImage), hasLength(1));
     _expectDefaultSelectionIsVideo(result);
+  });
+
+  // Offline, both services fail on the network, yet the only thing the user
+  // was ever told is that the post has no video. The causes must survive into
+  // the diagnostics, as the YouTube native error now does.
+  test('X keeps each service failure in the diagnostics', () async {
+    ExtractorHttp.getOverride = (uri, _) async {
+      if (uri.host == 'api.fxtwitter.com') {
+        throw const SocketException('Failed host lookup');
+      }
+      return http.Response('busy', 503);
+    };
+
+    await expectLater(
+      const TwitterExtractor().extract('https://x.com/fixture/status/1'),
+      throwsA(
+        isA<ExtractionException>()
+            .having(
+              (e) => e.failure.kind,
+              'kind',
+              ExtractionFailureKind.xNoVideo,
+            )
+            .having(
+              (e) => e.suppressedError,
+              'suppressedError',
+              allOf(
+                contains('FxTwitter'),
+                contains('Failed host lookup'),
+                contains('VxTwitter'),
+                contains('HTTP 503'),
+              ),
+            ),
+      ),
+    );
+  });
+
+  test('Instagram keeps each strategy failure in the diagnostics', () async {
+    ExtractorHttp.getOverride = (uri, _) async => uri.path.contains('/embed/')
+        ? http.Response('gone', 404)
+        : throw const SocketException('Connection reset');
+
+    await expectLater(
+      InstagramExtractor(
+        externalServiceAccess: const FixedExternalServiceAccess(true),
+        fallbackClient: _FailingInstagramFallback(),
+      ).extract('https://www.instagram.com/p/abc123/'),
+      throwsA(
+        isA<ExtractionException>()
+            .having(
+              (e) => e.failure.kind,
+              'kind',
+              ExtractionFailureKind.instagramLoginRequired,
+            )
+            .having(
+              (e) => e.suppressedError,
+              'suppressedError',
+              allOf(
+                contains('embed page: HTTP 404'),
+                contains('post page'),
+                contains('Connection reset'),
+                contains('SnapInsta'),
+                contains('service down'),
+              ),
+            ),
+      ),
+    );
+  });
+
+  test('Facebook keeps each page failure in the diagnostics', () async {
+    ExtractorHttp.getOverride = (uri, _) async => uri.host == 'm.facebook.com'
+        ? http.Response('blocked', 403)
+        : throw const SocketException('Network is unreachable');
+
+    await expectLater(
+      const FacebookExtractor(
+        externalServiceAccess: FixedExternalServiceAccess(false),
+      ).extract('https://www.facebook.com/watch/?v=123'),
+      throwsA(
+        isA<ExtractionException>().having(
+          (e) => e.suppressedError,
+          'suppressedError',
+          allOf(
+            contains('page: '),
+            contains('Network is unreachable'),
+            contains('embed: '),
+            contains('mobile: HTTP 403'),
+          ),
+        ),
+      ),
+    );
   });
 
   test('Facebook parses playable URLs from a page fixture', () async {
@@ -772,6 +863,50 @@ void main() {
     },
   );
 
+  // youtube_explode already retries a watch page five times before giving up,
+  // so a transient failure reaching us means YouTube is refusing for now. The
+  // fallback's "no streams" would tell the user the video is at fault.
+  test(
+    'YouTube reports a temporary refusal rather than missing streams',
+    () async {
+      ExtractorHttp.getOverride = (_, _) async =>
+          http.Response('<html>no player here</html>', 200);
+      var watchPageRequests = 0;
+
+      await expectLater(
+        YouTubeExtractor(
+          nativeHttpClient: MockClient((request) async {
+            if (request.url.path == '/watch') watchPageRequests++;
+            // A page with cookies but no initial data: the shape YouTube
+            // serves while it is throttling a client.
+            return http.Response(
+              '<html></html>',
+              200,
+              headers: {'set-cookie': 'VISITOR_INFO1_LIVE=x; path=/'},
+              // The library validates against the originating request, which
+              // MockClient leaves unset unless it is passed through.
+              request: request,
+            );
+          }),
+        ).extract('https://www.youtube.com/watch?v=dQw4w9WgXcQ'),
+        throwsA(
+          isA<ExtractionException>()
+              .having(
+                (e) => e.failure.kind,
+                'kind',
+                ExtractionFailureKind.youtubeTemporarilyUnavailable,
+              )
+              .having(
+                (e) => e.suppressedError,
+                'suppressedError',
+                contains('TransientFailureException'),
+              ),
+        ),
+      );
+      expect(watchPageRequests, greaterThan(1));
+    },
+  );
+
   test('Generic extractor resolves Open Graph fixture URLs', () async {
     ExtractorHttp.getOverride = (_, _) async => http.Response(
       fixture('generic.html'),
@@ -824,4 +959,10 @@ void main() {
       'https://fixture.example/media/post-image.webp',
     );
   });
+}
+
+class _FailingInstagramFallback implements InstagramFallbackClient {
+  @override
+  Future<String?> search(String postUrl) async =>
+      throw Exception('service down');
 }

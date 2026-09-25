@@ -164,7 +164,23 @@ class YouTubeExtractor extends BaseVideoExtractor {
       return await _extractFromWatchPage(url, videoId);
     } on ExtractionException catch (e) {
       if (nativeError == null) rethrow;
-      throw e.withSuppressedError('native-client: $nativeError');
+      final suppressed = 'native-client: $nativeError';
+      // The library retries a refused page itself before throwing these, so
+      // by now YouTube is throttling this client. The fallback cannot
+      // decipher streams on a native platform, so its own failure would
+      // blame the video for what is a wait-and-retry.
+      if (nativeError is yt_lib.TransientFailureException ||
+          nativeError is yt_lib.RequestLimitExceededException) {
+        throw ExtractionException(
+          const ExtractionFailure(
+            ExtractionFailureKind.youtubeTemporarilyUnavailable,
+          ),
+          diagnosticCode: 'youtube_temporarily_unavailable',
+          attemptedStrategies: const ['native-client', 'watch-page'],
+          suppressedError: suppressed,
+        );
+      }
+      throw e.withSuppressedError(suppressed);
     }
   }
 
@@ -338,8 +354,9 @@ class YouTubeExtractor extends BaseVideoExtractor {
           in streamingData?['adaptiveFormats'] as List<dynamic>? ?? [])
         entry as Map<String, dynamic>,
     ];
+    final decipherErrors = StrategyErrors();
     final deciphered = kIsWeb
-        ? await _decipherWebStreams(response.body, allFormats)
+        ? await _decipherWebStreams(response.body, allFormats, decipherErrors)
         : const <String, String>{};
 
     /// `signatureCipher` streams need YouTube's player JS to be deciphered,
@@ -426,6 +443,7 @@ class YouTubeExtractor extends BaseVideoExtractor {
           'watch-page',
           'web-decipher',
         ],
+        suppressedError: decipherErrors.summary,
       );
     }
 
@@ -446,6 +464,7 @@ class YouTubeExtractor extends BaseVideoExtractor {
   Future<Map<String, String>> _decipherWebStreams(
     String watchPage,
     List<Map<String, dynamic>> formats,
+    StrategyErrors errors,
   ) async {
     final ciphers = formats
         .map((format) => format['signatureCipher']?.toString())
@@ -455,7 +474,10 @@ class YouTubeExtractor extends BaseVideoExtractor {
     if (ciphers.isEmpty) return const {};
 
     final playerMatch = _playerJsUrl.firstMatch(watchPage);
-    if (playerMatch == null) return const {};
+    if (playerMatch == null) {
+      errors.add('web-decipher', 'no player script URL on the page');
+      return const {};
+    }
     try {
       final relative = jsonDecode('"${playerMatch.group(1)!}"') as String;
       final playerUrl = Uri.parse(
@@ -470,17 +492,24 @@ class YouTubeExtractor extends BaseVideoExtractor {
             body: jsonEncode({'playerUrl': playerUrl, 'ciphers': ciphers}),
           )
           .timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) return const {};
+      if (response.statusCode != 200) {
+        errors.addStatus('web-decipher', response.statusCode);
+        return const {};
+      }
       final payload = jsonDecode(response.body) as Map<String, dynamic>;
       final urls = (payload['urls'] as List<dynamic>? ?? [])
           .map((value) => value.toString())
           .toList(growable: false);
-      if (urls.length != ciphers.length) return const {};
+      if (urls.length != ciphers.length) {
+        errors.add('web-decipher', '${urls.length} of ${ciphers.length} URLs');
+        return const {};
+      }
       return {
         for (var index = 0; index < ciphers.length; index++)
           ciphers[index]: urls[index],
       };
-    } catch (_) {
+    } catch (error) {
+      errors.add('web-decipher', error);
       return const {};
     }
   }

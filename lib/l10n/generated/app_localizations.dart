@@ -980,6 +980,12 @@ abstract class AppLocalizations {
   /// **'No downloadable stream was found for this YouTube video.'**
   String get youtubeNoStreams;
 
+  /// No description provided for @youtubeTemporarilyUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube is refusing requests from this device for now. Wait a few minutes and try again.'**
+  String get youtubeTemporarilyUnavailable;
+
   /// No description provided for @xInvalidPost.
   ///
   /// In en, this message translates to:

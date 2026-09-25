@@ -197,21 +197,27 @@ class InstagramExtractor extends BaseVideoExtractor {
       );
     }
 
-    final viaEmbed = await _fromEmbedPage(shortcode, cleanUrl);
+    final errors = StrategyErrors();
+    final viaEmbed = await _fromEmbedPage(shortcode, cleanUrl, errors);
     if (viaEmbed != null) {
       return await _enrichImagePost(viaEmbed, shortcode, cleanUrl);
     }
 
-    final viaPage = await _fromPostPage(shortcode, cleanUrl);
+    final viaPage = await _fromPostPage(shortcode, cleanUrl, errors);
     if (viaPage != null) {
       return await _enrichImagePost(viaPage, shortcode, cleanUrl);
     }
 
-    final viaSnapInsta = await _fromSnapInsta(shortcode, cleanUrl);
+    final viaSnapInsta = await _fromSnapInsta(
+      shortcode,
+      cleanUrl,
+      errors: errors,
+    );
     if (viaSnapInsta != null) return viaSnapInsta;
 
     throw ExtractionException(
       const ExtractionFailure(ExtractionFailureKind.instagramLoginRequired),
+      suppressedError: errors.summary,
     );
   }
 
@@ -228,10 +234,12 @@ class InstagramExtractor extends BaseVideoExtractor {
         const ExtractionFailure(ExtractionFailureKind.externalServicesDisabled),
       );
     }
-    final viaSnapInsta = await _fromSnapInsta(storyId, url);
+    final errors = StrategyErrors();
+    final viaSnapInsta = await _fromSnapInsta(storyId, url, errors: errors);
     if (viaSnapInsta != null) return viaSnapInsta;
     throw ExtractionException(
       const ExtractionFailure(ExtractionFailureKind.instagramLoginRequired),
+      suppressedError: errors.summary,
     );
   }
 
@@ -252,11 +260,15 @@ class InstagramExtractor extends BaseVideoExtractor {
     String shortcode,
     String url, {
     VideoMetadata? fallback,
+    StrategyErrors? errors,
   }) async {
     if (!externalServiceAccess.allowExternalServices) return fallback;
     try {
       final resultHtml = await fallbackClient.search(url);
-      if (resultHtml == null) return null;
+      if (resultHtml == null) {
+        errors?.add('SnapInsta', 'no result');
+        return null;
+      }
 
       final downloadUrls = <String>[];
       final previewUrls = <String>[];
@@ -342,22 +354,31 @@ class InstagramExtractor extends BaseVideoExtractor {
         commentCount: fallback?.commentCount,
         shareCount: fallback?.shareCount,
       );
-    } catch (_) {
+    } catch (error) {
+      errors?.add('SnapInsta', error);
       return null;
     }
   }
 
   /// The embed player ships the media URL inside a `contextJSON` blob.
-  Future<VideoMetadata?> _fromEmbedPage(String shortcode, String url) async {
+  Future<VideoMetadata?> _fromEmbedPage(
+    String shortcode,
+    String url,
+    StrategyErrors errors,
+  ) async {
     final String html;
     try {
       final response = await ExtractorHttp.get(
         'https://www.instagram.com/p/$shortcode/embed/captioned/',
         userAgent: AppConstants.defaultUserAgent,
       );
-      if (response.statusCode >= 400) return null;
+      if (response.statusCode >= 400) {
+        errors.addStatus('embed page', response.statusCode);
+        return null;
+      }
       html = response.body;
-    } catch (_) {
+    } catch (error) {
+      errors.add('embed page', error);
       return null;
     }
 
@@ -392,16 +413,24 @@ class InstagramExtractor extends BaseVideoExtractor {
   }
 
   /// The post page still exposes an `og:video` tag for some public Reels.
-  Future<VideoMetadata?> _fromPostPage(String shortcode, String url) async {
+  Future<VideoMetadata?> _fromPostPage(
+    String shortcode,
+    String url,
+    StrategyErrors errors,
+  ) async {
     final String html;
     try {
       final response = await ExtractorHttp.get(
         'https://www.instagram.com/p/$shortcode/',
         userAgent: AppConstants.mobileUserAgent,
       );
-      if (response.statusCode >= 400) return null;
+      if (response.statusCode >= 400) {
+        errors.addStatus('post page', response.statusCode);
+        return null;
+      }
       html = response.body;
-    } catch (_) {
+    } catch (error) {
+      errors.add('post page', error);
       return null;
     }
 

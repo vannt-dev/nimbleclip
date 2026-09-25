@@ -122,11 +122,13 @@ class FacebookExtractor extends BaseVideoExtractor {
     }
 
     // Strategy 1: the watch page itself.
+    final errors = StrategyErrors();
     var result = await _fromPage(
       cleanUrl,
       cleanUrl,
       cached: resolvedPage,
       onAgeGate: markAgeGated,
+      errors: errors,
     );
     final pageVideo = accept(result);
     if (pageVideo != null) {
@@ -138,7 +140,13 @@ class FacebookExtractor extends BaseVideoExtractor {
     // interstitial than the full watch page.
     final embedUrl =
         'https://www.facebook.com/plugins/video.php?href=${Uri.encodeComponent(cleanUrl)}';
-    result = await _fromPage(embedUrl, cleanUrl, onAgeGate: markAgeGated);
+    result = await _fromPage(
+      embedUrl,
+      cleanUrl,
+      onAgeGate: markAgeGated,
+      errors: errors,
+      strategy: 'embed',
+    );
     final embedVideo = accept(result);
     if (embedVideo != null) {
       return _withPostPhotoFallback(embedVideo, cleanUrl);
@@ -154,6 +162,8 @@ class FacebookExtractor extends BaseVideoExtractor {
       cleanUrl,
       userAgent: AppConstants.mobileUserAgent,
       onAgeGate: markAgeGated,
+      errors: errors,
+      strategy: 'mobile',
     );
     final mobileVideo = accept(result);
     if (mobileVideo != null) {
@@ -177,6 +187,7 @@ class FacebookExtractor extends BaseVideoExtractor {
               ? 'facebook_age_gated'
               : 'facebook_video_not_exposed',
           attemptedStrategies: const ['page', 'embed', 'mobile'],
+          suppressedError: errors.summary,
         );
       }
       return _withPostPhotoFallback(imageFallback!, cleanUrl);
@@ -188,6 +199,7 @@ class FacebookExtractor extends BaseVideoExtractor {
           ? 'facebook_age_gated'
           : 'facebook_no_public_media',
       attemptedStrategies: const ['page', 'embed', 'mobile'],
+      suppressedError: errors.summary,
     );
   }
 
@@ -345,14 +357,20 @@ class FacebookExtractor extends BaseVideoExtractor {
     String userAgent = AppConstants.defaultUserAgent,
     http.Response? cached,
     void Function()? onAgeGate,
+    StrategyErrors? errors,
+    String strategy = 'page',
   }) async {
     final String html;
     try {
       final response =
           cached ?? await ExtractorHttp.get(pageUrl, userAgent: userAgent);
-      if (response.statusCode >= 400) return null;
+      if (response.statusCode >= 400) {
+        errors?.addStatus(strategy, response.statusCode);
+        return null;
+      }
       html = response.body;
-    } catch (_) {
+    } catch (error) {
+      errors?.add(strategy, error);
       return null;
     }
 

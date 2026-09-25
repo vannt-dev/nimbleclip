@@ -539,6 +539,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'No downloadable stream was found for this YouTube video.';
 
   @override
+  String get youtubeTemporarilyUnavailable =>
+      'YouTube is refusing requests from this device for now. Wait a few minutes and try again.';
+
+  @override
   String get xInvalidPost =>
       'No post ID was found in this X / Twitter link. Use a link like x.com/<account>/status/<id>.';
 

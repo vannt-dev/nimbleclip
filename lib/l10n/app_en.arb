@@ -178,6 +178,7 @@
   "@youtubePlaybackRejected": {"placeholders": {"reason": {"type": "String"}}},
   "youtubeCipherUnsupported": "This video uses a protected signature stream that the Web build cannot decode. Use the Android, iOS, or Desktop app instead.",
   "youtubeNoStreams": "No downloadable stream was found for this YouTube video.",
+  "youtubeTemporarilyUnavailable": "YouTube is refusing requests from this device for now. Wait a few minutes and try again.",
   "xInvalidPost": "No post ID was found in this X / Twitter link. Use a link like x.com/<account>/status/<id>.",
   "xNoVideo": "This post has no downloadable video, or the account is protected.",
   "originalMp4": "MP4 (Original quality)",

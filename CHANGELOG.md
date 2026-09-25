@@ -6,10 +6,17 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- When YouTube refuses the page even after the YouTube library's own five
+  retries, the app now says YouTube is refusing requests for now and to try
+  again in a few minutes. It used to report "no downloadable stream", which
+  blamed the video.
 - Starting the same merged YouTube download or TikTok slideshow while it is
   still running no longer produces it twice. Downloads fetched from a URL were
   already guarded; options produced on the device were split off before that
   check.
+- X, Instagram and Facebook failures now keep every strategy's own cause in
+  the copied diagnostics, as YouTube's do since 1.7.0. Offline, each of them
+  used to report only that the post had no media.
 - The live extractor check now covers a YouTube Short shared with `?si=`.
 
 ## [1.7.0] - 2026-09-25
