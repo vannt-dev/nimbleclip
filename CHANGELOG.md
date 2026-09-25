@@ -13,6 +13,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 - When a YouTube extraction fails, copied diagnostics now include the native
   client's own error. It used to be discarded in favour of the fallback's
   failure, which is how the Shorts bug above surfaced as "no streams".
+- Upgraded `cached_network_image` to 4.0.2 and refreshed other dependencies
+  within their existing constraints.
 
 ## [1.6.0] - 2026-09-03
 
