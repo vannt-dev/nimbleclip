@@ -480,6 +480,41 @@ void main() {
       expect(storage.downloadDir.listSync(), isEmpty);
     });
 
+    // A URL download already refuses a second copy of an option that is still
+    // in flight; a rendered one was split off before that check and was
+    // fetched and muxed twice.
+    test('the same merged option is not started twice while running', () async {
+      final muxer = _FakeMuxer();
+      final fetcher = _FakeFetcher(
+        {
+          'https://yt.example/audio': [4],
+        },
+        blocking: {'https://yt.example/video-1080'},
+      );
+      final downloader = provider(muxer, fetcher);
+      final option = _merged();
+      final metadata = _metadata([option]);
+
+      await downloader.startNewDownloads(
+        metadata: metadata,
+        qualities: [option],
+        l10n: l10n,
+        options: noGallery,
+      );
+      await _waitUntil(() => fetcher.fetched.isNotEmpty);
+      await downloader.startNewDownloads(
+        metadata: metadata,
+        qualities: [option],
+        l10n: l10n,
+        options: noGallery,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(downloader.allTasks, hasLength(1));
+      expect(fetcher.fetched, hasLength(1));
+      downloader.cancelTask(downloader.allTasks.single.id);
+    });
+
     // Stream URLs are signed and expire within hours, so a retry must not
     // reuse the remembered ones while the post can still be re-read.
     test('a retry re-extracts fresh stream urls', () async {

@@ -6,6 +6,11 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- Starting the same merged YouTube download or TikTok slideshow while it is
+  still running no longer produces it twice. Downloads fetched from a URL were
+  already guarded; options produced on the device were split off before that
+  check.
+
 ## [1.7.0] - 2026-09-25
 
 - Added 480p, 720p and 1080p YouTube downloads on Android. YouTube serves

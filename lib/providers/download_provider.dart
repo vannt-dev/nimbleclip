@@ -257,6 +257,17 @@ class DownloadProvider extends ChangeNotifier {
     return matches;
   }
 
+  /// Whether [quality] of [metadata] is already queued, running or paused.
+  bool _isInFlight(
+    VideoMetadata metadata,
+    VideoQualityOption quality,
+    AppLocalizations l10n,
+  ) => _tasks.any(
+    (task) =>
+        (task.isActive || task.status == DownloadStatus.paused) &&
+        _matchesSelection(task, metadata, [quality], l10n),
+  );
+
   bool _matchesSelection(
     DownloadTask task,
     VideoMetadata metadata,
@@ -291,19 +302,17 @@ class DownloadProvider extends ChangeNotifier {
     // A slideshow or a merged video has no single URL to fetch: it is produced
     // on the device first, and the finished file enters history as a file that
     // already exists. Splitting it off here keeps the URL path below untouched.
-    final renderable = qualities.where((q) => q.needsRendering).toList();
+    final renderable = qualities
+        .where((q) => q.needsRendering && !_isInFlight(metadata, q, l10n))
+        .toList();
     if (renderable.isNotEmpty) {
       unawaited(_renderAll(renderable, metadata, l10n, options));
-      qualities = qualities.where((q) => !q.needsRendering).toList();
     }
+    qualities = qualities.where((q) => !q.needsRendering).toList();
 
     if (qualities.isEmpty) return [];
     final pendingQualities = qualities.where(
-      (quality) => !_tasks.any(
-        (task) =>
-            (task.isActive || task.status == DownloadStatus.paused) &&
-            _matchesSelection(task, metadata, [quality], l10n),
-      ),
+      (quality) => !_isInFlight(metadata, quality, l10n),
     );
     final tasks = pendingQualities
         .map(
@@ -355,6 +364,9 @@ class DownloadProvider extends ChangeNotifier {
     DownloadOptions options,
   ) async {
     for (final quality in renderable) {
+      // Checked again per option: tasks are created one at a time, so a second
+      // batch started meanwhile may already be producing this one.
+      if (_isInFlight(metadata, quality, l10n)) continue;
       final task = DownloadTask(
         id: _uuid.v4(),
         videoId: metadata.id,
