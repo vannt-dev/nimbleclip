@@ -3,6 +3,7 @@
 [![CI](https://github.com/vannt-dev/nimbleclip/actions/workflows/ci.yml/badge.svg)](https://github.com/vannt-dev/nimbleclip/actions/workflows/ci.yml)
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)](https://flutter.dev/)
 [![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?logo=dart)](https://dart.dev/)
+[![Downloads](https://img.shields.io/github/downloads/vannt-dev/nimbleclip/total)](https://github.com/vannt-dev/nimbleclip/releases)
 
 **Save clips. Keep moments.**
 
