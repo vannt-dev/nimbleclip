@@ -12,12 +12,10 @@ import 'package:nimble_clip/models/slideshow_source.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/providers/download_provider.dart';
-import 'package:nimble_clip/services/download_history_repository.dart';
-import 'package:nimble_clip/services/media_file_actions.dart';
 import 'package:nimble_clip/services/slideshow/slideshow_renderer.dart';
-import 'package:nimble_clip/services/storage_service.dart';
 
 import 'support/inert_download_service.dart';
+import 'support/memory_storage.dart';
 
 /// Stands in for the platform encoder, so the download flow can be exercised
 /// without an emulator.
@@ -48,6 +46,15 @@ class _FakeRenderer implements SlideshowRenderer {
   String? lastAudioPath;
   Duration? lastPerImage;
   final Map<String, Completer<void>> _cancelled = {};
+
+  @override
+  Future<String> mux({
+    required String videoPath,
+    required String audioPath,
+    required String outputPath,
+    String? renderId,
+    void Function(double progress)? onProgress,
+  }) async => throw UnimplementedError();
 
   @override
   Future<void> cancel(String renderId) async {
@@ -84,65 +91,6 @@ class _FakeRenderer implements SlideshowRenderer {
     await File(outputPath).writeAsBytes(const [0, 1, 2, 3]);
     return SlideshowResult(filePath: outputPath, audioSkipped: audioSkipped);
   }
-}
-
-/// The pieces of storage the provider touches, backed by real directories so
-/// the rendered file can actually be asserted on.
-class _MemoryStorage
-    implements StorageService, DownloadHistoryRepository, MediaFileActions {
-  _MemoryStorage(this.downloadDir);
-
-  final Directory downloadDir;
-  List<Map<String, dynamic>> history = [];
-  List<Map<String, dynamic>> receipts = [];
-
-  @override
-  Future<String?> getDownloadDirectory() async => downloadDir.path;
-
-  @override
-  Future<List<DownloadTask>> loadHistory() async =>
-      history.map(DownloadTask.fromJson).toList();
-
-  @override
-  Future<void> saveHistory(List<Map<String, dynamic>> snapshots) async {
-    history = snapshots.toList();
-  }
-
-  @override
-  Future<List<DownloadTask>> loadDownloadReceipts() async =>
-      receipts.map(DownloadTask.fromJson).toList();
-
-  @override
-  Future<void> saveDownloadReceipt(Map<String, dynamic> snapshot) async {
-    receipts.removeWhere((entry) => entry['id'] == snapshot['id']);
-    receipts.add(snapshot);
-  }
-
-  @override
-  Future<void> saveDownloadReceipts(
-    Iterable<Map<String, dynamic>> snapshots,
-  ) async {
-    for (final snapshot in snapshots) {
-      await saveDownloadReceipt(snapshot);
-    }
-  }
-
-  @override
-  Future<void> removeDownloadReceipts(Set<String> ids) async {
-    receipts.removeWhere((entry) => ids.contains(entry['id']));
-  }
-
-  @override
-  bool exists(String filePath) => File(filePath).existsSync();
-
-  @override
-  Future<void> delete(String filePath) async {
-    final file = File(filePath);
-    if (file.existsSync()) file.deleteSync();
-  }
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 const _source = SlideshowSource(
@@ -186,13 +134,13 @@ void main() {
   late Directory root;
   late Directory downloads;
   late Directory workspace;
-  late _MemoryStorage storage;
+  late MemoryStorage storage;
 
   setUp(() {
     root = Directory.systemTemp.createTempSync('slideshow_download_test');
     downloads = Directory('${root.path}/downloads')..createSync();
     workspace = Directory('${root.path}/work')..createSync();
-    storage = _MemoryStorage(downloads);
+    storage = MemoryStorage(downloads);
     ExtractorHttp.getOverride = (uri, _) async =>
         http.Response.bytes(const [1, 2, 3], 200);
   });

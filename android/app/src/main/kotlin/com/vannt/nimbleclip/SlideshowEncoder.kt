@@ -1049,10 +1049,10 @@ class SlideshowEncoder {
             if (renderId.isNotEmpty()) cancelledRenders.add(renderId)
         }
 
-        private fun isCancelled(renderId: String): Boolean =
+        internal fun isCancelled(renderId: String): Boolean =
             renderId.isNotEmpty() && cancelledRenders.contains(renderId)
 
-        private fun clearCancellation(renderId: String) {
+        internal fun clearCancellation(renderId: String) {
             if (renderId.isNotEmpty()) cancelledRenders.remove(renderId)
         }
 

@@ -49,6 +49,19 @@ abstract interface class SlideshowRenderer {
     void Function(double progress)? onProgress,
   });
 
+  /// Joins a video-only and an audio-only MP4 into one MP4 at [outputPath],
+  /// copying the compressed samples without re-encoding them.
+  ///
+  /// Shares [onProgress], [renderId] and [cancel] with [render]. Returns the
+  /// path of the written file; throws a [SlideshowException] on failure.
+  Future<String> mux({
+    required String videoPath,
+    required String audioPath,
+    required String outputPath,
+    String? renderId,
+    void Function(double progress)? onProgress,
+  });
+
   /// Asks the render started under [renderId] to stop.
   ///
   /// The in-flight [render] future then completes with a

@@ -11,11 +11,13 @@ import '../l10n/quality_descriptor_text.dart';
 import '../core/utils/quality_helper.dart';
 import '../models/download_task.dart';
 import '../models/download_options.dart';
+import '../models/merge_source.dart';
 import '../models/slideshow_source.dart';
 import '../models/video_metadata.dart';
 import '../services/download_service.dart';
 import '../services/slideshow/slideshow_asset_fetcher.dart';
 import '../services/slideshow/slideshow_renderer.dart';
+import '../services/slideshow/stream_fetcher.dart';
 import '../services/background_download_service.dart';
 import '../services/download_history_repository.dart';
 import '../services/async_work_queue.dart';
@@ -32,7 +34,9 @@ class DownloadProvider extends ChangeNotifier {
     ExtractorRegistry? extractorRegistry,
     SlideshowRenderer? slideshowRenderer,
     Future<Directory> Function()? slideshowWorkspace,
+    StreamFetcher? streamFetcher,
   }) : _downloadService = downloadService ?? createDefaultDownloadService(),
+       _streamFetcher = streamFetcher ?? _defaultStreamFetcher,
        _storageService = storageService ?? StorageService(),
        _historyRepository =
            historyRepository ?? SharedPreferencesDownloadHistoryRepository(),
@@ -57,11 +61,12 @@ class DownloadProvider extends ChangeNotifier {
   final MediaFileActions _fileActions;
   final SlideshowRenderer _slideshowRenderer;
   final Future<Directory> Function() _slideshowWorkspace;
+  final StreamFetcher _streamFetcher;
 
-  /// The source a rendered task was built from, so a retry can render it again
+  /// The option a rendered task was built from, so a retry can render it again
   /// rather than re-extracting it. In memory only: after a restart a finished
   /// render is just a file, and a failed one is redone from the post.
-  final Map<String, SlideshowSource> _slideshowSources = {};
+  final Map<String, VideoQualityOption> _renderOptions = {};
 
   /// Ids of renders currently running, so `cancelTask` knows which tasks the
   /// download queue cannot speak for.
@@ -283,12 +288,12 @@ class DownloadProvider extends ChangeNotifier {
     // starts immediately after launch.
     await _historyReady;
 
-    // A slideshow has no URL to fetch: it is rendered first, and the finished
-    // file enters history as a file that already exists. Splitting it off here
-    // keeps the URL path below untouched.
+    // A slideshow or a merged video has no single URL to fetch: it is produced
+    // on the device first, and the finished file enters history as a file that
+    // already exists. Splitting it off here keeps the URL path below untouched.
     final renderable = qualities.where((q) => q.needsRendering).toList();
     if (renderable.isNotEmpty) {
-      unawaited(_renderSlideshows(renderable, metadata, l10n));
+      unawaited(_renderAll(renderable, metadata, l10n, options));
       qualities = qualities.where((q) => !q.needsRendering).toList();
     }
 
@@ -337,19 +342,19 @@ class DownloadProvider extends ChangeNotifier {
     return tasks;
   }
 
-  /// Renders each slideshow option in turn.
+  /// Renders each slideshow or merged option in turn.
   ///
   /// Sequentially, not concurrently: a render holds a hardware encoder and the
   /// decoded frames of a 1080x1920 canvas, and two at once is how a mid-range
-  /// device runs out of memory.
-  Future<void> _renderSlideshows(
+  /// device runs out of memory. A merge is lighter but fetches two large
+  /// streams, which gain nothing from competing for the same connection.
+  Future<void> _renderAll(
     List<VideoQualityOption> renderable,
     VideoMetadata metadata,
     AppLocalizations l10n,
+    DownloadOptions options,
   ) async {
     for (final quality in renderable) {
-      final source = quality.slideshow;
-      if (source == null) continue;
       final task = DownloadTask(
         id: _uuid.v4(),
         videoId: metadata.id,
@@ -366,20 +371,22 @@ class DownloadProvider extends ChangeNotifier {
         qualityLabel: describeQuality(quality.label, l10n),
         format: quality.format,
         kind: quality.kind,
+        totalBytes: quality.sizeBytes ?? 0,
         status: DownloadStatus.downloading,
       );
-      _slideshowSources[task.id] = source;
+      _renderOptions[task.id] = quality;
       _tasks.insert(0, task);
       notifyListeners();
-      await _renderSlideshow(task, source, l10n);
+      await _render(task, quality, l10n, options);
     }
   }
 
   /// Clears the previous attempt off [task] and renders it again.
-  Future<void> _retrySlideshow(
+  Future<void> _retryRender(
     DownloadTask task,
-    SlideshowSource source,
+    VideoQualityOption option,
     AppLocalizations l10n,
+    DownloadOptions options,
   ) async {
     if (task.filePath != null) {
       await _fileActions.delete(task.filePath!);
@@ -387,22 +394,24 @@ class DownloadProvider extends ChangeNotifier {
     task
       ..status = DownloadStatus.downloading
       ..progress = 0.0
+      ..receivedBytes = 0
       ..errorMessage = null
       ..filePath = null;
     notifyListeners();
-    await _renderSlideshow(task, source, l10n);
+    await _render(task, option, l10n, options);
   }
 
-  /// Fetches [source]'s assets, renders them into the download directory and
-  /// records the result on [task].
+  /// Produces [option]'s file in the download directory and records the
+  /// result on [task].
   ///
   /// Nothing here throws: a render is started without anyone awaiting it, so an
   /// escaping error would surface as an unhandled asynchronous exception with
   /// the task left stuck at `downloading` forever.
-  Future<void> _renderSlideshow(
+  Future<void> _render(
     DownloadTask task,
-    SlideshowSource source,
+    VideoQualityOption option,
     AppLocalizations l10n,
+    DownloadOptions options,
   ) async {
     Directory? workspace;
     String? outputPath;
@@ -413,38 +422,50 @@ class DownloadProvider extends ChangeNotifier {
         throw const SlideshowException(SlideshowFailureKind.encoderUnavailable);
       }
       workspace = await _slideshowWorkspace();
-      final assets = await fetchSlideshowAssets(source, into: workspace);
       // Rendered straight into its final home rather than moved there
       // afterwards: the temp and download directories can sit on different
       // filesystems, where a rename fails and a copy doubles the disk cost of
       // a file the encoder is already writing whole.
       outputPath = '$downloadDir/${_slideshowFileName(task)}';
-      final result = await _slideshowRenderer.render(
-        imagePaths: assets.imagePaths,
-        audioPath: assets.audioPath,
-        perImage: source.perImage,
-        width: source.width,
-        height: source.height,
-        outputPath: outputPath,
-        renderId: task.id,
-        onProgress: (fraction) {
-          // Only while it is still running: a cancel already moved the task on,
-          // and a late event would drag its bar back up.
-          if (task.status != DownloadStatus.downloading) return;
-          task.progress = fraction;
-          task.notifyProgressChanged();
-        },
-      );
+      final merge = option.merge;
+      final String filePath;
+      String? note;
+      if (merge != null) {
+        filePath = await _mergeStreams(task, merge, workspace, outputPath);
+      } else {
+        final result = await _renderSlideshow(
+          task,
+          option.slideshow!,
+          workspace,
+          outputPath,
+        );
+        filePath = result.filePath;
+        // Music that could not be transcoded is a note on a finished download,
+        // not a failure: the video is there and it plays.
+        if (result.audioSkipped) note = l10n.slideshowMusicUnavailable;
+      }
+      // A cancel that landed after the last cancellable step: the file is
+      // whole, but the user asked not to have it.
+      if (task.status == DownloadStatus.cancelled) {
+        throw const SlideshowException(SlideshowFailureKind.cancelled);
+      }
       task
-        ..filePath = result.filePath
+        ..filePath = filePath
         ..status = DownloadStatus.completed
         ..progress = 1
         ..completedAt = DateTime.now()
-        // Music that could not be transcoded is a note on a finished download,
-        // not a failure: the video is there and it plays.
-        ..errorMessage = result.audioSkipped
-            ? l10n.slideshowMusicUnavailable
-            : null;
+        ..errorMessage = note;
+      if (merge != null) {
+        final size = await File(filePath).length();
+        task
+          ..totalBytes = size
+          ..receivedBytes = size;
+        if (options.autoSaveToGallery) {
+          // Best effort, as for a fetched download: the file is complete in
+          // the app either way, and Save to gallery stays on offer.
+          await saveToGalleryManually(task).catchError((_) => false);
+        }
+      }
     } catch (error) {
       // A cancel is the user's own decision, already recorded on the task by
       // cancelTask. Overwriting it with `failed` would report their choice back
@@ -478,6 +499,89 @@ class DownloadProvider extends ChangeNotifier {
     await _saveHistory(
       receipt: task.status == DownloadStatus.completed ? task : null,
     );
+  }
+
+  Future<SlideshowResult> _renderSlideshow(
+    DownloadTask task,
+    SlideshowSource source,
+    Directory workspace,
+    String outputPath,
+  ) async {
+    final assets = await fetchSlideshowAssets(source, into: workspace);
+    return _slideshowRenderer.render(
+      imagePaths: assets.imagePaths,
+      audioPath: assets.audioPath,
+      perImage: source.perImage,
+      width: source.width,
+      height: source.height,
+      outputPath: outputPath,
+      renderId: task.id,
+      onProgress: (fraction) => _reportRenderProgress(task, fraction),
+    );
+  }
+
+  /// Share of a merged task's bar given to fetching; joining the two files
+  /// only copies samples, so it takes the last sliver.
+  static const double _mergeFetchShare = 0.95;
+
+  /// Fetches [source]'s two streams into [workspace] and joins them at
+  /// [outputPath].
+  Future<String> _mergeStreams(
+    DownloadTask task,
+    MergeSource source,
+    Directory workspace,
+    String outputPath,
+  ) async {
+    final videoFile = File('${workspace.path}/video.mp4');
+    final audioFile = File('${workspace.path}/audio.m4a');
+    final expected = (source.videoBytes ?? 0) + (source.audioBytes ?? 0);
+    bool stopped() => task.status != DownloadStatus.downloading;
+    void reportBytes(int received) {
+      if (stopped()) return;
+      task.receivedBytes = received;
+      if (expected > 0) {
+        task.progress = (received / expected * _mergeFetchShare).clamp(
+          0.0,
+          _mergeFetchShare,
+        );
+      }
+      task.notifyProgressChanged();
+    }
+
+    await _streamFetcher(
+      source.videoUrl,
+      videoFile,
+      onBytes: reportBytes,
+      isCancelled: stopped,
+    );
+    final videoReceived = await videoFile.length();
+    await _streamFetcher(
+      source.audioUrl,
+      audioFile,
+      onBytes: (received) => reportBytes(videoReceived + received),
+      isCancelled: stopped,
+    );
+    if (stopped()) {
+      throw const SlideshowException(SlideshowFailureKind.cancelled);
+    }
+    return _slideshowRenderer.mux(
+      videoPath: videoFile.path,
+      audioPath: audioFile.path,
+      outputPath: outputPath,
+      renderId: task.id,
+      onProgress: (fraction) => _reportRenderProgress(
+        task,
+        _mergeFetchShare + fraction * (1 - _mergeFetchShare),
+      ),
+    );
+  }
+
+  void _reportRenderProgress(DownloadTask task, double fraction) {
+    // Only while it is still running: a cancel already moved the task on, and
+    // a late event would drag its bar back up.
+    if (task.status != DownloadStatus.downloading) return;
+    task.progress = fraction;
+    task.notifyProgressChanged();
   }
 
   /// Mirrors the download services' naming so a rendered file sits alongside
@@ -608,9 +712,12 @@ class DownloadProvider extends ChangeNotifier {
     // be the whole answer: the map lives in memory, while a failed task is
     // persisted and comes back on the next launch, so a retry after a restart
     // has to fall through to re-extraction — see `_retrySlideshow`.
-    final remembered = _slideshowSources[task.id];
-    if (remembered != null) {
-      await _retrySlideshow(task, remembered, l10n);
+    //
+    // A merged YouTube option is the exception to the shortcut: its stream
+    // URLs are signed and expire within hours, so it is always re-extracted.
+    final remembered = _renderOptions[task.id];
+    if (remembered != null && remembered.merge == null) {
+      await _retryRender(task, remembered, l10n, options);
       return;
     }
 
@@ -630,10 +737,14 @@ class DownloadProvider extends ChangeNotifier {
     // Re-extraction is what makes a retry survive a restart: the option comes
     // back with a live source, even though nothing about the stored task could
     // have said how to render it.
-    final refreshedSlideshow = refreshedUrl?.slideshow;
-    if (refreshedSlideshow != null) {
-      _slideshowSources[task.id] = refreshedSlideshow;
-      await _retrySlideshow(task, refreshedSlideshow, l10n);
+    if (refreshedUrl != null && refreshedUrl.needsRendering) {
+      _renderOptions[task.id] = refreshedUrl;
+      await _retryRender(task, refreshedUrl, l10n, options);
+      return;
+    }
+    if (refreshedUrl == null && remembered != null) {
+      // Re-extraction failed; the remembered streams are the only lead left.
+      await _retryRender(task, remembered, l10n, options);
       return;
     }
 
@@ -833,6 +944,23 @@ class DownloadProvider extends ChangeNotifier {
 
 /// A fresh scratch directory under the OS temp directory, one per render, so
 /// two runs of the same post cannot read each other's half-written images.
+/// Fetches one stream of a merged video to a local file; injectable so tests
+/// can stand in for the network.
+typedef StreamFetcher =
+    Future<void> Function(
+      String url,
+      File into, {
+      void Function(int receivedBytes)? onBytes,
+      bool Function()? isCancelled,
+    });
+
+Future<void> _defaultStreamFetcher(
+  String url,
+  File into, {
+  void Function(int receivedBytes)? onBytes,
+  bool Function()? isCancelled,
+}) => fetchStreamToFile(url, into, onBytes: onBytes, isCancelled: isCancelled);
+
 Future<Directory> _defaultSlideshowWorkspace() async {
   final temp = await getTemporaryDirectory();
   return Directory(

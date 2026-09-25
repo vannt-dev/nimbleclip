@@ -6,6 +6,21 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- Added 480p, 720p and 1080p YouTube downloads on Android. YouTube serves
+  nothing above 360p with sound; higher qualities are a video-only stream plus
+  a separate audio stream. Both are now fetched and joined on the device into
+  one MP4 by copying their samples, without re-encoding, so a 1080p clip takes
+  seconds to join and the picture is exactly what YouTube sent. H.264 only,
+  which is why the ceiling is 1080p: above it YouTube offers only VP9 and AV1.
+  Other platforms keep the 360p option and see no higher row.
+- Each stream is fetched in 10 MB byte ranges and written straight to disk.
+  One open-ended request is throttled by YouTube to roughly playback speed; a
+  3-minute 1080p video (84 MB) now arrives in under a minute on an emulator.
+- A vertical Short labelled 720p is 720x1280. Qualities are compared on the
+  short side, as YouTube names them, so a Short is not mistaken for 1280p and
+  dropped by the 1080p ceiling.
+- A retry of a failed merged download re-reads the video first: the stream
+  URLs are signed and expire within hours.
 - Fixed YouTube Shorts share links (`/shorts/<id>?si=...`) failing with "no
   streams". The YouTube library's own Shorts pattern requires the ID to end
   the URL, so it rejected every copied share link; the extractor now hands it

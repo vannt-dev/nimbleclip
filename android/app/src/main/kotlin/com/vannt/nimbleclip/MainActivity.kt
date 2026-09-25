@@ -137,7 +137,7 @@ class MainActivity : FlutterActivity() {
                     SlideshowEncoder.cancel(call.argument<String>("renderId").orEmpty())
                     result.success(null)
                 }
-                "render", "probe", "frameColorAt" -> {
+                "render", "mux", "probe", "frameColorAt" -> {
                     // A slideshow encode runs for seconds; on the platform
                     // thread that freezes the UI and trips the ANR watchdog.
                     // The MethodChannel.Result must still be completed on the
@@ -147,6 +147,28 @@ class MainActivity : FlutterActivity() {
                             val encoder = SlideshowEncoder()
                             val payload: Any = when (call.method) {
                                 "probe" -> encoder.probe(call.argument<String>("path")!!)
+                                "mux" -> {
+                                    val renderId = call.argument<String>("renderId").orEmpty()
+                                    val filePath = StreamMuxer().mux(
+                                        StreamMuxer.Request(
+                                            videoPath = call.argument<String>("videoPath")!!,
+                                            audioPath = call.argument<String>("audioPath")!!,
+                                            outputPath = call.argument<String>("outputPath")!!,
+                                            renderId = renderId,
+                                        ),
+                                    ) { progress ->
+                                        runOnUiThread {
+                                            slideshowChannel.invokeMethod(
+                                                "progress",
+                                                mapOf(
+                                                    "renderId" to renderId,
+                                                    "progress" to progress,
+                                                ),
+                                            )
+                                        }
+                                    }
+                                    mapOf("filePath" to filePath)
+                                }
                                 "frameColorAt" -> encoder.frameColorAt(
                                     call.argument<String>("path")!!,
                                     call.argument<Int>("atMs") ?: 0,

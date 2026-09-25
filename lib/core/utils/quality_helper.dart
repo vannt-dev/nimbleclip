@@ -56,7 +56,7 @@ class QualityHelper {
     // A slideshow does not exist until it is rendered, so it must not win the
     // default selection away from the photos it is made of. It shares the
     // image tier: below every real video, above audio.
-    if (option.needsRendering) return 0;
+    if (option.isSlideshow) return 0;
     // An image carries no resolution: `VideoQualityOption.image` leaves
     // `quality` at the literal 'Original', which the named-height table reads
     // as 2160. Parsing it ranked every photo above every video, so a post
@@ -106,7 +106,7 @@ class QualityHelper {
     }
 
     final videoOnly = sorted
-        .where((o) => !o.isAudioOnly && !o.isImage && !o.needsRendering)
+        .where((o) => !o.isAudioOnly && !o.isImage && !o.isSlideshow)
         .toList();
     if (videoOnly.isEmpty) return sorted.first;
 

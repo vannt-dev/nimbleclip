@@ -1,4 +1,5 @@
 import 'gallery_notice.dart';
+import 'merge_source.dart';
 import 'quality_descriptor.dart';
 import 'slideshow_source.dart';
 import 'video_platform.dart';
@@ -24,6 +25,10 @@ class VideoQualityOption {
   /// is a file. Null for everything that is fetched from a URL.
   final SlideshowSource? slideshow;
 
+  /// Set only on a video whose picture and sound are fetched separately and
+  /// joined on the device. Null for everything else.
+  final MergeSource? merge;
+
   const VideoQualityOption({
     required this.id,
     required this.label,
@@ -36,10 +41,11 @@ class VideoQualityOption {
     this.headers,
     this.mediaId,
     this.slideshow,
+    this.merge,
     bool checked = true,
   }) : assert(
-         !checked || downloadUrl != '' || slideshow != null,
-         'An option with no download URL must carry a SlideshowSource.',
+         !checked || downloadUrl != '' || slideshow != null || merge != null,
+         'An option with no download URL must carry a source to render.',
        );
 
   const VideoQualityOption.image({
@@ -53,7 +59,8 @@ class VideoQualityOption {
     this.headers,
     this.mediaId,
     this.slideshow,
-  }) : kind = MediaKind.image;
+  }) : kind = MediaKind.image,
+       merge = null;
 
   const VideoQualityOption.video({
     required this.id,
@@ -66,7 +73,8 @@ class VideoQualityOption {
     this.headers,
     this.mediaId,
     this.slideshow,
-  }) : kind = MediaKind.video;
+  }) : kind = MediaKind.video,
+       merge = null;
 
   const VideoQualityOption.audio({
     required this.id,
@@ -79,7 +87,8 @@ class VideoQualityOption {
     this.headers,
     this.mediaId,
     this.slideshow,
-  }) : kind = MediaKind.audio;
+  }) : kind = MediaKind.audio,
+       merge = null;
 
   /// A video the device will render from [source]. [downloadUrl] is empty
   /// because there is nothing to fetch; `needsRendering` is what callers
@@ -96,11 +105,33 @@ class VideoQualityOption {
        downloadUrl = '',
        sizeBytes = null,
        headers = null,
+       merge = null,
        slideshow = source;
+
+  /// A video the device will join from [source]'s two streams. Like a
+  /// slideshow it has no single URL to fetch; unlike one it is the post's own
+  /// video at a real resolution, so it competes for the default selection.
+  const VideoQualityOption.merged({
+    required this.id,
+    required this.label,
+    required this.quality,
+    required MergeSource source,
+    this.format = 'mp4',
+    this.thumbnailUrl,
+    this.sizeBytes,
+    this.mediaId,
+  }) : kind = MediaKind.video,
+       downloadUrl = '',
+       headers = null,
+       slideshow = null,
+       merge = source;
 
   bool get isAudioOnly => kind == MediaKind.audio;
   bool get isImage => kind == MediaKind.image;
-  bool get needsRendering => slideshow != null;
+  bool get isSlideshow => slideshow != null;
+
+  /// True when the file is produced on the device rather than fetched whole.
+  bool get needsRendering => slideshow != null || merge != null;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -190,7 +221,7 @@ class VideoMetadata {
     for (final quality in qualities) {
       // A slideshow is not a file yet. Preferring it here would move a photo
       // post's default selection off its photos and onto the video tab.
-      if (quality.needsRendering) continue;
+      if (quality.isSlideshow) continue;
       if (!quality.isAudioOnly && !quality.isImage) return quality;
     }
     for (final quality in qualities) {

@@ -26,6 +26,17 @@ class UnsupportedSlideshowRenderer implements SlideshowRenderer {
     throw const SlideshowException(SlideshowFailureKind.encoderUnavailable);
   }
 
+  @override
+  Future<String> mux({
+    required String videoPath,
+    required String audioPath,
+    required String outputPath,
+    String? renderId,
+    void Function(double progress)? onProgress,
+  }) async {
+    throw const SlideshowException(SlideshowFailureKind.encoderUnavailable);
+  }
+
   /// Nothing can be running, so there is nothing to stop.
   @override
   Future<void> cancel(String renderId) async {}

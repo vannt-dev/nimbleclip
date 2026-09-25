@@ -428,6 +428,130 @@ void main() {
       await File(path).delete();
     }
   });
+
+  /// A silent clip and a clip with sound, rendered by the encoder above: the
+  /// mux inputs a YouTube download stands for, without a network fixture.
+  Future<({String video, String withSound, List<String> frames})>
+  muxInputs() async {
+    final dir = await getTemporaryDirectory();
+    final paths = await writeFixtures(dir);
+    final song = File('${dir.path}/mux_song.mp3');
+    await song.writeAsBytes(_silentMp3(seconds: 4));
+    final silent = await channel.invokeMapMethod<String, dynamic>('render', {
+      'imagePaths': paths,
+      'audioPath': null,
+      'perImageMs': 1000,
+      'width': 1080,
+      'height': 1920,
+      'outputPath': '${dir.path}/mux_video.mp4',
+    });
+    final sound = await channel.invokeMapMethod<String, dynamic>('render', {
+      'imagePaths': paths,
+      'audioPath': song.path,
+      'perImageMs': 1000,
+      'width': 1080,
+      'height': 1920,
+      'outputPath': '${dir.path}/mux_sound.mp4',
+    });
+    return (
+      video: silent!['filePath'] as String,
+      withSound: sound!['filePath'] as String,
+      frames: [...paths, song.path],
+    );
+  }
+
+  Future<void> deleteAll(Iterable<String> paths) async {
+    for (final path in paths) {
+      final file = File(path);
+      if (file.existsSync()) await file.delete();
+    }
+  }
+
+  test('a video stream and an audio stream mux into one mp4', () async {
+    final inputs = await muxInputs();
+    final out = '${(await getTemporaryDirectory()).path}/muxed.mp4';
+    final progress = <double>[];
+    // Filtered by id: the renders that built the inputs post their own
+    // progress through the main thread, and some land after this handler.
+    channel.setMethodCallHandler((call) async {
+      final arguments = call.arguments;
+      if (call.method == 'progress' &&
+          arguments is Map &&
+          arguments['renderId'] == 'mux-ok') {
+        progress.add((arguments['progress'] as num).toDouble());
+      }
+      return null;
+    });
+    addTearDown(() => channel.setMethodCallHandler(null));
+
+    final result = await channel.invokeMapMethod<String, dynamic>('mux', {
+      'videoPath': inputs.video,
+      'audioPath': inputs.withSound,
+      'outputPath': out,
+      'renderId': 'mux-ok',
+    });
+
+    expect(result!['filePath'], out);
+    final probe = await channel.invokeMapMethod<String, dynamic>('probe', {
+      'path': out,
+    });
+    expect(probe!['hasVideo'], isTrue);
+    expect(probe['hasAudio'], isTrue);
+    expect(probe['width'], 1080);
+    expect(probe['height'], 1920);
+    expect(probe['durationMs'] as int, greaterThan(2500));
+    expect(probe['durationMs'] as int, lessThan(4500));
+    // Samples are copied, not re-encoded: the picture costs what it did.
+    expect(
+      File(out).lengthSync(),
+      lessThan(File(inputs.video).lengthSync() * 2 + 200000),
+    );
+    expect(progress, isNotEmpty);
+    expect(progress.last, 1.0);
+    for (var i = 1; i < progress.length; i++) {
+      expect(progress[i], greaterThanOrEqualTo(progress[i - 1]));
+    }
+
+    await deleteAll([out, inputs.video, inputs.withSound, ...inputs.frames]);
+  });
+
+  test('an audio input without sound fails and writes no file', () async {
+    final inputs = await muxInputs();
+    final out = '${(await getTemporaryDirectory()).path}/muxed_silent.mp4';
+
+    await expectLater(
+      channel.invokeMapMethod<String, dynamic>('mux', {
+        'videoPath': inputs.video,
+        'audioPath': inputs.video,
+        'outputPath': out,
+        'renderId': 'mux-no-audio',
+      }),
+      throwsA(
+        isA<PlatformException>().having((e) => e.code, 'code', 'encode_failed'),
+      ),
+    );
+    expect(File(out).existsSync(), isFalse);
+
+    await deleteAll([inputs.video, inputs.withSound, ...inputs.frames]);
+  });
+
+  // A cancel sent while Dart was still fetching reaches Kotlin with no mux
+  // running. Left registered, it would kill the retry of that same task.
+  test('a cancel sent before a mux starts does not stop it', () async {
+    final inputs = await muxInputs();
+    final out = '${(await getTemporaryDirectory()).path}/muxed_retry.mp4';
+
+    await channel.invokeMethod<void>('cancel', {'renderId': 'mux-retry'});
+    final result = await channel.invokeMapMethod<String, dynamic>('mux', {
+      'videoPath': inputs.video,
+      'audioPath': inputs.withSound,
+      'outputPath': out,
+      'renderId': 'mux-retry',
+    });
+
+    expect(File(result!['filePath'] as String).existsSync(), isTrue);
+    await deleteAll([out, inputs.video, inputs.withSound, ...inputs.frames]);
+  });
 }
 
 /// Builds a real MPEG-1 Layer III file: 44.1 kHz, stereo, 128 kbps — the shape

@@ -42,6 +42,10 @@ management, local playback, and gallery export.
   folder of pictures. Android only for now: the encode runs on the platform's
   own codecs, and the option is hidden everywhere else rather than offered and
   failed.
+- Downloads YouTube videos at up to 1080p on Android by fetching the separate
+  picture and sound streams and joining them on the device without
+  re-encoding. Other platforms offer YouTube's 360p stream, the highest it
+  serves with sound.
 - Uses one shared download queue with a configurable limit of one to five
   concurrent transfers, so separate batches cannot overload the device or
   network.
