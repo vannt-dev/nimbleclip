@@ -86,14 +86,18 @@ void main() {
           greaterThanOrEqualTo(entry.value.minimumVideos),
           reason: 'a case named for video must not pass on photographs alone',
         );
-        // A slideshow is rendered on the device and so has no download URL of
-        // its own; the images and music it is rendered from must resolve.
+        // A slideshow or a merged video is produced on the device and so has
+        // no download URL of its own; the sources it is built from must
+        // resolve instead.
         bool resolves(String url) => Uri.tryParse(url)?.hasScheme == true;
         for (final option in metadata.qualities) {
           final slideshow = option.slideshow;
-          final urls = slideshow == null
-              ? [option.downloadUrl]
-              : [...slideshow.imageUrls, ?slideshow.audioUrl];
+          final merge = option.merge;
+          final urls = slideshow != null
+              ? [...slideshow.imageUrls, ?slideshow.audioUrl]
+              : merge != null
+              ? [merge.videoUrl, merge.audioUrl]
+              : [option.downloadUrl];
           expect(urls, isNotEmpty, reason: option.id);
           expect(urls.every(resolves), isTrue, reason: option.id);
         }
