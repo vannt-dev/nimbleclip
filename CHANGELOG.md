@@ -10,6 +10,9 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   streams". The YouTube library's own Shorts pattern requires the ID to end
   the URL, so it rejected every copied share link; the extractor now hands it
   the parsed ID.
+- The YouTube audio option now picks the best AAC stream. It used to pick the
+  highest bitrate overall, usually Opus in WebM, and saved it under an `.m4a`
+  name it is not.
 - When a YouTube extraction fails, copied diagnostics now include the native
   client's own error. It used to be discarded in favour of the fallback's
   failure, which is how the Shorts bug above surfaced as "no streams".

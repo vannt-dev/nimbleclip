@@ -98,9 +98,16 @@ class YouTubeExtractor extends BaseVideoExtractor {
         );
       }
 
-      final audioStreams = manifest.audioOnly.sortByBitrate();
-      if (audioStreams.isNotEmpty) {
-        final bestAudio = audioStreams.withHighestBitrate();
+      // AAC in MP4 only. The highest bitrate overall is usually Opus in WebM,
+      // which was once offered here and saved under an .m4a name it is not.
+      final aacStreams = manifest.audioOnly
+          .where((stream) => stream.container == yt_lib.StreamContainer.mp4)
+          .toList();
+      final bestAudio = aacStreams.isEmpty
+          ? null
+          : aacStreams.withHighestBitrate();
+
+      if (bestAudio != null) {
         final kbps = bestAudio.bitrate.kiloBitsPerSecond.round();
         qualities.add(
           VideoQualityOption(
