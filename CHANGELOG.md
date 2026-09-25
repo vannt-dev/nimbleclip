@@ -10,6 +10,7 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   still running no longer produces it twice. Downloads fetched from a URL were
   already guarded; options produced on the device were split off before that
   check.
+- The live extractor check now covers a YouTube Short shared with `?si=`.
 
 ## [1.7.0] - 2026-09-25
 

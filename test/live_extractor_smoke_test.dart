@@ -33,6 +33,14 @@ void main() {
       minimumMedia: 1,
       minimumVideos: 1,
     ),
+    // The shape the YouTube app shares, `?si=` and all. The library's own
+    // Shorts pattern once rejected every such link while the plain watch URL
+    // above kept passing.
+    'YouTube Short from a share link': (
+      url: 'https://youtube.com/shorts/uX_MyFPrkxA?si=odC7xSUW-rNQw5PZ',
+      minimumMedia: 1,
+      minimumVideos: 1,
+    ),
     'Facebook gallery': (
       url: 'https://www.facebook.com/cebuanafinance/posts/662287040177856/',
       minimumMedia: 2,
