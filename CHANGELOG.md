@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-09-25
+
 - Added 480p, 720p and 1080p YouTube downloads on Android. YouTube serves
   nothing above 360p with sound; higher qualities are a video-only stream plus
   a separate audio stream. Both are now fetched and joined on the device into
@@ -31,8 +33,14 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 - When a YouTube extraction fails, copied diagnostics now include the native
   client's own error. It used to be discarded in favour of the fallback's
   failure, which is how the Shorts bug above surfaced as "no streams".
+- Fixed Facebook albums arriving as their cover photo alone. The gallery
+  service moved to its `www` host and answers the bare domain with a `308`
+  redirect, which is not followed for a POST, so every gallery lookup failed
+  from 2026-09-16.
 - Upgraded `cached_network_image` to 4.0.2 and refreshed other dependencies
-  within their existing constraints.
+  within their existing constraints. The iOS build now needs Xcode 26.1.1 or
+  later, since `connectivity_plus` (via `background_downloader`) uses iOS 26
+  APIs.
 
 ## [1.6.0] - 2026-09-03
 
