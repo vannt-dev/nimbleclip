@@ -48,6 +48,10 @@ enum ExtractionFailureKind {
 
   /// Detail: the reason YouTube gave.
   youtubePlaybackRejected,
+
+  /// YouTube kept refusing the page after the library's own retries: it is
+  /// throttling this client, and the video itself may be fine.
+  youtubeTemporarilyUnavailable,
 }
 
 /// A failure kind plus the one piece of context some kinds carry.

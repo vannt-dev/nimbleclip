@@ -147,6 +147,7 @@
   "youtubePlaybackRejected": "YouTube từ chối phát video này: {reason}",
   "youtubeCipherUnsupported": "Video sử dụng luồng có chữ ký bảo vệ mà bản Web không giải mã được. Hãy dùng ứng dụng Android, iOS hoặc Desktop.",
   "youtubeNoStreams": "Không tìm thấy luồng tải nào cho video YouTube này.",
+  "youtubeTemporarilyUnavailable": "YouTube đang tạm từ chối yêu cầu từ thiết bị này. Hãy đợi vài phút rồi thử lại.",
   "xInvalidPost": "Không tìm thấy ID bài đăng trong liên kết X / Twitter. Hãy dùng link dạng x.com/<tài khoản>/status/<id>.",
   "xNoVideo": "Bài đăng không có video tải được hoặc tài khoản đang được bảo vệ.",
   "originalMp4": "MP4 (Chất lượng gốc)",

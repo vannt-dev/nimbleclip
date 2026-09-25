@@ -39,6 +39,25 @@ class ExtractionException implements Exception {
   String toString() => 'ExtractionException(${failure.kind.name})';
 }
 
+/// Why each strategy an extractor tried came back empty-handed.
+///
+/// Strategies recover from their own failures by returning nothing, so the
+/// next one can try. The final error then names only the outcome ("no
+/// video"), which reads the same whether the post is empty or the device is
+/// offline. Collected here, the causes go into the diagnostics instead.
+class StrategyErrors {
+  final List<String> _entries = [];
+
+  void add(String strategy, Object error) => _entries.add('$strategy: $error');
+
+  /// Records a response that came back but was refused.
+  void addStatus(String strategy, int statusCode) =>
+      add(strategy, 'HTTP $statusCode');
+
+  /// All causes in the order they happened; null when nothing failed.
+  String? get summary => _entries.isEmpty ? null : _entries.join('; ');
+}
+
 abstract class BaseVideoExtractor {
   const BaseVideoExtractor();
 
