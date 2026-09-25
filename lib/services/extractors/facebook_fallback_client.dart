@@ -26,8 +26,10 @@ class ToolspyFacebookFallbackClient implements FacebookFallbackClient {
 
   @override
   Future<List<String>> extractImageUrls(String postUrl) async {
+    // The bare domain answers with a 308 to this host, and a POST does not
+    // follow redirects.
     final response = await ExtractorHttp.postWithRetry(
-      'https://toolspy.net/api/facebook-image-extract/',
+      'https://www.toolspy.net/api/facebook-image-extract/',
       service: 'Toolspy',
       body: jsonEncode({'url': postUrl}),
       headers: const {

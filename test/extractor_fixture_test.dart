@@ -403,6 +403,28 @@ void main() {
     expect(result.qualities.where((option) => option.isImage), hasLength(4));
   });
 
+  // Toolspy moved its API to the www host and answers the bare domain with a
+  // 308. `http` does not follow a redirect for a POST, so the gallery check
+  // failed on every post and each album shrank to its cover photo.
+  test('Facebook asks the gallery service at the host that answers', () async {
+    ExtractorHttp.getOverride = (_, _) async =>
+        http.Response(fixture('facebook_image.html'), 200);
+    ExtractorHttp.postOverride = (uri, _, _) async =>
+        uri.host == 'www.toolspy.net'
+        ? http.Response(fixture('facebook_fallback.json'), 200)
+        : http.Response(
+            '{"redirect": "https://www.toolspy.net${uri.path}"}',
+            308,
+          );
+
+    final result = await const FacebookExtractor().extract(
+      'https://www.facebook.com/example/posts/654321',
+    );
+
+    expect(result.galleryNotice, isNull);
+    expect(result.qualities.where((option) => option.isImage), hasLength(4));
+  });
+
   test('Facebook reads a group post permalink album', () async {
     ExtractorHttp.getOverride = (_, _) async =>
         http.Response(fixture('facebook_image.html'), 200);
