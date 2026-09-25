@@ -20,6 +20,7 @@ class VideoExtractorProvider extends ChangeNotifier {
   String _currentUrl = '';
   String? _diagnosticCode;
   List<String> _attemptedStrategies = const [];
+  String? _suppressedError;
   List<BatchAnalysisResult> _batchResults = const [];
   Duration? _lastAnalysisDuration;
   DateTime? _lastAnalyzedAt;
@@ -39,6 +40,7 @@ class VideoExtractorProvider extends ChangeNotifier {
   String? get diagnosticCode => _diagnosticCode;
   List<String> get attemptedStrategies =>
       List.unmodifiable(_attemptedStrategies);
+  String? get suppressedError => _suppressedError;
   List<BatchAnalysisResult> get batchResults =>
       List.unmodifiable(_batchResults);
   Duration? get lastAnalysisDuration => _lastAnalysisDuration;
@@ -66,6 +68,7 @@ class VideoExtractorProvider extends ChangeNotifier {
     _currentUrl = cleanUrl;
     _diagnosticCode = null;
     _attemptedStrategies = const [];
+    _suppressedError = null;
     _batchResults = const [];
     notifyListeners();
     final stopwatch = Stopwatch()..start();
@@ -94,6 +97,7 @@ class VideoExtractorProvider extends ChangeNotifier {
         _attemptedStrategies = e.attemptedStrategies.isEmpty
             ? const ['extractor_registry']
             : e.attemptedStrategies;
+        _suppressedError = e.suppressedError;
       } else {
         _diagnosticCode =
             '${UrlHelper.detectPlatform(cleanUrl).name}_extraction_failed';
@@ -279,6 +283,7 @@ class VideoExtractorProvider extends ChangeNotifier {
     _currentUrl = '';
     _diagnosticCode = null;
     _attemptedStrategies = const [];
+    _suppressedError = null;
     _batchResults = const [];
     _lastAnalysisDuration = null;
     _lastAnalyzedAt = null;

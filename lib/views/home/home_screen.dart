@@ -181,6 +181,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           'URL: ${extractor.currentUrl}',
           'Platform: ${UrlHelper.detectPlatform(extractor.currentUrl).name}',
           'Strategies: ${extractor.attemptedStrategies.join(', ')}',
+          if (extractor.suppressedError != null)
+            'Earlier error: ${extractor.suppressedError}',
           if (duration != null) 'Duration: ${duration.inMilliseconds}ms',
           if (analyzedAt != null)
             'Analyzed at: ${analyzedAt.toIso8601String()}',

@@ -116,6 +116,52 @@ class MethodChannelSlideshowRenderer implements SlideshowRenderer {
   }
 
   @override
+  Future<String> mux({
+    required String videoPath,
+    required String audioPath,
+    required String outputPath,
+    String? renderId,
+    void Function(double progress)? onProgress,
+  }) async {
+    if (!isSupported) {
+      throw const SlideshowException(SlideshowFailureKind.encoderUnavailable);
+    }
+    final id = renderId ?? 'mux_${DateTime.now().microsecondsSinceEpoch}';
+    if (onProgress != null) {
+      _installHandler();
+      _listeners[id] = onProgress;
+    }
+
+    final Map<String, dynamic>? result;
+    try {
+      result = await _channel.invokeMapMethod<String, dynamic>('mux', {
+        'videoPath': videoPath,
+        'audioPath': audioPath,
+        'outputPath': outputPath,
+        'renderId': id,
+      });
+    } on PlatformException catch (error) {
+      throw SlideshowException(_kindFor(error.code), detail: error.message);
+    } on MissingPluginException catch (error) {
+      throw SlideshowException(
+        SlideshowFailureKind.encoderUnavailable,
+        detail: error.message,
+      );
+    } finally {
+      _listeners.remove(id);
+    }
+
+    final filePath = result?['filePath'] as String?;
+    if (filePath == null || filePath.isEmpty) {
+      throw const SlideshowException(
+        SlideshowFailureKind.encodeFailed,
+        detail: 'the muxer returned no file path',
+      );
+    }
+    return filePath;
+  }
+
+  @override
   Future<void> cancel(String renderId) async {
     if (!isSupported) return;
     _listeners.remove(renderId);

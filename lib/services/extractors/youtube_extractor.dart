@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -8,16 +9,115 @@ import '../../core/utils/http_helper.dart';
 import '../../core/utils/cors_helper.dart';
 import '../../core/utils/json_scanner.dart';
 import '../../core/utils/quality_helper.dart';
+import '../../models/merge_source.dart';
 import '../../models/quality_descriptor.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
+import '../slideshow/slideshow_renderer.dart';
 import 'base_extractor.dart';
 import 'extraction_failure.dart';
 
+/// One adaptive stream as the planner needs it, free of the library's types
+/// so the choice can be tested without a network manifest.
+@visibleForTesting
+class AdaptiveStream {
+  const AdaptiveStream({
+    required this.tag,
+    required this.qualityLabel,
+    required this.height,
+    required this.container,
+    required this.codecs,
+    required this.url,
+    required this.bytes,
+    required this.bitrate,
+  });
+
+  final int tag;
+  final String qualityLabel;
+  final int height;
+  final String container;
+  final String codecs;
+  final String url;
+  final int bytes;
+  final int bitrate;
+}
+
 class YouTubeExtractor extends BaseVideoExtractor {
-  const YouTubeExtractor({this.useNativeClient = true});
+  const YouTubeExtractor({
+    this.useNativeClient = true,
+    @visibleForTesting this.nativeHttpClient,
+    this.canMergeStreams,
+  });
 
   final bool useNativeClient;
+
+  /// Transport for the native client; `null` uses the library's default.
+  final http.Client? nativeHttpClient;
+
+  /// Overrides the platform check behind [mergeStreams]; null asks the
+  /// device.
+  final bool? canMergeStreams;
+
+  /// Whether to offer qualities above 360p, which only exist as separate
+  /// picture and sound streams and must be joined on the device.
+  ///
+  /// Decided here rather than filtered in the UI: the default selection is
+  /// made from the full list, so an option this device cannot produce would
+  /// otherwise be picked as "Highest" and then hidden.
+  bool get mergeStreams =>
+      canMergeStreams ?? createSlideshowRenderer().isSupported;
+
+  /// The highest quality offered as a merged download.
+  static const int maxMergedHeight = 1080;
+
+  /// The side YouTube names a quality after: a vertical Short labelled 720p
+  /// is 720x1280, and comparing its height would call it 1280p.
+  static int _shortSide(yt_lib.VideoResolution resolution) =>
+      min(resolution.width, resolution.height);
+
+  /// Picks one H.264 stream per quality above [aboveHeight], up to
+  /// [maxMergedHeight], each paired with [audio].
+  ///
+  /// H.264 only: it is the one codec `MediaMuxer` puts in an MP4 on every
+  /// supported Android version and every player opens. YouTube stops offering
+  /// it above 1080p, which is where VP9 and AV1 take over.
+  @visibleForTesting
+  static List<VideoQualityOption> planMergedOptions({
+    required List<AdaptiveStream> videos,
+    required AdaptiveStream audio,
+    required int aboveHeight,
+  }) {
+    final byLabel = <String, AdaptiveStream>{};
+    for (final stream in videos) {
+      if (stream.container != 'mp4' || !stream.codecs.startsWith('avc1')) {
+        continue;
+      }
+      if (stream.height <= aboveHeight || stream.height > maxMergedHeight) {
+        continue;
+      }
+      final current = byLabel[stream.qualityLabel];
+      if (current == null || stream.bitrate > current.bitrate) {
+        byLabel[stream.qualityLabel] = stream;
+      }
+    }
+    final picked = byLabel.values.toList()
+      ..sort((a, b) => b.height.compareTo(a.height));
+    return [
+      for (final stream in picked)
+        VideoQualityOption.merged(
+          id: 'yt_merged_${stream.tag}',
+          label: VideoWithAudio(stream.qualityLabel),
+          quality: stream.qualityLabel,
+          sizeBytes: stream.bytes + audio.bytes,
+          source: MergeSource(
+            videoUrl: stream.url,
+            audioUrl: audio.url,
+            videoBytes: stream.bytes,
+            audioBytes: audio.bytes,
+          ),
+        ),
+    ];
+  }
 
   @override
   VideoPlatform get platform => VideoPlatform.youtube;
@@ -30,31 +130,52 @@ class YouTubeExtractor extends BaseVideoExtractor {
     r'(?:youtu\.be/|youtube(?:-nocookie)?\.com/(?:embed/|v/|live/|shorts/|watch\?(?:.*&)?v=))([\w-]{11})',
   );
 
-  String? _extractVideoId(String url) =>
+  @visibleForTesting
+  static String? videoIdFrom(String url) =>
       _videoIdPattern.firstMatch(url)?.group(1);
 
   @override
   Future<VideoMetadata> extract(String url) async {
+    final videoId = videoIdFrom(url);
+
     // Native platforms get the real deal: youtube_explode_dart deciphers
     // signature-protected stream URLs, which plain HTML scraping cannot.
+    Object? nativeError;
     if (!kIsWeb && useNativeClient) {
-      final native = await _extractNative(url);
-      if (native != null) return native;
+      try {
+        // Hand the library the parsed ID, not the URL: its Shorts pattern
+        // requires the ID to end the string, so a copied share link such as
+        // `/shorts/<id>?si=...` is rejected as an invalid URL.
+        final native = await _extractNative(url, videoId ?? url);
+        if (native != null) return native;
+      } catch (e) {
+        // Fall through to the watch-page strategy, but keep the error: the
+        // fallback's own failure is what the user sees.
+        nativeError = e;
+      }
     }
 
-    final videoId = _extractVideoId(url);
-    if (videoId == null) {
-      throw ExtractionException(
-        const ExtractionFailure(ExtractionFailureKind.youtubeInvalidId),
-      );
+    try {
+      if (videoId == null) {
+        throw ExtractionException(
+          const ExtractionFailure(ExtractionFailureKind.youtubeInvalidId),
+        );
+      }
+      return await _extractFromWatchPage(url, videoId);
+    } on ExtractionException catch (e) {
+      if (nativeError == null) rethrow;
+      throw e.withSuppressedError('native-client: $nativeError');
     }
-    return _extractFromWatchPage(url, videoId);
   }
 
-  Future<VideoMetadata?> _extractNative(String url) async {
-    final yt = yt_lib.YoutubeExplode();
+  Future<VideoMetadata?> _extractNative(String url, String idOrUrl) async {
+    final yt = yt_lib.YoutubeExplode(
+      httpClient: nativeHttpClient == null
+          ? null
+          : yt_lib.YoutubeHttpClient(nativeHttpClient),
+    );
     try {
-      final video = await yt.videos.get(url);
+      final video = await yt.videos.get(idOrUrl);
       final manifest = await yt.videos.streamsClient.getManifest(video.id);
       final qualities = <VideoQualityOption>[];
 
@@ -71,9 +192,51 @@ class YouTubeExtractor extends BaseVideoExtractor {
         );
       }
 
-      final audioStreams = manifest.audioOnly.sortByBitrate();
-      if (audioStreams.isNotEmpty) {
-        final bestAudio = audioStreams.withHighestBitrate();
+      // AAC in MP4 only. The highest bitrate overall is usually Opus in WebM,
+      // which was once offered here and saved under an .m4a name it is not.
+      final aacStreams = manifest.audioOnly
+          .where((stream) => stream.container == yt_lib.StreamContainer.mp4)
+          .toList();
+      final bestAudio = aacStreams.isEmpty
+          ? null
+          : aacStreams.withHighestBitrate();
+
+      if (bestAudio != null && mergeStreams) {
+        final maxMuxedHeight = manifest.muxed.fold<int>(
+          0,
+          (height, stream) => max(height, _shortSide(stream.videoResolution)),
+        );
+        qualities.addAll(
+          planMergedOptions(
+            videos: [
+              for (final stream in manifest.videoOnly)
+                AdaptiveStream(
+                  tag: stream.tag,
+                  qualityLabel: stream.qualityLabel,
+                  height: _shortSide(stream.videoResolution),
+                  container: stream.container.name,
+                  codecs: stream.codec.parameters['codecs'] ?? '',
+                  url: stream.url.toString(),
+                  bytes: stream.size.totalBytes,
+                  bitrate: stream.bitrate.bitsPerSecond,
+                ),
+            ],
+            audio: AdaptiveStream(
+              tag: bestAudio.tag,
+              qualityLabel: '',
+              height: 0,
+              container: bestAudio.container.name,
+              codecs: bestAudio.codec.parameters['codecs'] ?? '',
+              url: bestAudio.url.toString(),
+              bytes: bestAudio.size.totalBytes,
+              bitrate: bestAudio.bitrate.bitsPerSecond,
+            ),
+            aboveHeight: maxMuxedHeight,
+          ),
+        );
+      }
+
+      if (bestAudio != null) {
         final kbps = bestAudio.bitrate.kiloBitsPerSecond.round();
         qualities.add(
           VideoQualityOption(
@@ -105,9 +268,6 @@ class YouTubeExtractor extends BaseVideoExtractor {
         viewCount: video.engagement.viewCount,
         likeCount: video.engagement.likeCount,
       );
-    } catch (_) {
-      // Fall through to the watch-page strategy.
-      return null;
     } finally {
       yt.close();
     }

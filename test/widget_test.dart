@@ -290,6 +290,26 @@ void main() {
     expect(provider.errorMessage, isNot(contains('ExtractionFailureKind')));
   });
 
+  test('an error a fallback recovered from stays in the diagnostics', () async {
+    final registry = _FailingExtractorRegistry(
+      const ExtractionException(
+        ExtractionFailure(ExtractionFailureKind.youtubeNoStreams),
+        suppressedError: 'native-client: invalid URL',
+      ),
+    );
+    final provider = VideoExtractorProvider(extractorRegistry: registry);
+
+    await provider.analyzeUrl(
+      'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      l10n: l10n,
+    );
+    expect(provider.suppressedError, 'native-client: invalid URL');
+
+    // Clearing must not leave the old error for the next diagnostics copy.
+    provider.clear();
+    expect(provider.suppressedError, isNull);
+  });
+
   test('a non-extraction error still falls back to its message', () async {
     final registry = _FailingExtractorRegistry(Exception('network down'));
     final provider = VideoExtractorProvider(extractorRegistry: registry);

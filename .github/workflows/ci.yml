@@ -118,6 +118,10 @@ jobs:
     name: iOS build and Share Extension
     runs-on: macos-15
     timeout-minutes: 25
+    env:
+      # connectivity_plus (via background_downloader) uses iOS 26 APIs such as
+      # NWPath.isUltraConstrained, which the image's default Xcode 16.4 lacks.
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     steps:
       - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
