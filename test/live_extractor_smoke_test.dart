@@ -86,12 +86,17 @@ void main() {
           greaterThanOrEqualTo(entry.value.minimumVideos),
           reason: 'a case named for video must not pass on photographs alone',
         );
-        expect(
-          metadata.qualities.every(
-            (option) => Uri.tryParse(option.downloadUrl)?.hasScheme == true,
-          ),
-          isTrue,
-        );
+        // A slideshow is rendered on the device and so has no download URL of
+        // its own; the images and music it is rendered from must resolve.
+        bool resolves(String url) => Uri.tryParse(url)?.hasScheme == true;
+        for (final option in metadata.qualities) {
+          final slideshow = option.slideshow;
+          final urls = slideshow == null
+              ? [option.downloadUrl]
+              : [...slideshow.imageUrls, ?slideshow.audioUrl];
+          expect(urls, isNotEmpty, reason: option.id);
+          expect(urls.every(resolves), isTrue, reason: option.id);
+        }
       },
       skip: !_runLive
           ? 'Run tool/check_live_extractors.ps1 to test live services.'
