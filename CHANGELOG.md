@@ -18,6 +18,13 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   the copied diagnostics, as YouTube's do since 1.7.0. Offline, each of them
   used to report only that the post had no media.
 - The live extractor check now covers a YouTube Short shared with `?si=`.
+- On Android, a 480p-1080p YouTube download now keeps going after the app is
+  closed or Android ends it. Both streams are queued up front as
+  system-managed downloads of at most 10 MB each (YouTube throttles larger
+  ranges to about playback speed), several of which run at once. One
+  notification counts the parts. Joining the streams still needs the app: if
+  the parts finish while it is closed, the video is joined the next time it
+  opens.
 
 ## [1.7.0] - 2026-09-25
 

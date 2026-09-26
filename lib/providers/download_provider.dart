@@ -24,6 +24,7 @@ import '../services/async_work_queue.dart';
 import '../services/extractors/registry.dart';
 import '../services/media_file_actions.dart';
 import '../services/storage_service.dart';
+import '../services/stream_pair_gateway.dart';
 
 class DownloadProvider extends ChangeNotifier {
   DownloadProvider({
@@ -171,6 +172,7 @@ class DownloadProvider extends ChangeNotifier {
         },
       );
     }
+    _resumeMerges();
     for (final task in loaded) {
       // fromJson already demotes interrupted downloads to `failed`; give them a
       // message so the UI explains why they need a retry.
@@ -184,6 +186,37 @@ class DownloadProvider extends ChangeNotifier {
           .map((task) => task.toJson()),
     );
     notifyListeners();
+  }
+
+  /// Picks up the merges the previous process left fetching.
+  ///
+  /// Their parts kept arriving without the app, but joining them needs it. A
+  /// merge whose task is gone, or is no longer the interrupted one, is thrown
+  /// away rather than resumed.
+  void _resumeMerges() {
+    final gateway = _streamPairs;
+    if (gateway == null) return;
+    for (final transfer in gateway.takeRecoveredStreamPairs()) {
+      final task = _findTask(transfer.taskId);
+      if (task == null ||
+          task.status != DownloadStatus.failed ||
+          task.errorMessage != null) {
+        unawaited(transfer.discard());
+        continue;
+      }
+      task
+        ..status = DownloadStatus.downloading
+        ..progress = 0;
+      // The locale is not known this early; history recovery reports in
+      // English for the same reason.
+      unawaited(
+        _resumeMerge(
+          task,
+          transfer,
+          lookupAppLocalizations(const Locale('en')),
+        ),
+      );
+    }
   }
 
   Future<void> _saveHistory({DownloadTask? receipt}) {
@@ -389,6 +422,9 @@ class DownloadProvider extends ChangeNotifier {
       _renderOptions[task.id] = quality;
       _tasks.insert(0, task);
       notifyListeners();
+      // Persisted before anything runs: a merge fetches outside the app, and a
+      // launch that finds its parts but not its task throws them away.
+      await _saveHistory();
       await _render(task, quality, l10n, options);
     }
   }
@@ -410,15 +446,14 @@ class DownloadProvider extends ChangeNotifier {
       ..errorMessage = null
       ..filePath = null;
     notifyListeners();
+    // The stored failure has to go before the parts start: a launch resumes
+    // only a merge whose task was interrupted, not one that had failed.
+    await _saveHistory();
     await _render(task, option, l10n, options);
   }
 
   /// Produces [option]'s file in the download directory and records the
   /// result on [task].
-  ///
-  /// Nothing here throws: a render is started without anyone awaiting it, so an
-  /// escaping error would surface as an unhandled asynchronous exception with
-  /// the task left stuck at `downloading` forever.
   Future<void> _render(
     DownloadTask task,
     VideoQualityOption option,
@@ -426,6 +461,98 @@ class DownloadProvider extends ChangeNotifier {
     DownloadOptions options,
   ) async {
     Directory? workspace;
+    Future<Directory> scratch() async =>
+        workspace ??= await _slideshowWorkspace();
+    // Images and music are megabytes apiece; one leaked scratch directory per
+    // render fills the cache up silently. Deleted inside [produce], so it is
+    // gone by the time the task reads as finished.
+    void deleteScratch() {
+      final scratchDir = workspace;
+      if (scratchDir == null) return;
+      try {
+        if (scratchDir.existsSync()) scratchDir.deleteSync(recursive: true);
+      } catch (_) {
+        // A locked file is not worth failing a finished render over.
+      }
+    }
+
+    final merge = option.merge;
+    await _produceRendered(
+      task,
+      l10n,
+      isMerge: merge != null,
+      autoSaveToGallery: options.autoSaveToGallery,
+      produce: (outputPath) async {
+        try {
+          if (merge != null) {
+            final gateway = _streamPairs;
+            if (gateway == null) {
+              final path = await _mergeStreams(
+                task,
+                merge,
+                await scratch(),
+                outputPath,
+              );
+              return (filePath: path, note: null);
+            }
+            final transfer = await gateway.startStreamPair(
+              taskId: task.id,
+              title: task.title,
+              source: merge,
+              autoSaveToGallery: options.autoSaveToGallery,
+            );
+            final path = await _muxTransfer(task, transfer, outputPath);
+            return (filePath: path, note: null);
+          }
+          final result = await _renderSlideshow(
+            task,
+            option.slideshow!,
+            await scratch(),
+            outputPath,
+          );
+          // Music that could not be transcoded is a note on a finished
+          // download, not a failure: the video is there and it plays.
+          return (
+            filePath: result.filePath,
+            note: result.audioSkipped ? l10n.slideshowMusicUnavailable : null,
+          );
+        } finally {
+          deleteScratch();
+        }
+      },
+    );
+  }
+
+  /// Joins the streams of a merge the previous process left fetching.
+  Future<void> _resumeMerge(
+    DownloadTask task,
+    StreamPairTransfer transfer,
+    AppLocalizations l10n,
+  ) => _produceRendered(
+    task,
+    l10n,
+    isMerge: true,
+    autoSaveToGallery: transfer.autoSaveToGallery,
+    produce: (outputPath) async =>
+        (filePath: await _muxTransfer(task, transfer, outputPath), note: null),
+  );
+
+  /// Runs [produce] against [task]'s file in the download directory and
+  /// records the outcome on [task].
+  ///
+  /// Nothing here throws: a render is started without anyone awaiting it, so an
+  /// escaping error would surface as an unhandled asynchronous exception with
+  /// the task left stuck at `downloading` forever.
+  Future<void> _produceRendered(
+    DownloadTask task,
+    AppLocalizations l10n, {
+    required bool isMerge,
+    required bool autoSaveToGallery,
+    required Future<({String filePath, String? note})> Function(
+      String outputPath,
+    )
+    produce,
+  }) async {
     String? outputPath;
     _slideshowRenders.add(task.id);
     try {
@@ -433,46 +560,30 @@ class DownloadProvider extends ChangeNotifier {
       if (downloadDir == null) {
         throw const SlideshowException(SlideshowFailureKind.encoderUnavailable);
       }
-      workspace = await _slideshowWorkspace();
       // Rendered straight into its final home rather than moved there
       // afterwards: the temp and download directories can sit on different
       // filesystems, where a rename fails and a copy doubles the disk cost of
       // a file the encoder is already writing whole.
       outputPath = '$downloadDir/${_slideshowFileName(task)}';
-      final merge = option.merge;
-      final String filePath;
-      String? note;
-      if (merge != null) {
-        filePath = await _mergeStreams(task, merge, workspace, outputPath);
-      } else {
-        final result = await _renderSlideshow(
-          task,
-          option.slideshow!,
-          workspace,
-          outputPath,
-        );
-        filePath = result.filePath;
-        // Music that could not be transcoded is a note on a finished download,
-        // not a failure: the video is there and it plays.
-        if (result.audioSkipped) note = l10n.slideshowMusicUnavailable;
-      }
+      final result = await produce(outputPath);
       // A cancel that landed after the last cancellable step: the file is
       // whole, but the user asked not to have it.
       if (task.status == DownloadStatus.cancelled) {
         throw const SlideshowException(SlideshowFailureKind.cancelled);
       }
       task
-        ..filePath = filePath
+        ..filePath = result.filePath
         ..status = DownloadStatus.completed
         ..progress = 1
+        ..downloadSpeed = 0
         ..completedAt = DateTime.now()
-        ..errorMessage = note;
-      if (merge != null) {
-        final size = await File(filePath).length();
+        ..errorMessage = result.note;
+      if (isMerge) {
+        final size = await File(result.filePath).length();
         task
           ..totalBytes = size
           ..receivedBytes = size;
-        if (options.autoSaveToGallery) {
+        if (autoSaveToGallery) {
           // Best effort, as for a fetched download: the file is complete in
           // the app either way, and Save to gallery stays on offer.
           await saveToGalleryManually(task).catchError((_) => false);
@@ -489,6 +600,7 @@ class DownloadProvider extends ChangeNotifier {
       task
         ..status = cancelled ? DownloadStatus.cancelled : DownloadStatus.failed
         ..progress = 0
+        ..downloadSpeed = 0
         ..filePath = null
         ..errorMessage = cancelled ? null : _slideshowFailureText(error, l10n);
       // A partial file would show up in the list as a playable download.
@@ -497,15 +609,6 @@ class DownloadProvider extends ChangeNotifier {
       }
     } finally {
       _slideshowRenders.remove(task.id);
-      // Images and music are megabytes apiece; one leaked scratch directory per
-      // render fills the cache up silently.
-      if (workspace != null) {
-        try {
-          if (workspace.existsSync()) workspace.deleteSync(recursive: true);
-        } catch (_) {
-          // A locked file is not worth failing a finished render over.
-        }
-      }
     }
     notifyListeners();
     await _saveHistory(
@@ -532,9 +635,68 @@ class DownloadProvider extends ChangeNotifier {
     );
   }
 
+  /// The gateway that fetches a merge's streams as operating-system
+  /// transfers, when the platform has one; otherwise the streams are fetched
+  /// here, and only while the app is running.
+  StreamPairGateway? get _streamPairs {
+    final gateway = _downloadService;
+    return gateway is StreamPairGateway ? gateway as StreamPairGateway : null;
+  }
+
   /// Share of a merged task's bar given to fetching; joining the two files
   /// only copies samples, so it takes the last sliver.
   static const double _mergeFetchShare = 0.95;
+
+  /// Waits for [transfer]'s two streams and joins them at [outputPath].
+  ///
+  /// The transfer's files are deleted however this ends, except when the
+  /// process itself ends part-way: then the next launch finishes the join.
+  Future<String> _muxTransfer(
+    DownloadTask task,
+    StreamPairTransfer transfer,
+    String outputPath,
+  ) async {
+    bool stopped() => task.status != DownloadStatus.downloading;
+    try {
+      // A cancel that landed while the parts were being queued found nothing
+      // to stop yet.
+      if (stopped()) {
+        throw const SlideshowException(SlideshowFailureKind.cancelled);
+      }
+      task.totalBytes = transfer.totalBytes;
+      transfer.onProgress = (received, bytesPerSecond) {
+        if (stopped()) return;
+        task
+          ..receivedBytes = received
+          ..downloadSpeed = bytesPerSecond
+          ..progress = transfer.totalBytes > 0
+              ? (received / transfer.totalBytes * _mergeFetchShare).clamp(
+                  0.0,
+                  _mergeFetchShare,
+                )
+              : 0.0;
+        task.notifyProgressChanged();
+      };
+      final files = await transfer.files;
+      if (stopped()) {
+        throw const SlideshowException(SlideshowFailureKind.cancelled);
+      }
+      task.downloadSpeed = 0;
+      return await _slideshowRenderer.mux(
+        videoPath: files.videoPath,
+        audioPath: files.audioPath,
+        outputPath: outputPath,
+        renderId: task.id,
+        onProgress: (fraction) => _reportRenderProgress(
+          task,
+          _mergeFetchShare + fraction * (1 - _mergeFetchShare),
+        ),
+      );
+    } finally {
+      transfer.onProgress = null;
+      await transfer.discard();
+    }
+  }
 
   /// Fetches [source]'s two streams into [workspace] and joins them at
   /// [outputPath].
@@ -668,9 +830,7 @@ class DownloadProvider extends ChangeNotifier {
     // heard of it, so neither line below can stop one. Only the renderer can,
     // and it has to be told before the status is set: the render's own catch
     // reads that status to tell a cancel apart from a failure.
-    if (_slideshowRenders.contains(taskId)) {
-      unawaited(_slideshowRenderer.cancel(taskId));
-    }
+    _stopRender(taskId);
     _downloadService.cancelDownload(taskId);
     final task = _findTask(taskId);
     if (task == null) return;
@@ -678,6 +838,14 @@ class DownloadProvider extends ChangeNotifier {
     task.downloadSpeed = 0.0;
     notifyListeners();
     unawaited(_saveHistory());
+  }
+
+  /// Stops a running render or merge, including any stream parts still
+  /// arriving outside the app.
+  void _stopRender(String taskId) {
+    if (!_slideshowRenders.contains(taskId)) return;
+    unawaited(_slideshowRenderer.cancel(taskId));
+    _streamPairs?.cancelStreamPair(taskId);
   }
 
   /// Suspends a running download, keeping the bytes already written.
@@ -818,6 +986,12 @@ class DownloadProvider extends ChangeNotifier {
     _queue.removeWhere((queued) => queued.task.id == taskId);
     if (task.isActive || task.status == DownloadStatus.paused) {
       _downloadService.cancelDownload(taskId);
+    }
+    if (_slideshowRenders.contains(taskId)) {
+      _stopRender(taskId);
+      // Silences the render's progress callbacks, which only report while a
+      // task is downloading; the task is disposed below.
+      task.status = DownloadStatus.cancelled;
     }
     if (deleteLocalFile && task.filePath != null) {
       await _fileActions.delete(task.filePath!);
