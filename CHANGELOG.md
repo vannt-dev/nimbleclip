@@ -6,6 +6,15 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-09-26
+
+- On Android, a 480p-1080p YouTube download now keeps going after the app is
+  closed or Android ends it. Both streams are queued up front as
+  system-managed downloads of at most 10 MB each (YouTube throttles larger
+  ranges to about playback speed), several of which run at once. One
+  notification counts the parts. Joining the streams still needs the app: if
+  the parts finish while it is closed, the video is joined the next time it
+  opens.
 - When YouTube refuses the page even after the YouTube library's own five
   retries, the app now says YouTube is refusing requests for now and to try
   again in a few minutes. It used to report "no downloadable stream", which
@@ -18,13 +27,6 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   the copied diagnostics, as YouTube's do since 1.7.0. Offline, each of them
   used to report only that the post had no media.
 - The live extractor check now covers a YouTube Short shared with `?si=`.
-- On Android, a 480p-1080p YouTube download now keeps going after the app is
-  closed or Android ends it. Both streams are queued up front as
-  system-managed downloads of at most 10 MB each (YouTube throttles larger
-  ranges to about playback speed), several of which run at once. One
-  notification counts the parts. Joining the streams still needs the app: if
-  the parts finish while it is closed, the video is joined the next time it
-  opens.
 
 ## [1.7.0] - 2026-09-25
 
