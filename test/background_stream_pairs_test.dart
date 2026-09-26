@@ -49,8 +49,14 @@ class _FakeParts implements StreamPartDownloader {
     final from = int.parse(range.group(1)!);
     final to = int.parse(range.group(2)!);
     final bytes = streams[task.url]!.sublist(from, to + 1);
+    // background_downloader strips a leading separator from a task's
+    // directory and puts it back when it resolves BaseDirectory.root, so a
+    // POSIX `/tmp/...` arrives here as `tmp/...`.
+    final directory = Platform.isWindows || task.directory.startsWith('/')
+        ? task.directory
+        : '/${task.directory}';
     await File(
-      '${task.directory}/${task.filename}',
+      '$directory/${task.filename}',
     ).writeAsBytes(short ? bytes.sublist(1) : bytes);
     known.remove(task.taskId);
     return bg.TaskStatusUpdate(task, bg.TaskStatus.complete);
