@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -17,6 +18,7 @@ import 'package:nimble_clip/services/extractors/registry.dart';
 import 'package:nimble_clip/services/extractors/youtube_extractor.dart';
 import 'package:nimble_clip/services/slideshow/slideshow_renderer.dart';
 import 'package:nimble_clip/services/slideshow/stream_fetcher.dart';
+import 'package:nimble_clip/services/stream_pair_gateway.dart';
 
 import 'support/inert_download_service.dart';
 import 'support/memory_storage.dart';
@@ -353,6 +355,34 @@ void main() {
       );
       expect(ranges, hasLength(1));
     });
+
+    test('probes the real length from the first byte', () async {
+      final ranges = <String>[];
+      expect(
+        await probeStreamLength(
+          'https://yt.example/v',
+          client: rangedServer(ranges),
+        ),
+        body.length,
+      );
+      expect(ranges, ['bytes=0-0']);
+    });
+
+    test('a probe that finds no length fails the fetch', () async {
+      await expectLater(
+        probeStreamLength(
+          'https://yt.example/v',
+          client: MockClient((_) async => http.Response('', 403)),
+        ),
+        throwsA(
+          isA<SlideshowException>().having(
+            (e) => e.kind,
+            'kind',
+            SlideshowFailureKind.fetchFailed,
+          ),
+        ),
+      );
+    });
   });
 
   group('downloading a merged option', () {
@@ -572,4 +602,303 @@ void main() {
       expect(task.errorMessage, l10n.slideshowOutOfSpace);
     });
   });
+
+  group('merging through background transfers', () {
+    late Directory root;
+    late Directory streams;
+    late MemoryStorage storage;
+
+    setUp(() {
+      root = Directory.systemTemp.createTempSync('background_merge');
+      final downloads = Directory('${root.path}/downloads')..createSync();
+      streams = Directory('${root.path}/streams')..createSync();
+      storage = MemoryStorage(downloads);
+    });
+
+    tearDown(() {
+      if (root.existsSync()) root.deleteSync(recursive: true);
+    });
+
+    DownloadProvider provider(
+      SlideshowRenderer renderer,
+      _PairGateway gateway, {
+      _FakeFetcher? fetcher,
+    }) => DownloadProvider(
+      downloadService: gateway,
+      storageService: storage,
+      historyRepository: storage,
+      fileActions: storage,
+      slideshowRenderer: renderer,
+      streamFetcher: (fetcher ?? _FakeFetcher({})).call,
+      slideshowWorkspace: () async =>
+          Directory('${root.path}/work')..createSync(recursive: true),
+    );
+
+    const noGallery = DownloadOptions(autoSaveToGallery: false);
+
+    StreamPairFiles writeStreams(List<int> video, List<int> audio) {
+      final videoFile = File('${streams.path}/video.mp4')
+        ..writeAsBytesSync(video);
+      final audioFile = File('${streams.path}/audio.m4a')
+        ..writeAsBytesSync(audio);
+      return (videoPath: videoFile.path, audioPath: audioFile.path);
+    }
+
+    test('hands the fetch to the gateway and joins what it fetched', () async {
+      final muxer = _FakeMuxer();
+      final gateway = _PairGateway();
+      final fetcher = _FakeFetcher({});
+      final downloader = provider(muxer, gateway, fetcher: fetcher);
+      final option = _merged();
+
+      await downloader.startNewDownloads(
+        metadata: _metadata([option]),
+        qualities: [option],
+        l10n: l10n,
+        options: noGallery,
+      );
+      await _waitUntil(() => gateway.started.isNotEmpty);
+      final transfer = gateway.started.single;
+      final task = downloader.allTasks.single;
+      expect(transfer.taskId, task.id);
+      expect(transfer.source.videoUrl, 'https://yt.example/video-1080');
+      expect(transfer.autoSaveToGallery, isFalse);
+
+      transfer.report(50, 2048);
+      expect(task.progress, closeTo(0.475, 1e-9));
+      expect(task.receivedBytes, 50);
+      expect(task.totalBytes, 100);
+      expect(task.downloadSpeed, 2048);
+
+      transfer.complete(writeStreams([1, 2, 3], [4, 5]));
+      await _waitUntil(() => task.isDone);
+
+      expect(task.status, DownloadStatus.completed);
+      expect(File(task.filePath!).readAsBytesSync(), [1, 2, 3, 4, 5]);
+      expect(task.downloadSpeed, 0);
+      expect(transfer.discarded, isTrue);
+      expect(fetcher.fetched, isEmpty, reason: 'nothing fetched in Dart');
+    });
+
+    test('the task is in history before its parts start', () async {
+      final gateway = _PairGateway();
+      final downloader = provider(_FakeMuxer(), gateway);
+      final option = _merged();
+
+      await downloader.startNewDownloads(
+        metadata: _metadata([option]),
+        qualities: [option],
+        l10n: l10n,
+        options: noGallery,
+      );
+      await _waitUntil(() => gateway.started.isNotEmpty);
+
+      // A process ended now must find the task on the next launch, or the
+      // parts arriving without the app are thrown away.
+      expect(storage.history.map((t) => t['id']), [
+        gateway.started.single.taskId,
+      ]);
+      expect(storage.history.single['status'], isNot('completed'));
+    });
+
+    test('a cancel stops the transfer and never muxes', () async {
+      final muxer = _FakeMuxer();
+      final gateway = _PairGateway();
+      final downloader = provider(muxer, gateway);
+      final option = _merged();
+
+      await downloader.startNewDownloads(
+        metadata: _metadata([option]),
+        qualities: [option],
+        l10n: l10n,
+        options: noGallery,
+      );
+      await _waitUntil(() => gateway.started.isNotEmpty);
+      final task = downloader.allTasks.single;
+
+      downloader.cancelTask(task.id);
+      await _waitUntil(() => gateway.started.single.discarded);
+
+      expect(gateway.cancelled, [task.id]);
+      expect(task.status, DownloadStatus.cancelled);
+      expect(task.errorMessage, isNull);
+      expect(muxer.calls, isEmpty);
+    });
+
+    test('a failed transfer fails the task', () async {
+      final gateway = _PairGateway();
+      final downloader = provider(_FakeMuxer(), gateway);
+      final option = _merged();
+
+      await downloader.startNewDownloads(
+        metadata: _metadata([option]),
+        qualities: [option],
+        l10n: l10n,
+        options: noGallery,
+      );
+      await _waitUntil(() => gateway.started.isNotEmpty);
+      gateway.started.single.fail(
+        const SlideshowException(SlideshowFailureKind.fetchFailed),
+      );
+      final task = downloader.allTasks.single;
+      await _waitUntil(() => task.isDone);
+
+      expect(task.status, DownloadStatus.failed);
+      expect(task.errorMessage, l10n.downloadFailed);
+    });
+
+    test('deleting a running merge stops its transfer', () async {
+      final gateway = _PairGateway();
+      final downloader = provider(_FakeMuxer(), gateway);
+      final option = _merged();
+
+      await downloader.startNewDownloads(
+        metadata: _metadata([option]),
+        qualities: [option],
+        l10n: l10n,
+        options: noGallery,
+      );
+      await _waitUntil(() => gateway.started.isNotEmpty);
+      final task = downloader.allTasks.single;
+
+      await downloader.deleteTask(task.id);
+      await _waitUntil(() => gateway.started.single.discarded);
+
+      expect(gateway.cancelled, [task.id]);
+      expect(downloader.allTasks, isEmpty);
+    });
+
+    test('finishes a merge the previous process left fetching', () async {
+      final interrupted = DownloadTask(
+        id: 'merge-1',
+        videoId: 'dQw4w9WgXcQ',
+        title: 'A video',
+        author: 'Author',
+        thumbnailUrl: '',
+        downloadUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        originalUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        platform: VideoPlatform.youtube,
+        qualityLabel: '1080p',
+        format: 'mp4',
+        status: DownloadStatus.downloading,
+      );
+      final gone = DownloadTask(
+        id: 'merge-2',
+        videoId: 'other',
+        title: 'Finished earlier',
+        author: 'Author',
+        thumbnailUrl: '',
+        originalUrl: 'https://www.youtube.com/watch?v=other',
+        downloadUrl: 'https://www.youtube.com/watch?v=other',
+        platform: VideoPlatform.youtube,
+        qualityLabel: '1080p',
+        format: 'mp4',
+        status: DownloadStatus.completed,
+      );
+      storage.history = [interrupted.toJson(), gone.toJson()];
+      final gateway = _PairGateway()
+        ..recovered.addAll([
+          _FakeTransfer('merge-1', autoSaveToGallery: false),
+          _FakeTransfer('merge-2', autoSaveToGallery: false),
+          _FakeTransfer('merge-3', autoSaveToGallery: false),
+        ]);
+      final resumed = gateway.recovered.first;
+      final downloader = provider(_FakeMuxer(), gateway);
+
+      await _waitUntil(() => downloader.allTasks.length == 2);
+      final task = downloader.allTasks.firstWhere((t) => t.id == 'merge-1');
+      expect(task.status, DownloadStatus.downloading);
+      expect(task.errorMessage, isNull);
+      // Neither a finished task nor one no longer in history is resumed.
+      expect(gateway.recovered[1].discarded, isTrue);
+      expect(gateway.recovered[2].discarded, isTrue);
+
+      resumed.complete(writeStreams([9, 8], [7]));
+      await _waitUntil(() => task.isDone);
+
+      expect(task.status, DownloadStatus.completed);
+      expect(File(task.filePath!).readAsBytesSync(), [9, 8, 7]);
+      expect(resumed.discarded, isTrue);
+      expect(storage.receipts.map((r) => r['id']), contains('merge-1'));
+    });
+  });
+}
+
+/// A [StreamPairGateway] whose transfers the test finishes by hand.
+class _PairGateway extends InertDownloadService implements StreamPairGateway {
+  final List<_FakeTransfer> started = [];
+  final List<_FakeTransfer> recovered = [];
+  final List<String> cancelled = [];
+
+  @override
+  Future<StreamPairTransfer> startStreamPair({
+    required String taskId,
+    required String title,
+    required MergeSource source,
+    required bool autoSaveToGallery,
+  }) async {
+    final transfer = _FakeTransfer(
+      taskId,
+      source: source,
+      autoSaveToGallery: autoSaveToGallery,
+    );
+    started.add(transfer);
+    return transfer;
+  }
+
+  @override
+  List<StreamPairTransfer> takeRecoveredStreamPairs() => List.of(recovered);
+
+  @override
+  void cancelStreamPair(String taskId) {
+    cancelled.add(taskId);
+    for (final transfer in [...started, ...recovered]) {
+      if (transfer.taskId == taskId) {
+        transfer.fail(const SlideshowException(SlideshowFailureKind.cancelled));
+      }
+    }
+  }
+}
+
+class _FakeTransfer implements StreamPairTransfer {
+  _FakeTransfer(
+    this.taskId, {
+    this.source = const MergeSource(videoUrl: '', audioUrl: ''),
+    required this.autoSaveToGallery,
+  }) {
+    _files.future.ignore();
+  }
+
+  @override
+  final String taskId;
+  final MergeSource source;
+  @override
+  final bool autoSaveToGallery;
+  final Completer<StreamPairFiles> _files = Completer<StreamPairFiles>();
+  void Function(int receivedBytes, double bytesPerSecond)? _onProgress;
+  bool discarded = false;
+
+  @override
+  int get totalBytes => 100;
+
+  @override
+  Future<StreamPairFiles> get files => _files.future;
+
+  @override
+  set onProgress(void Function(int receivedBytes, double bytesPerSecond)? cb) =>
+      _onProgress = cb;
+
+  void report(int received, double speed) => _onProgress?.call(received, speed);
+
+  void complete(StreamPairFiles files) => _files.complete(files);
+
+  void fail(SlideshowException error) {
+    if (!_files.isCompleted) _files.completeError(error);
+  }
+
+  @override
+  Future<void> discard() async {
+    fail(const SlideshowException(SlideshowFailureKind.cancelled));
+    discarded = true;
+  }
 }

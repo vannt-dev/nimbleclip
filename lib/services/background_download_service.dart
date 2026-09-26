@@ -1,16 +1,21 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:background_downloader/background_downloader.dart' as bg;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show Locale;
+import 'package:path_provider/path_provider.dart';
 
 import '../core/constants/app_constants.dart';
 import '../core/utils/media_file_validator.dart';
 import '../core/utils/platform_file.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../models/download_task.dart';
+import '../models/merge_source.dart';
+import 'background_stream_pairs.dart';
 import 'download_service.dart';
 import 'storage_service.dart';
+import 'stream_pair_gateway.dart';
 
 DownloadGateway createDefaultDownloadService() {
   if (!kIsWeb &&
@@ -24,13 +29,34 @@ DownloadGateway createDefaultDownloadService() {
 /// Mobile download gateway backed by Android DownloadWorker and iOS
 /// URLSession. Transfers therefore keep running while Flutter is suspended.
 class BackgroundDownloadService
-    implements DownloadGateway, RecoverableDownloadGateway {
+    implements DownloadGateway, RecoverableDownloadGateway, StreamPairGateway {
   BackgroundDownloadService({
     StorageService? storageService,
     this.validator = const MediaFileValidator(),
     this.requestNotificationPermission = true,
-  }) : _storage = storageService ?? StorageService() {
+    BackgroundStreamPairs? streamPairs,
+  }) : _storage = storageService ?? StorageService(),
+       _pairs = streamPairs ?? BackgroundStreamPairs(root: _streamPairRoot) {
     _updates = bg.FileDownloader().updates.listen(_onUpdate);
+    // A merged video is dozens of parts; one notification counts them rather
+    // than each posting its own.
+    bg.FileDownloader().configureNotificationForGroup(
+      streamPartGroup,
+      running: const bg.TaskNotification(
+        'NimbleClip - HD video',
+        '{numFinished} of {numTotal} parts',
+      ),
+      complete: const bg.TaskNotification(
+        'NimbleClip - HD video',
+        'Downloaded - open NimbleClip if it does not finish',
+      ),
+      error: const bg.TaskNotification(
+        'NimbleClip - HD video',
+        'Download failed',
+      ),
+      progressBar: true,
+      groupNotificationId: streamPartGroup,
+    );
     bg.FileDownloader().configureNotificationForGroup(
       bg.FileDownloader.defaultGroup,
       running: const bg.TaskNotification(
@@ -62,10 +88,40 @@ class BackgroundDownloadService
   final Map<String, _BackgroundContext> _contexts = {};
   final Set<String> _running = {};
   final Set<String> _finishing = {};
+  final BackgroundStreamPairs _pairs;
   Future<void>? _startFuture;
 
   Future<void> _ensureStarted() =>
       _startFuture ??= bg.FileDownloader().start(autoCleanDatabase: true);
+
+  /// Where merged videos' parts wait to be joined. Not the cache: Android
+  /// may clear that while parts are still arriving without the app.
+  static Future<Directory> _streamPairRoot() async =>
+      Directory('${(await getApplicationSupportDirectory()).path}/merge');
+
+  @override
+  Future<StreamPairTransfer> startStreamPair({
+    required String taskId,
+    required String title,
+    required MergeSource source,
+    required bool autoSaveToGallery,
+  }) async {
+    await _ensureStarted();
+    await _requestNotificationPermission();
+    return _pairs.startStreamPair(
+      taskId: taskId,
+      title: title,
+      source: source,
+      autoSaveToGallery: autoSaveToGallery,
+    );
+  }
+
+  @override
+  List<StreamPairTransfer> takeRecoveredStreamPairs() =>
+      _pairs.takeRecoveredStreamPairs();
+
+  @override
+  void cancelStreamPair(String taskId) => _pairs.cancelStreamPair(taskId);
 
   @override
   Future<void> recoverDownloads({
@@ -125,9 +181,14 @@ class BackgroundDownloadService
       onChanged(task);
     }
 
+    // Merged videos' parts are not in `tasks` — the history holds the merged
+    // task, not its parts — so they are rebuilt from their own manifests.
+    await _pairs.recover();
+
     // Contexts must be registered before start(), because it immediately
     // replays status updates collected while Flutter was not running.
     await _ensureStarted();
+    await _pairs.requeueLostParts();
 
     for (final task in tasks) {
       final record = recordsById[task.id];
@@ -198,7 +259,7 @@ class BackgroundDownloadService
     await completer.future;
   }
 
-  Future<void> _enqueue(DownloadTask task, AppLocalizations l10n) async {
+  Future<void> _requestNotificationPermission() async {
     try {
       final status = await bg.FileDownloader().permissions.status(
         bg.PermissionType.notifications,
@@ -212,6 +273,10 @@ class BackgroundDownloadService
     } catch (_) {
       // Notification permission is optional; the transfer itself can proceed.
     }
+  }
+
+  Future<void> _enqueue(DownloadTask task, AppLocalizations l10n) async {
+    await _requestNotificationPermission();
     final directory = await _storage.getDownloadDirectory();
     if (directory == null) {
       throw StateError(l10n.unknownNetworkError);
@@ -245,6 +310,10 @@ class BackgroundDownloadService
 
   void _onUpdate(bg.TaskUpdate update) {
     final id = update.task.taskId;
+    if (_pairs.owns(id)) {
+      _pairs.handleUpdate(update);
+      return;
+    }
     final context = _contexts[id];
     if (context == null) return;
     final task = context.task;

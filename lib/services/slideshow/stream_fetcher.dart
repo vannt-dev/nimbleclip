@@ -80,13 +80,56 @@ Future<void> fetchStreamToFile(
     await sink.flush();
   } on FileSystemException catch (error) {
     throw SlideshowException(
-      _isOutOfSpace(error)
+      isOutOfSpace(error)
           ? SlideshowFailureKind.outOfSpace
           : SlideshowFailureKind.fetchFailed,
       detail: error.toString(),
     );
   } finally {
     await sink.close().catchError((_) {});
+    if (client == null) httpClient.close();
+  }
+}
+
+/// Asks the server for [url]'s first byte and returns the whole length it
+/// reports, so the stream can be split into ranges up front.
+///
+/// The size the source listed is not trusted for this: a range that starts
+/// past the real end is refused outright, which would fail the whole fetch.
+Future<int> probeStreamLength(
+  String url, {
+  http.Client? client,
+  int attempts = 3,
+}) async {
+  final httpClient = client ?? http.Client();
+  try {
+    final response = await _sendWithRetry(
+      httpClient,
+      url,
+      'bytes=0-0',
+      attempts,
+    );
+    await response.stream.drain<void>();
+    final total = switch (response.statusCode) {
+      206 => _totalFrom(response.headers['content-range']),
+      200 => response.contentLength,
+      _ => null,
+    };
+    if (total == null || total <= 0) {
+      throw SlideshowException(
+        SlideshowFailureKind.fetchFailed,
+        detail: 'no length for the stream (HTTP ${response.statusCode})',
+      );
+    }
+    return total;
+  } on SlideshowException {
+    rethrow;
+  } catch (error) {
+    throw SlideshowException(
+      SlideshowFailureKind.fetchFailed,
+      detail: error.toString(),
+    );
+  } finally {
     if (client == null) httpClient.close();
   }
 }
@@ -131,7 +174,8 @@ void _throwIfCancelled(bool Function()? isCancelled) {
   }
 }
 
-bool _isOutOfSpace(FileSystemException error) {
+/// True when [error] is the disk running out of room.
+bool isOutOfSpace(FileSystemException error) {
   final code = error.osError?.errorCode;
   // ENOSPC on Linux/Android, ERROR_DISK_FULL / ERROR_HANDLE_DISK_FULL on Windows.
   return code == 28 || code == 112 || code == 39;
