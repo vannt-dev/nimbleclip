@@ -451,6 +451,9 @@ void main() {
       ]);
       // The two stream files are scratch; only the joined one is kept.
       expect(workspace.listSync(recursive: true).whereType<File>(), isEmpty);
+      // The receipt is written after the task reads as done, by the history
+      // save that follows; waiting on the status alone races it.
+      await _waitUntil(() => storage.receipts.isNotEmpty);
       expect(storage.receipts.map((r) => r['id']), [task.id]);
     });
 
@@ -819,6 +822,7 @@ void main() {
       expect(task.status, DownloadStatus.completed);
       expect(File(task.filePath!).readAsBytesSync(), [9, 8, 7]);
       expect(resumed.discarded, isTrue);
+      await _waitUntil(() => storage.receipts.isNotEmpty);
       expect(storage.receipts.map((r) => r['id']), contains('merge-1'));
     });
   });
