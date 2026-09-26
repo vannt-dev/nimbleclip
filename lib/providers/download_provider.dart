@@ -463,14 +463,27 @@ class DownloadProvider extends ChangeNotifier {
     Directory? workspace;
     Future<Directory> scratch() async =>
         workspace ??= await _slideshowWorkspace();
+    // Images and music are megabytes apiece; one leaked scratch directory per
+    // render fills the cache up silently. Deleted inside [produce], so it is
+    // gone by the time the task reads as finished.
+    void deleteScratch() {
+      final scratchDir = workspace;
+      if (scratchDir == null) return;
+      try {
+        if (scratchDir.existsSync()) scratchDir.deleteSync(recursive: true);
+      } catch (_) {
+        // A locked file is not worth failing a finished render over.
+      }
+    }
+
     final merge = option.merge;
-    try {
-      await _produceRendered(
-        task,
-        l10n,
-        isMerge: merge != null,
-        autoSaveToGallery: options.autoSaveToGallery,
-        produce: (outputPath) async {
+    await _produceRendered(
+      task,
+      l10n,
+      isMerge: merge != null,
+      autoSaveToGallery: options.autoSaveToGallery,
+      produce: (outputPath) async {
+        try {
           if (merge != null) {
             final gateway = _streamPairs;
             if (gateway == null) {
@@ -503,20 +516,11 @@ class DownloadProvider extends ChangeNotifier {
             filePath: result.filePath,
             note: result.audioSkipped ? l10n.slideshowMusicUnavailable : null,
           );
-        },
-      );
-    } finally {
-      // Images and music are megabytes apiece; one leaked scratch directory
-      // per render fills the cache up silently.
-      final scratchDir = workspace;
-      if (scratchDir != null) {
-        try {
-          if (scratchDir.existsSync()) scratchDir.deleteSync(recursive: true);
-        } catch (_) {
-          // A locked file is not worth failing a finished render over.
+        } finally {
+          deleteScratch();
         }
-      }
-    }
+      },
+    );
   }
 
   /// Joins the streams of a merge the previous process left fetching.
