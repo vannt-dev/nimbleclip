@@ -16,6 +16,7 @@ extension PlatformStyle on VideoPlatform {
     VideoPlatform.facebook => AppColors.facebook,
     VideoPlatform.twitter => AppColors.twitter,
     VideoPlatform.instagram => AppColors.instagram,
+    VideoPlatform.threads => AppColors.threads,
     VideoPlatform.generic => AppColors.primary,
   };
 
@@ -25,6 +26,7 @@ extension PlatformStyle on VideoPlatform {
     VideoPlatform.facebook => Icons.facebook_rounded,
     VideoPlatform.twitter => Icons.flutter_dash_rounded,
     VideoPlatform.instagram => Icons.camera_alt_rounded,
+    VideoPlatform.threads => Icons.alternate_email_rounded,
     VideoPlatform.generic => Icons.link_rounded,
   };
 }

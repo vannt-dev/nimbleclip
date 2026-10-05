@@ -4,6 +4,7 @@ enum VideoPlatform {
   facebook,
   twitter,
   instagram,
+  threads,
   generic;
 
   String get displayName {
@@ -18,6 +19,8 @@ enum VideoPlatform {
         return 'Twitter / X';
       case VideoPlatform.instagram:
         return 'Instagram';
+      case VideoPlatform.threads:
+        return 'Threads';
       case VideoPlatform.generic:
         return 'Direct Link';
     }

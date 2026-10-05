@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 
 import '../../core/utils/http_helper.dart';
@@ -10,8 +12,9 @@ import '../../models/video_platform.dart';
 import 'base_extractor.dart';
 import 'extraction_failure.dart';
 
-/// Fallback for direct media links and pages that advertise a video through
-/// Open Graph tags. Registered last, so it only sees URLs no platform claimed.
+/// Fallback for direct media links and for pages that declare their media in
+/// a standard way: Open Graph tags, `<video>` / `<audio>` elements or JSON-LD.
+/// Registered last, so it only sees URLs no platform claimed.
 class GenericExtractor extends BaseVideoExtractor {
   const GenericExtractor();
 
@@ -94,7 +97,7 @@ class GenericExtractor extends BaseVideoExtractor {
     final media = _fromMediaHeaders(response, uri, cleanUrl, id);
     if (media != null) return media;
 
-    return _fromOpenGraph(response.body, uri, cleanUrl, id);
+    return _fromPage(response.body, uri, cleanUrl, id);
   }
 
   VideoMetadata? _fromMediaHeaders(
@@ -184,20 +187,77 @@ class GenericExtractor extends BaseVideoExtractor {
     );
   }
 
-  VideoMetadata _fromOpenGraph(String html, Uri uri, String url, String id) {
-    final videoUrl =
-        _meta(html, ['og:video:secure_url', 'og:video:url', 'og:video']) ??
-        _meta(html, ['twitter:player:stream']);
-    final image = _meta(html, ['og:image']);
-    if (videoUrl == null && image == null) {
+  /// Reads a page for the media it declares in standard ways: Open Graph and
+  /// Twitter card tags, `<video>` / `<audio>` elements, and JSON-LD.
+  ///
+  /// Nothing here is specific to a site, which is the point: it is what makes
+  /// "any other link" work on blogs, news sites and forums without a parser
+  /// per site.
+  VideoMetadata _fromPage(String html, Uri uri, String url, String id) {
+    final media = _PageMedia(uri);
+
+    for (final key in const [
+      'og:video:secure_url',
+      'og:video:url',
+      'og:video',
+      'twitter:player:stream',
+    ]) {
+      _metaAll(html, key).forEach(media.addVideo);
+    }
+    for (final key in const ['og:audio:secure_url', 'og:audio']) {
+      _metaAll(html, key).forEach(media.addAudio);
+    }
+
+    String? poster;
+    for (final tag in _mediaTag.allMatches(html)) {
+      final isAudio = tag.group(1)!.toLowerCase() == 'audio';
+      final attributes = tag.group(2) ?? '';
+      // The <source> children of one element are the same clip in several
+      // encodings, so the element contributes one download, not one each.
+      final encodings = [
+        _attribute(attributes, 'src'),
+        for (final source in _sourceTag.allMatches(tag.group(3) ?? ''))
+          _attribute(source.group(1) ?? '', 'src'),
+      ];
+      if (isAudio) {
+        media.addAudio(media.preferred(encodings, const ['.mp3', '.m4a']));
+      } else {
+        media.addVideo(media.preferred(encodings, const ['.mp4', '.m4v']));
+        poster ??= _attribute(attributes, 'poster');
+      }
+    }
+
+    for (final script in _ldJson.allMatches(html)) {
+      try {
+        _readLinkedData(jsonDecode(script.group(1) ?? ''), media);
+      } catch (_) {
+        // Hand-written JSON-LD is often invalid; the other sources still apply.
+      }
+    }
+
+    // On an image-only page og:image is the post media. On a page with a
+    // video or audio it is merely the poster and must not be offered as a
+    // second download.
+    final ogImages = _metaAll(html, 'og:image').toList();
+    final hasPlayable = media.videos.isNotEmpty || media.audio.isNotEmpty;
+    if (!hasPlayable) ogImages.forEach(media.addImage);
+
+    if (media.isEmpty) {
       throw ExtractionException(
-        const ExtractionFailure(ExtractionFailureKind.genericNoVideo),
+        ExtractionFailure(
+          media.sawStream
+              ? ExtractionFailureKind.genericStreamOnly
+              : ExtractionFailureKind.genericNoVideo,
+        ),
       );
     }
 
-    // Open Graph URLs are often protocol-relative or site-relative.
-    final resolved = videoUrl == null ? null : uri.resolve(videoUrl).toString();
-    final resolvedImage = image == null ? null : uri.resolve(image).toString();
+    final cover = [
+      ...ogImages,
+      ?poster,
+    ].map(media.resolve).whereType<String>().firstOrNull;
+    final videos = media.videos.toList();
+    final images = media.images.take(_maxPageImages).toList();
     final height = _meta(html, ['og:video:height']);
 
     return VideoMetadata(
@@ -206,32 +266,124 @@ class GenericExtractor extends BaseVideoExtractor {
       title: _meta(html, ['og:title']) ?? _title(html) ?? 'Web Video',
       description: _meta(html, ['og:description']),
       author: _meta(html, ['og:site_name']) ?? uri.host,
-      coverUrl: resolvedImage ?? '',
+      coverUrl: cover ?? '',
       duration: _durationFrom(
         _meta(html, ['og:video:duration', 'video:duration']),
       ),
       platform: VideoPlatform.generic,
       qualities: QualityHelper.sortedByQuality([
-        if (resolved != null)
+        for (var index = 0; index < videos.length; index++)
           VideoQualityOption.video(
-            id: 'gen_og_$id',
-            label: const EmbeddedVideo(),
-            quality: height != null ? '${height}p' : 'Original',
-            format: 'mp4',
-            downloadUrl: resolved,
+            id: index == 0 ? 'gen_og_$id' : 'gen_video_${index + 1}_$id',
+            // Several videos on one page are separate clips, not qualities
+            // of one, so each is its own download.
+            mediaId: videos.length == 1 ? null : 'gen_video_${index + 1}_$id',
+            label: videos.length == 1
+                ? const EmbeddedVideo()
+                : VideoIndex(index + 1),
+            quality: videos.length == 1 && height != null
+                ? '${height}p'
+                : 'Original',
+            format: _formatOf(videos[index], fallback: 'mp4'),
+            downloadUrl: videos[index],
           ),
-        // On an image-only page og:image is the post media. On a video page it
-        // is merely the poster and must not be downloaded as a second asset.
-        if (resolved == null && resolvedImage != null)
+        if (media.audio.isNotEmpty)
+          VideoQualityOption(
+            id: 'gen_audio_$id',
+            label: const OriginalAudio(),
+            quality: 'Audio',
+            format: _formatOf(media.audio.first, fallback: 'mp3'),
+            downloadUrl: media.audio.first,
+            kind: MediaKind.audio,
+          ),
+        for (var index = 0; index < images.length; index++)
           VideoQualityOption.image(
-            id: 'gen_image_$id',
-            label: const ImageIndex(1),
+            id: index == 0 ? 'gen_image_$id' : 'gen_image_${index + 1}_$id',
+            mediaId: images.length == 1 ? null : 'gen_image_${index + 1}_$id',
+            label: ImageIndex(index + 1),
             quality: 'Original',
-            format: MediaFormatHelper.inferImageFormat(resolvedImage),
-            downloadUrl: resolvedImage,
+            format: MediaFormatHelper.inferImageFormat(images[index]),
+            downloadUrl: images[index],
+            thumbnailUrl: images[index],
           ),
       ]),
     );
+  }
+
+  /// A gallery page can list hundreds of pictures; the picker stays usable.
+  static const int _maxPageImages = 30;
+
+  /// Walks JSON-LD for the media schema.org says a page is about.
+  ///
+  /// Only objects that are themselves media count. An `Article.image` or an
+  /// `Organization.logo` is decoration, and offering it as the page's media
+  /// would be wrong more often than right.
+  void _readLinkedData(dynamic value, _PageMedia media) {
+    if (value is List) {
+      for (final item in value) {
+        _readLinkedData(item, media);
+      }
+      return;
+    }
+    if (value is! Map<String, dynamic>) return;
+
+    final type = value['@type'];
+    final types = type is List ? type.map((t) => '$t') : ['$type'];
+    final content = value['contentUrl'];
+    if (content is String) {
+      if (types.contains('VideoObject')) media.addVideo(content);
+      if (types.contains('AudioObject')) media.addAudio(content);
+      if (types.contains('ImageObject')) media.addImage(content);
+    }
+    for (final child in value.values) {
+      _readLinkedData(child, media);
+    }
+  }
+
+  String _formatOf(String url, {required String fallback}) =>
+      _directMediaFormat(Uri.parse(url)) ?? fallback;
+
+  /// Every value of a `<meta>` key, in page order. A gallery repeats
+  /// `og:image` once per picture.
+  Iterable<String> _metaAll(String html, String key) sync* {
+    final patterns = _patternsFor(key);
+    final seen = <String>{};
+    for (final pattern in patterns) {
+      for (final match in pattern.allMatches(html)) {
+        final value = match.group(1);
+        if (value == null || value.isEmpty) continue;
+        final decoded = decodeHtmlEntities(value);
+        if (seen.add(decoded)) yield decoded;
+      }
+    }
+  }
+
+  static final RegExp _mediaTag = RegExp(
+    r'<(video|audio)\b([^>]*)>([\s\S]*?)</\1\s*>',
+    caseSensitive: false,
+  );
+  static final RegExp _sourceTag = RegExp(
+    r'<source\b([^>]*)>',
+    caseSensitive: false,
+  );
+  static final RegExp _ldJson = RegExp(
+    r'''<script[^>]*type=["']application/ld\+json["'][^>]*>([\s\S]*?)</script>''',
+    caseSensitive: false,
+  );
+  static final Map<String, RegExp> _attributePatterns = {};
+
+  /// The value of [name] in a tag's attribute text, quoted either way or bare.
+  String? _attribute(String attributes, String name) {
+    final pattern = _attributePatterns.putIfAbsent(
+      name,
+      () => RegExp(
+        '(?:^|\\s)$name\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\'|([^\\s"\'>]+))',
+        caseSensitive: false,
+      ),
+    );
+    final match = pattern.firstMatch(attributes);
+    final value = match?.group(1) ?? match?.group(2) ?? match?.group(3);
+    return value == null || value.isEmpty ? null : decodeHtmlEntities(value);
   }
 
   /// Reads a `<meta>` tag's content, tolerating either attribute order
@@ -239,19 +391,7 @@ class GenericExtractor extends BaseVideoExtractor {
   /// `property=`.
   String? _meta(String html, List<String> keys) {
     for (final key in keys) {
-      final patterns = _metaPatterns.putIfAbsent(key, () {
-        final escaped = RegExp.escape(key);
-        return [
-          RegExp(
-            '<meta[^>]+(?:property|name)=["\']$escaped["\'][^>]*content=["\']([^"\']*)["\']',
-            caseSensitive: false,
-          ),
-          RegExp(
-            '<meta[^>]+content=["\']([^"\']*)["\'][^>]*(?:property|name)=["\']$escaped["\']',
-            caseSensitive: false,
-          ),
-        ];
-      });
+      final patterns = _patternsFor(key);
       final match =
           patterns[0].firstMatch(html) ?? patterns[1].firstMatch(html);
       final value = match?.group(1);
@@ -263,6 +403,22 @@ class GenericExtractor extends BaseVideoExtractor {
   /// Meta keys come from the caller, so the pair of patterns per key is cached
   /// rather than recompiled on every page.
   static final Map<String, List<RegExp>> _metaPatterns = {};
+
+  static List<RegExp> _patternsFor(
+    String key,
+  ) => _metaPatterns.putIfAbsent(key, () {
+    final escaped = RegExp.escape(key);
+    return [
+      RegExp(
+        '<meta[^>]+(?:property|name)=["\']$escaped["\'][^>]*content=["\']([^"\']*)["\']',
+        caseSensitive: false,
+      ),
+      RegExp(
+        '<meta[^>]+content=["\']([^"\']*)["\'][^>]*(?:property|name)=["\']$escaped["\']',
+        caseSensitive: false,
+      ),
+    ];
+  });
 
   static final RegExp _htmlTitle = RegExp(
     r'<title[^>]*>(.*?)</title>',
@@ -295,5 +451,75 @@ class GenericExtractor extends BaseVideoExtractor {
     if (isImage) return subtype == 'jpeg' ? 'jpg' : subtype;
     if (isAudio) return subtype == 'mpeg' ? 'mp3' : subtype;
     return subtype == 'quicktime' ? 'mov' : subtype;
+  }
+}
+
+/// The media a page declares, resolved against the page's own address and
+/// free of duplicates, in the order it was found.
+class _PageMedia {
+  _PageMedia(this._page);
+
+  final Uri _page;
+  final videos = <String>{};
+  final audio = <String>{};
+  final images = <String>{};
+
+  /// A video or audio was declared, but only as a stream playlist.
+  var sawStream = false;
+
+  bool get isEmpty => videos.isEmpty && audio.isEmpty && images.isEmpty;
+
+  void addVideo(String? url) => _add(videos, url, playable: true);
+  void addAudio(String? url) => _add(audio, url, playable: true);
+  void addImage(String? url) => _add(images, url, playable: false);
+
+  /// [url] as an absolute http(s) address, or null when it is not one.
+  ///
+  /// Declared URLs are often protocol-relative or site-relative. `blob:` and
+  /// `data:` addresses only mean something inside the page that made them.
+  String? resolve(String? url) {
+    final trimmed = url?.trim() ?? '';
+    if (trimmed.isEmpty) return null;
+    final Uri resolved;
+    try {
+      resolved = _page.resolve(trimmed);
+    } catch (_) {
+      return null;
+    }
+    if (resolved.scheme != 'http' && resolved.scheme != 'https') return null;
+    return resolved.toString();
+  }
+
+  /// The one of [urls] to download: the first in a widely playable format,
+  /// else the first that is a file at all.
+  String? preferred(List<String?> urls, List<String> extensions) {
+    String? fallback;
+    for (final url in urls) {
+      final resolved = resolve(url);
+      if (resolved == null) continue;
+      final path = Uri.parse(resolved).path.toLowerCase();
+      if (_isPlaylist(path)) {
+        sawStream = true;
+        continue;
+      }
+      if (extensions.any(path.endsWith)) return resolved;
+      fallback ??= resolved;
+    }
+    return fallback;
+  }
+
+  // HLS and DASH playlists list hundreds of segments; there is no single
+  // file behind them to download.
+  static bool _isPlaylist(String path) =>
+      path.endsWith('.m3u8') || path.endsWith('.mpd');
+
+  void _add(Set<String> target, String? url, {required bool playable}) {
+    final resolved = resolve(url);
+    if (resolved == null) return;
+    if (playable && _isPlaylist(Uri.parse(resolved).path.toLowerCase())) {
+      sawStream = true;
+      return;
+    }
+    target.add(resolved);
   }
 }

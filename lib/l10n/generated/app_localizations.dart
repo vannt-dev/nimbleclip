@@ -191,7 +191,7 @@ abstract class AppLocalizations {
   /// No description provided for @guideCopyDescription.
   ///
   /// In en, this message translates to:
-  /// **'Open YouTube, TikTok, Facebook, or X and choose Copy link.'**
+  /// **'Open YouTube, TikTok, Facebook, Threads, or X and choose Copy link.'**
   String get guideCopyDescription;
 
   /// No description provided for @guidePasteTitle.
@@ -998,6 +998,18 @@ abstract class AppLocalizations {
   /// **'This post has no downloadable video, or the account is protected.'**
   String get xNoVideo;
 
+  /// No description provided for @threadsInvalidPost.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not recognize this Threads link. Use a post link like threads.com/@<account>/post/<id>.'**
+  String get threadsInvalidPost;
+
+  /// No description provided for @threadsNoMedia.
+  ///
+  /// In en, this message translates to:
+  /// **'No picture or video was found in this Threads post. It may be text only, private, or deleted.'**
+  String get threadsNoMedia;
+
   /// No description provided for @originalMp4.
   ///
   /// In en, this message translates to:
@@ -1097,8 +1109,14 @@ abstract class AppLocalizations {
   /// No description provided for @genericNoVideo.
   ///
   /// In en, this message translates to:
-  /// **'No video was found at this link. Check the URL or paste a direct .mp4 file link.'**
+  /// **'No video, audio or picture was found at this link. Check the URL or paste a direct link to the file.'**
   String get genericNoVideo;
+
+  /// No description provided for @genericStreamOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'This page plays its video as a stream, with no single file to download.'**
+  String get genericStreamOnly;
 
   /// No description provided for @embeddedVideo.
   ///

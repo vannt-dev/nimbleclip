@@ -5,6 +5,7 @@ import 'extraction_failure.dart';
 import 'facebook_extractor.dart';
 import 'generic_extractor.dart';
 import 'instagram_extractor.dart';
+import 'threads_extractor.dart';
 import 'tiktok_extractor.dart';
 import 'twitter_extractor.dart';
 import 'youtube_extractor.dart';
@@ -18,6 +19,7 @@ class ExtractorRegistry {
         TwitterExtractor(externalServiceAccess: externalServiceAccess),
         FacebookExtractor(externalServiceAccess: externalServiceAccess),
         InstagramExtractor(externalServiceAccess: externalServiceAccess),
+        const ThreadsExtractor(),
         const GenericExtractor(),
       ];
 

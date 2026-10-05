@@ -69,7 +69,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get guideCopyDescription =>
-      'Open YouTube, TikTok, Facebook, or X and choose Copy link.';
+      'Open YouTube, TikTok, Facebook, Threads, or X and choose Copy link.';
 
   @override
   String get guidePasteTitle => 'Paste the link into NimbleClip';
@@ -551,6 +551,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'This post has no downloadable video, or the account is protected.';
 
   @override
+  String get threadsInvalidPost =>
+      'Could not recognize this Threads link. Use a post link like threads.com/@<account>/post/<id>.';
+
+  @override
+  String get threadsNoMedia =>
+      'No picture or video was found in this Threads post. It may be text only, private, or deleted.';
+
+  @override
   String get originalMp4 => 'MP4 (Original quality)';
 
   @override
@@ -614,7 +622,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get genericNoVideo =>
-      'No video was found at this link. Check the URL or paste a direct .mp4 file link.';
+      'No video, audio or picture was found at this link. Check the URL or paste a direct link to the file.';
+
+  @override
+  String get genericStreamOnly =>
+      'This page plays its video as a stream, with no single file to download.';
 
   @override
   String get embeddedVideo => 'Embedded video (Web)';

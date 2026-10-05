@@ -14,6 +14,7 @@ class UrlHelper {
     VideoPlatform.facebook: ['facebook.com', 'fb.watch', 'fb.com', 'fb.me'],
     VideoPlatform.twitter: ['twitter.com', 'x.com', 't.co'],
     VideoPlatform.instagram: ['instagram.com', 'instagr.am', 'ig.me'],
+    VideoPlatform.threads: ['threads.net', 'threads.com'],
   };
 
   static final RegExp _singleUrl = RegExp(r'https?://[^\s<>"]+');

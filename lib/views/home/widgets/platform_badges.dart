@@ -18,6 +18,7 @@ class PlatformBadges extends StatelessWidget {
       VideoPlatform.facebook,
       VideoPlatform.twitter,
       VideoPlatform.instagram,
+      VideoPlatform.threads,
     ];
 
     return SingleChildScrollView(

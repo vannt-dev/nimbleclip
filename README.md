@@ -31,7 +31,7 @@ management, local playback, and gallery export.
 - Extracts available video, audio, and image options before downloading.
 - Shows carousel thumbnails in a lazy full-screen picker, with preview,
   select-all, and multi-image download for supported Facebook, Instagram,
-  TikTok, and X posts.
+  Threads, TikTok, and X posts.
 - Offers the same picker for a post carrying several videos, so they can be
   told apart by thumbnail, played before choosing, and downloaded together or
   left out individually. The grid builds only the cells on screen, so a story
@@ -98,7 +98,16 @@ management, local playback, and gallery export.
 | Facebook | Public videos, Watch links, Reels, image posts, carousels, and mixed-media posts |
 | X / Twitter | Public posts containing images, videos, or mixed media |
 | Instagram | Public image/carousel posts, video posts, Reels, mixed-media posts, and story/highlight links (these need external services) |
-| Direct URLs | Public image, video, or audio files and pages exposing standard Open Graph media metadata |
+| Threads | Public posts containing images, videos, or carousels mixing the two |
+| Other links | A direct link to an image, video, or audio file, and pages that declare their media in a standard way: Open Graph or Twitter card tags, `<video>` / `<audio>` elements, or JSON-LD (`VideoObject`, `AudioObject`, `ImageObject`) |
+
+"Other links" is not a promise that any page works. A page that only plays a
+stream (HLS or DASH) has no single file to download and is reported as such,
+and a page that builds its player in JavaScript declares nothing to find.
+
+Threads includes a post's media in the page only for search-engine crawlers, so
+NimbleClip requests Threads posts with a crawler's user agent. If Threads stops
+doing that, Threads links stop working until another route is found.
 
 Extraction depends on public endpoints and page formats controlled by third
 parties. A platform change, regional restriction, authentication requirement,
