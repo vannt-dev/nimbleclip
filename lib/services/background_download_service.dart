@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart' show Locale;
 import 'package:path_provider/path_provider.dart';
 
 import '../core/constants/app_constants.dart';
+import '../core/utils/download_file_name.dart';
 import '../core/utils/media_file_validator.dart';
 import '../core/utils/platform_file.dart';
 import '../l10n/generated/app_localizations.dart';
@@ -203,21 +204,10 @@ class BackgroundDownloadService
     }
   }
 
-  static final RegExp _nonAlphanumeric = RegExp('[^a-zA-Z0-9]');
   static final RegExp _pathSeparator = RegExp(r'[/\\]');
 
-  String buildFileName(DownloadTask task, {String? extension}) {
-    final compactId = task.id.replaceAll(_nonAlphanumeric, '');
-    final length = compactId.length.clamp(0, 12);
-    final idPart = compactId.isEmpty
-        ? 'NimbleClip'
-        : compactId.substring(0, length);
-    final platformPrefix = task.platform.name == 'twitter'
-        ? 'x'
-        : task.platform.name;
-    final ext = (extension ?? task.format).replaceAll('.', '').trim();
-    return '${platformPrefix}_$idPart.${ext.isEmpty ? 'mp4' : ext}';
-  }
+  String buildFileName(DownloadTask task, {String? extension}) =>
+      downloadFileName(task, extension: extension);
 
   @override
   Future<void> startDownload({

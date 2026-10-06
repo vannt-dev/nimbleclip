@@ -64,7 +64,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get quickGuide => 'Hướng dẫn nhanh';
 
   @override
-  String get guideCopyTitle => 'Sao chép liên kết video';
+  String get guideCopyTitle => 'Sao chép liên kết';
 
   @override
   String get guideCopyDescription =>
@@ -87,7 +87,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get clipboardPasted => 'Đã dán liên kết từ clipboard!';
 
   @override
-  String get pasteVideoLink => 'Dán liên kết video';
+  String get pasteVideoLink => 'Dán liên kết';
 
   @override
   String get clear => 'Xóa';
@@ -233,7 +233,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get noCompletedDownloadsDescription =>
-      'Dán liên kết video để bắt đầu tải về.';
+      'Dán liên kết để bắt đầu tải về.';
 
   @override
   String get emptyDownloadList => 'Danh sách tải về đang trống';

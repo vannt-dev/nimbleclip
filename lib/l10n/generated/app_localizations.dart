@@ -185,7 +185,7 @@ abstract class AppLocalizations {
   /// No description provided for @guideCopyTitle.
   ///
   /// In en, this message translates to:
-  /// **'Copy a video link'**
+  /// **'Copy a link'**
   String get guideCopyTitle;
 
   /// No description provided for @guideCopyDescription.
@@ -227,7 +227,7 @@ abstract class AppLocalizations {
   /// No description provided for @pasteVideoLink.
   ///
   /// In en, this message translates to:
-  /// **'Paste a video link'**
+  /// **'Paste a link'**
   String get pasteVideoLink;
 
   /// No description provided for @clear.
@@ -461,7 +461,7 @@ abstract class AppLocalizations {
   /// No description provided for @noCompletedDownloadsDescription.
   ///
   /// In en, this message translates to:
-  /// **'Paste a video link to start downloading.'**
+  /// **'Paste a link to start downloading.'**
   String get noCompletedDownloadsDescription;
 
   /// No description provided for @emptyDownloadList.

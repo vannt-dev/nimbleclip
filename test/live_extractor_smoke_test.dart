@@ -95,6 +95,18 @@ void main() {
       minimumMedia: 9,
       minimumVideos: 2,
     ),
+    // Words of its own, and the video of the post it quotes.
+    'Threads post quoting a video': (
+      url: 'https://www.threads.com/@natgeo/post/Dd_i0KnDfUr',
+      minimumMedia: 1,
+      minimumVideos: 1,
+    ),
+    // A video carried over from Instagram rather than attached to the post.
+    'Threads post with an inline video': (
+      url: 'https://www.threads.com/@nasa/post/DdEwHNClPdc',
+      minimumMedia: 1,
+      minimumVideos: 1,
+    ),
     'Threads short link': (
       url: 'https://www.threads.com/t/Dcqa7s8gu-P',
       minimumMedia: 1,

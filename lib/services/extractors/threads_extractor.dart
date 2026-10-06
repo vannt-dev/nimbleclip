@@ -189,22 +189,43 @@ class ThreadsExtractor extends BaseVideoExtractor {
     final post = found;
     if (post == null) return null;
 
-    final carousel = post['carousel_media'];
-    final items = carousel is List && carousel.isNotEmpty
-        ? carousel.whereType<Map<String, dynamic>>()
-        : [post];
+    // A post that only quotes or reposts another shows that one's media, and a
+    // post can also carry a video "inline" from Instagram. What the post holds
+    // itself comes first.
+    var media = _mediaIn(post);
+    final info = post['text_post_app_info'];
+    if (media.isEmpty && info is Map<String, dynamic>) {
+      final share = info['share_info'];
+      final shared = share is Map<String, dynamic>
+          ? [share['quoted_post'], share['reposted_post']]
+          : const <dynamic>[];
+      for (final other in [...shared, info['linked_inline_media']]) {
+        if (other is! Map<String, dynamic>) continue;
+        media = _mediaIn(other);
+        if (media.isNotEmpty) break;
+      }
+    }
 
     final user = post['user'];
     final caption = post['caption'];
     final likes = post['like_count'];
     return ThreadsPost(
-      media: [for (final item in items) ?_mediaOf(item)],
+      media: media,
       author: user is Map<String, dynamic> ? user['username'] as String? : null,
       caption: caption is Map<String, dynamic>
           ? caption['text'] as String?
           : null,
       likeCount: likes is int ? likes : null,
     );
+  }
+
+  /// Every picture and video [post] holds itself, a carousel's in order.
+  static List<ThreadsMedia> _mediaIn(Map<String, dynamic> post) {
+    final carousel = post['carousel_media'];
+    final items = carousel is List && carousel.isNotEmpty
+        ? carousel.whereType<Map<String, dynamic>>()
+        : [post];
+    return [for (final item in items) ?_mediaOf(item)];
   }
 
   /// The video of [item] when it has one, else its largest picture.

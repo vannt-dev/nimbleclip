@@ -60,9 +60,9 @@ management, local playback, and gallery export.
 - Recovers queued and running native transfers after the app process is
   terminated, then reconnects them to the in-app download history.
 - Refreshes expired media URLs before retrying a failed download.
-- Uses compact, filesystem-safe, platform-prefixed UUID filenames such as
-  `facebook_<uuid>` and `x_<uuid>`, and validates downloaded media from its
-  actual file signature. Native video downloads are also opened by the platform
+- Names files after the platform, the author and the start of the title, with
+  a short id to keep them apart (`threads_nasa_LIFTOFF_<id>.mp4`), and
+  validates downloaded media from its actual file signature. Native video downloads are also opened by the platform
   player once before they are marked complete, preventing an HTML error page or
   broken video from appearing as a successful download.
 - Previews remote media and plays downloaded files inside the app. Previews are

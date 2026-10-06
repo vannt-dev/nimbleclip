@@ -65,7 +65,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quickGuide => 'Quick start guide';
 
   @override
-  String get guideCopyTitle => 'Copy a video link';
+  String get guideCopyTitle => 'Copy a link';
 
   @override
   String get guideCopyDescription =>
@@ -89,7 +89,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get clipboardPasted => 'Link pasted from clipboard!';
 
   @override
-  String get pasteVideoLink => 'Paste a video link';
+  String get pasteVideoLink => 'Paste a link';
 
   @override
   String get clear => 'Clear';
@@ -235,7 +235,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noCompletedDownloadsDescription =>
-      'Paste a video link to start downloading.';
+      'Paste a link to start downloading.';
 
   @override
   String get emptyDownloadList => 'Your download list is empty';

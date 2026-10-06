@@ -21,13 +21,16 @@ class PlatformBadges extends StatelessWidget {
       VideoPlatform.threads,
     ];
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
+    // Wrapped rather than scrolled sideways: a row cut off at the screen edge
+    // hid the platforms after the third, with nothing to say there were more.
+    return SizedBox(
+      width: double.infinity,
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 8,
         children: platforms.map((p) {
-          return Padding(
-            padding: const EdgeInsets.only(right: 10),
+          return Material(
+            type: MaterialType.transparency,
             child: InkWell(
               onTap: () => onPlatformTap?.call(p),
               borderRadius: BorderRadius.circular(24),

@@ -112,6 +112,70 @@ void main() {
     );
   });
 
+  group('a post with no media of its own', () {
+    String page(String appInfo) =>
+        '<script type="application/json">{"post":{"code":"QUOTEcode01",'
+        '"media_type":19,"user":{"username":"a_writer"},'
+        '"caption":{"text":"Look at this"},"carousel_media":null,'
+        '"image_versions2":{"candidates":[]},"video_versions":null,'
+        '"text_post_app_info":$appInfo}}</script>';
+
+    const video =
+        '{"code":"OTHERcode01","media_type":2,'
+        '"image_versions2":{"candidates":[{"url":"https://cdn.example/t.jpg",'
+        '"width":640}]},'
+        '"video_versions":[{"type":101,"url":"https://cdn.example/v.mp4"}]}';
+
+    test('offers the media of the post it quotes', () {
+      final post = ThreadsExtractor.parsePost(
+        page(
+          '{"share_info":{"quoted_post":$video,"reposted_post":null},'
+          '"linked_inline_media":null}',
+        ),
+        'QUOTEcode01',
+      )!;
+
+      expect(post.media.single.url, 'https://cdn.example/v.mp4');
+      expect(post.media.single.isVideo, isTrue);
+      // Still the post that was asked for.
+      expect(post.author, 'a_writer');
+      expect(post.caption, 'Look at this');
+    });
+
+    test('offers the media of the post it reposts', () {
+      final post = ThreadsExtractor.parsePost(
+        page('{"share_info":{"quoted_post":null,"reposted_post":$video}}'),
+        'QUOTEcode01',
+      )!;
+
+      expect(post.media.single.url, 'https://cdn.example/v.mp4');
+    });
+
+    test('offers a video carried inline', () {
+      final post = ThreadsExtractor.parsePost(
+        page(
+          '{"share_info":{"quoted_post":null,"reposted_post":null},'
+          '"linked_inline_media":$video}',
+        ),
+        'QUOTEcode01',
+      )!;
+
+      expect(post.media.single.url, 'https://cdn.example/v.mp4');
+    });
+
+    test('has none when the quoted post is words only too', () {
+      final post = ThreadsExtractor.parsePost(
+        page(
+          '{"share_info":{"quoted_post":{"code":"OTHERcode01",'
+          '"media_type":19,"image_versions2":{"candidates":[]}}}}',
+        ),
+        'QUOTEcode01',
+      )!;
+
+      expect(post.media, isEmpty);
+    });
+  });
+
   test(
     'a short link is asked for again under the address the page names',
     () async {
