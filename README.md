@@ -95,14 +95,19 @@ management, local playback, and gallery export.
 | --- | --- |
 | YouTube | Public videos and available M4A audio streams |
 | TikTok | Public videos, slideshows/image posts, including watermark-free variants when exposed by the source, and audio |
-| Facebook | Public videos, Watch links, Reels, image posts, carousels, and mixed-media posts |
+| Facebook | Public videos, Watch links, Reels, image posts, carousels, mixed-media posts, and story links (these need external services) |
 | X / Twitter | Public posts containing images, videos, or mixed media |
 | Instagram | Public image/carousel posts, video posts, Reels, mixed-media posts, and story/highlight links (these need external services) |
 | Threads | Public posts containing images, videos, or carousels mixing the two |
 | Other links | A direct link to an image, video, or audio file, and pages that declare their media in a standard way: Open Graph or Twitter card tags, `<video>` / `<audio>` elements, or JSON-LD (`VideoObject`, `AudioObject`, `ImageObject`) |
 
-"Other links" is not a promise that any page works. A page that only plays a
-stream (HLS or DASH) has no single file to download and is reported as such,
+On Android, a video served as an HLS stream (`.m3u8`) is fetched segment by
+segment and joined into one MP4, whether the link is the playlist or a page
+that names it. A live broadcast and an encrypted stream cannot be downloaded
+and are reported as such.
+
+"Other links" is not a promise that any page works. Outside Android, and for
+DASH, a page that only plays a stream is reported as such,
 and a page that builds its player in JavaScript declares nothing to find.
 
 Threads includes a post's media in the page only for search-engine crawlers, so

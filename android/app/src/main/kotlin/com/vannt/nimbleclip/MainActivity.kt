@@ -155,6 +155,7 @@ class MainActivity : FlutterActivity() {
                                             audioPath = call.argument<String>("audioPath")!!,
                                             outputPath = call.argument<String>("outputPath")!!,
                                             renderId = renderId,
+                                            audioOptional = call.argument<Boolean>("audioOptional") ?: false,
                                         ),
                                     ) { progress ->
                                         runOnUiThread {

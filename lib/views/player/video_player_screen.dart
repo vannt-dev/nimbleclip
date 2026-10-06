@@ -104,7 +104,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Widget _singleStage() => Center(
     child: VideoStage(
       videoUrl:
-          widget.playlist?.elementAtOrNull(_index)?.downloadUrl ??
+          widget.playlist?.elementAtOrNull(_index)?.previewUrl ??
           widget.videoUrl,
       localFilePath: widget.localFilePath,
       isActive: true,
@@ -120,7 +120,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     itemBuilder: (_, index) => Center(
       child: VideoStage(
         key: ValueKey(_playlist[index].id),
-        videoUrl: _playlist[index].downloadUrl,
+        videoUrl: _playlist[index].previewUrl,
         isActive: index == _index,
       ),
     ),

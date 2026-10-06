@@ -81,13 +81,20 @@ class InstagramExtractor extends BaseVideoExtractor {
     r'icon-dlvideo|<video|(?:type|media)[-_ ]?video|download[-_ ]?video',
     caseSensitive: false,
   );
+  // An item lists its thumbnail first and its video second, each as a link.
+  // The video is the link that says so in its own title, whichever side of the
+  // address the title is written on; and failing that, the link whose own
+  // text says so. "Its own" is the point of the second pattern: read across
+  // the next link, "the first link followed somewhere by the word video" is
+  // the thumbnail, which then gets offered - and saved, and played - as the
+  // video.
   static final List<RegExp> _videoDownloadPatterns = [
     RegExp(
-      r'<a[^>]*title="[^"]*video"[^>]*href="(https://dl\.snapcdn\.app/get\?[^"]+)"[^>]*>',
+      r'<a(?=[^>]*title="[^"]*video")[^>]*href="(https://dl\.snapcdn\.app/get\?[^"]+)"[^>]*>',
       caseSensitive: false,
     ),
     RegExp(
-      r'<a[^>]+href="(https://dl\.snapcdn\.app/get\?[^"]+)"[^>]*>[\s\S]*?(?:Tải|Download)[^<]*video',
+      r'<a[^>]+href="(https://dl\.snapcdn\.app/get\?[^"]+)"[^>]*>(?:(?!<a[\s>])[\s\S])*?(?:Tải|Download)[^<]*video',
       caseSensitive: false,
     ),
   ];

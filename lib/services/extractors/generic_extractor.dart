@@ -6,17 +6,48 @@ import '../../core/utils/http_helper.dart';
 import '../../core/utils/media_format_helper.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/text_unescape.dart';
+import '../../models/hls_source.dart';
 import '../../models/quality_descriptor.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
+import '../hls/hls_playlist.dart';
+import '../slideshow/slideshow_renderer.dart';
 import 'extraction_failure.dart';
 
 /// Fallback for direct media links and for pages that declare their media in
 /// a standard way: Open Graph tags, `<video>` / `<audio>` elements or JSON-LD.
 /// Registered last, so it only sees URLs no platform claimed.
+///
+/// A video served as an HLS stream is offered where the device can join its
+/// segments into a file; elsewhere it is reported as a stream.
 class GenericExtractor extends BaseVideoExtractor {
-  const GenericExtractor();
+  const GenericExtractor({this.canJoinStreams});
+
+  /// Overrides the platform check behind [joinStreams]; null asks the device.
+  final bool? canJoinStreams;
+
+  /// Whether a stream can be turned into a file here. Decided in the
+  /// extractor rather than filtered in the UI, as for YouTube's merged
+  /// qualities: an option the device cannot produce must not be offered.
+  bool get joinStreams =>
+      canJoinStreams ?? createSlideshowRenderer().isSupported;
+
+  /// Qualities offered of one stream; a master playlist can list a dozen.
+  static const int _maxStreamQualities = 6;
+
+  static const Set<String> _playlistContentTypes = {
+    'application/vnd.apple.mpegurl',
+    'application/x-mpegurl',
+    'audio/mpegurl',
+    'audio/x-mpegurl',
+  };
+
+  /// A playlist address anywhere in a page: players built in JavaScript name
+  /// their stream in a script rather than in a tag. Slashes may be escaped.
+  static final RegExp _playlistInPage = RegExp(
+    r'''https?:(?:\\?/){2}[^\s"'<>]+?\.m3u8(?:\?[^\s"'<>\\]*)?''',
+  );
 
   static const Map<String, String> _mediaExtensions = {
     '.mp4': 'mp4',
@@ -61,6 +92,9 @@ class GenericExtractor extends BaseVideoExtractor {
 
     final direct = _directMediaFormat(uri);
     if (direct != null) return _directMedia(uri, cleanUrl, id, direct);
+    if (uri.path.toLowerCase().endsWith('.m3u8')) {
+      return _fromStream(cleanUrl, uri, cleanUrl, id);
+    }
 
     // An extensionless media URL may point at a multi-gigabyte file. Probe its
     // headers first so extraction never buffers the payload just to inspect
@@ -96,8 +130,203 @@ class GenericExtractor extends BaseVideoExtractor {
     // The URL had no media extension but the server says it is media anyway.
     final media = _fromMediaHeaders(response, uri, cleanUrl, id);
     if (media != null) return media;
+    if (_isPlaylistResponse(response)) {
+      return _fromStream(cleanUrl, uri, cleanUrl, id, playlist: response.body);
+    }
 
-    return _fromPage(response.body, uri, cleanUrl, id);
+    // What the page declares as files comes first. A page whose player is
+    // built in JavaScript declares at most a poster picture, so when there is
+    // no video or audio among it, a stream the page names is what was meant.
+    VideoMetadata? declared;
+    ExtractionException? refusal;
+    try {
+      declared = _fromPage(response.body, uri, cleanUrl, id);
+      if (declared.qualities.any((option) => !option.isImage)) return declared;
+    } on ExtractionException catch (error) {
+      refusal = error;
+    }
+
+    final stream = _streamIn(response.body, uri);
+    if (stream != null && joinStreams) {
+      try {
+        return await _fromStream(
+          stream,
+          uri,
+          cleanUrl,
+          id,
+          title: _meta(response.body, ['og:title']) ?? _title(response.body),
+          author: _meta(response.body, ['og:site_name']),
+          coverUrl: _PageMedia(uri).resolve(_meta(response.body, ['og:image'])),
+        );
+      } on ExtractionException catch (error) {
+        // A stream that is live or encrypted is the answer; one that merely
+        // could not be read leaves the page's own verdict standing.
+        final kind = error.failure.kind;
+        if (kind == ExtractionFailureKind.genericStreamLive ||
+            kind == ExtractionFailureKind.genericStreamProtected) {
+          rethrow;
+        }
+      }
+    }
+
+    if (declared != null) return declared;
+    throw stream == null
+        ? refusal!
+        : ExtractionException(
+            const ExtractionFailure(ExtractionFailureKind.genericStreamOnly),
+          );
+  }
+
+  static bool _isPlaylistResponse(http.Response response) {
+    final contentType = (response.headers['content-type'] ?? '')
+        .split(';')
+        .first
+        .trim()
+        .toLowerCase();
+    return _playlistContentTypes.contains(contentType) ||
+        response.body.trimLeft().startsWith('#EXTM3U');
+  }
+
+  /// The first HLS playlist [html] names, in a tag or in a script.
+  static String? _streamIn(String html, Uri page) {
+    final match = _playlistInPage.firstMatch(html);
+    if (match == null) return null;
+    final address = match
+        .group(0)!
+        .replaceAll(r'\/', '/')
+        .replaceAll(r'&', '&')
+        .replaceAll('&amp;', '&');
+    return _PageMedia(page).resolve(address);
+  }
+
+  /// Offers the qualities of the stream at [playlistUrl].
+  Future<VideoMetadata> _fromStream(
+    String playlistUrl,
+    Uri page,
+    String url,
+    String id, {
+    String? playlist,
+    String? title,
+    String? author,
+    String? coverUrl,
+  }) async {
+    if (!joinStreams) {
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.genericStreamOnly),
+      );
+    }
+    final base = Uri.parse(playlistUrl);
+    final body = playlist ?? await _playlist(playlistUrl);
+
+    final List<VideoQualityOption> qualities;
+    final HlsMedia media;
+    if (isHlsMaster(body)) {
+      final master = parseHlsMaster(body, base);
+      // One per size: several bitrates of the same picture are not a choice
+      // worth a row each. The list is best first, so the first one stays -
+      // unless it is in a codec the device may not be able to write to a
+      // file, and the same size is also there in one every device can.
+      final bySize = <int?, HlsVariant>{};
+      for (final variant in master.variants) {
+        final kept = bySize[variant.shortSide];
+        if (kept == null || (!kept.joinsAnywhere && variant.joinsAnywhere)) {
+          bySize[variant.shortSide] = variant;
+        }
+      }
+      final variants = bySize.values.take(_maxStreamQualities).toList();
+      if (variants.isEmpty) {
+        throw ExtractionException(
+          const ExtractionFailure(ExtractionFailureKind.genericNoVideo),
+        );
+      }
+      // Every quality of one stream is live or encrypted alike, so the best
+      // one answers for all of them.
+      media = parseHlsMedia(
+        await _playlist(variants.first.url),
+        Uri.parse(variants.first.url),
+      );
+      qualities = [
+        for (final variant in variants)
+          VideoQualityOption.stream(
+            id: 'gen_hls_${variant.shortSide ?? variant.bandwidth}',
+            label: variant.shortSide == null
+                ? const OriginalVideo()
+                : VideoWithAudio('${variant.shortSide}p'),
+            quality: variant.shortSide == null
+                ? 'Original'
+                : '${variant.shortSide}p',
+            source: HlsSource(
+              videoPlaylistUrl: variant.url,
+              audioPlaylistUrl: master.audio[variant.audioGroup],
+              playlistUrl: playlistUrl,
+            ),
+          ),
+      ];
+    } else {
+      media = parseHlsMedia(body, base);
+      qualities = [
+        VideoQualityOption.stream(
+          id: 'gen_hls',
+          label: const OriginalVideo(),
+          quality: 'Original',
+          source: HlsSource(videoPlaylistUrl: playlistUrl),
+        ),
+      ];
+    }
+
+    if (media.isEncrypted) {
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.genericStreamProtected),
+      );
+    }
+    if (!media.isComplete) {
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.genericStreamLive),
+      );
+    }
+    if (media.segments.isEmpty) {
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.genericNoVideo),
+      );
+    }
+
+    return VideoMetadata(
+      id: id,
+      originalUrl: url,
+      title: title ?? _fileNameOf(base) ?? 'Web Video',
+      description: null,
+      author: author ?? page.host,
+      coverUrl: coverUrl ?? '',
+      duration: media.duration > Duration.zero ? media.duration : null,
+      platform: VideoPlatform.generic,
+      qualities: qualities,
+    );
+  }
+
+  Future<String> _playlist(String url) async {
+    final http.Response response;
+    try {
+      response = await ExtractorHttp.get(
+        url,
+        timeout: const Duration(seconds: 12),
+      );
+    } catch (error) {
+      throw ExtractionException(
+        ExtractionFailure(
+          ExtractionFailureKind.linkAccessFailed,
+          detail: error.toString(),
+        ),
+      );
+    }
+    if (response.statusCode >= 400) {
+      throw ExtractionException(
+        ExtractionFailure(
+          ExtractionFailureKind.linkAccessFailed,
+          detail: 'HTTP ${response.statusCode}',
+        ),
+      );
+    }
+    return response.body;
   }
 
   VideoMetadata? _fromMediaHeaders(

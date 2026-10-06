@@ -82,7 +82,7 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
         MaterialPageRoute(
           builder: (_) => VideoPlayerScreen(
             title: describeQuality(option.label, context.l10n),
-            videoUrl: option.downloadUrl,
+            videoUrl: option.previewUrl,
             // The grid already holds one entry per video, so it is the set to
             // swipe through as it stands.
             playlist: widget.options,

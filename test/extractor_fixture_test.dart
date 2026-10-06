@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +14,7 @@ import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/services/extractors/base_extractor.dart';
 import 'package:nimble_clip/services/extractors/extraction_failure.dart';
 import 'package:nimble_clip/services/extractors/facebook_extractor.dart';
+import 'package:nimble_clip/services/extractors/facebook_video_fallback_client.dart';
 import 'package:nimble_clip/services/extractors/generic_extractor.dart';
 import 'package:nimble_clip/services/extractors/instagram_extractor.dart';
 import 'package:nimble_clip/services/extractors/instagram_fallback_client.dart';
@@ -496,6 +498,52 @@ void main() {
     expect(result.qualities.where((option) => option.isImage), hasLength(4));
   });
 
+  // And then it moved back: the www host began answering with a 307 to the
+  // bare domain, with the address in a Location header. Whichever host the
+  // API lives on, the album must come back whole.
+  test('Facebook follows the gallery service to its other host', () async {
+    ExtractorHttp.getOverride = (_, _) async =>
+        http.Response(fixture('facebook_image.html'), 200);
+    final asked = <String>[];
+    ExtractorHttp.postOverride = (uri, _, _) async {
+      asked.add(uri.host);
+      return uri.host == 'www.toolspy.net'
+          ? http.Response(fixture('facebook_fallback.json'), 200)
+          : http.Response(
+              '',
+              307,
+              headers: {'location': 'https://www.toolspy.net${uri.path}'},
+            );
+    };
+
+    final result = await const FacebookExtractor(
+      videoFallbackClient: _NoFacebookVideo(),
+    ).extract('https://www.facebook.com/example/posts/654321');
+
+    expect(asked, ['toolspy.net', 'www.toolspy.net']);
+    expect(result.qualities.where((option) => option.isImage), hasLength(4));
+  });
+
+  test('Facebook does not follow the gallery service anywhere else', () async {
+    ExtractorHttp.getOverride = (_, _) async =>
+        http.Response(fixture('facebook_image.html'), 200);
+    final asked = <String>[];
+    ExtractorHttp.postOverride = (uri, _, _) async {
+      asked.add(uri.host);
+      return http.Response(
+        '',
+        307,
+        headers: {'location': 'https://elsewhere.example${uri.path}'},
+      );
+    };
+
+    await const FacebookExtractor(
+      videoFallbackClient: _NoFacebookVideo(),
+    ).extract('https://www.facebook.com/example/posts/654321');
+
+    expect(asked, everyElement('toolspy.net'));
+  });
+
   // Toolspy moved its API to the www host and answers the bare domain with a
   // 308. `http` does not follow a redirect for a POST, so the gallery check
   // failed on every post and each album shrank to its cover photo.
@@ -766,6 +814,48 @@ void main() {
     );
   });
 
+  // The service lists an item's thumbnail before its video, each as a link
+  // with the address first and the title after. Reading "the first link
+  // followed by the word video" took the thumbnail, which was then offered,
+  // saved and played as the Reel: a picture the player could not open.
+  test('Instagram takes the video link, not the thumbnail before it', () async {
+    ExtractorHttp.getOverride = (uri, _) async {
+      if (uri.host == 'snap-insta.to') {
+        return http.Response(fixture('snapinsta_page.html'), 200);
+      }
+      return http.Response(fixture('instagram_single_image.html'), 200);
+    };
+    ExtractorHttp.postOverride = (_, _, _) async => http.Response(
+      jsonEncode({
+        'status': 'ok',
+        'data':
+            '<ul><li><div class="download-items">'
+            '<div class="download-items__thumb">'
+            '<img src="https://i.snapcdn.app/photo?token=preview">'
+            '<span class="format-icon"><i class="icon icon-dlvideo"></i></span>'
+            '</div><div class="download-items__btn dl-thumb">'
+            '<a href="https://dl.snapcdn.app/get?token=thumbnail" '
+            'class="abutton" rel="nofollow" title="Download Thumbnail">'
+            '<span>Download Thumbnail</span></a></div>'
+            '<div class="download-items__btn">'
+            '<a href="https://dl.snapcdn.app/get?token=the-video" '
+            'class="abutton" rel="nofollow" title="Download Video">'
+            '<span>Download Video</span></a></div></div></li></ul>',
+      }),
+      200,
+    );
+
+    final result = await const InstagramExtractor().extract(
+      'https://www.instagram.com/reel/videoFixture/',
+    );
+
+    expect(result.qualities.single.kind, MediaKind.video);
+    expect(
+      result.qualities.single.downloadUrl,
+      'https://dl.snapcdn.app/get?token=the-video',
+    );
+  });
+
   test('YouTube parses a watch-page player fixture', () async {
     ExtractorHttp.getOverride = (_, _) async =>
         http.Response(fixture('youtube.html'), 200);
@@ -965,4 +1055,11 @@ class _FailingInstagramFallback implements InstagramFallbackClient {
   @override
   Future<String?> search(String postUrl) async =>
       throw Exception('service down');
+}
+
+class _NoFacebookVideo implements FacebookVideoFallbackClient {
+  const _NoFacebookVideo();
+
+  @override
+  Future<FacebookFallbackVideo?> find(String postUrl) async => null;
 }

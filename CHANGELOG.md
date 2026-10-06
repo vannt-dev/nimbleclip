@@ -15,8 +15,12 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   `og:image` of a gallery page as its own picture. Several videos on one page
   are offered as separate downloads; the encodings of one `<video>` element
   count as one clip, MP4 preferred.
-- A page that only plays a stream (HLS or DASH) now says so, instead of
-  "no video was found".
+- On Android, a video served as an HLS stream can be downloaded: a link to an
+  `.m3u8` playlist, or a page whose player names one, even in a script. Each
+  size the stream comes in is offered once, its segments are fetched and
+  joined into one MP4, and Preview plays the stream. A live broadcast and an
+  encrypted stream say what they are. Elsewhere, and for DASH, a page that
+  only plays a stream now says so instead of "no video was found".
 - A Threads post with no media of its own offers that of the post it quotes or
   reposts, and a video carried inline from Instagram.
 - A downloaded picture is named after its place in the post ("Image 3") in the
@@ -24,6 +28,19 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   already in the list are put right when it is read.
 - Saved files carry the author and the start of the title:
   `threads_nasa_LIFTOFF_<id>.mp4` where it was `threads_<id>.mp4`.
+- A Facebook story, which Facebook shows only to a logged-in reader, is
+  fetched through an external service when Facebook itself shows no video.
+  Like the other external services, this follows the setting that allows
+  them.
+- Instagram reels, stories and highlights work again on networks that cannot
+  reach the service they are read through: a second service is asked when
+  the first does not answer.
+- An Instagram video read through the service is the video, not its
+  thumbnail. The thumbnail was being offered as the Reel, which then would
+  not play and saved as a picture named `.mp4`.
+- A Facebook album is whole again. The service its photos are read through
+  moved its address and answered the old one with a redirect, so every album
+  had shrunk to its cover photo; the redirect is now followed.
 - The home screen shows every supported platform at once instead of a row that
   ran off the edge, and asks for "a link" rather than "a video link".
 

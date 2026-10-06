@@ -23,6 +23,12 @@ enum ExtractionFailureKind {
   /// The page declares its video only as an HLS or DASH playlist, which has
   /// no single file behind it.
   genericStreamOnly,
+
+  /// The stream is still being broadcast, so it has no end to download to.
+  genericStreamLive,
+
+  /// The stream's segments are encrypted.
+  genericStreamProtected,
   instagramInvalidPost,
   instagramLoginRequired,
 
