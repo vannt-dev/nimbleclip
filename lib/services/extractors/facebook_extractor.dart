@@ -14,19 +14,24 @@ import '../../models/video_platform.dart';
 import 'base_extractor.dart';
 import 'extraction_failure.dart';
 import 'facebook_fallback_client.dart';
+import 'facebook_video_fallback_client.dart';
 import 'facebook_page_parser.dart';
 
 class FacebookExtractor extends BaseVideoExtractor {
   final ExternalServiceAccess externalServiceAccess;
   final FacebookFallbackClient fallbackClient;
+  final FacebookVideoFallbackClient videoFallbackClient;
   static const _pageParser = FacebookPageParser();
 
   const FacebookExtractor({
     ExternalServiceAccess? externalServiceAccess,
     FacebookFallbackClient? fallbackClient,
+    FacebookVideoFallbackClient? videoFallbackClient,
   }) : externalServiceAccess =
            externalServiceAccess ?? const FixedExternalServiceAccess(true),
-       fallbackClient = fallbackClient ?? const ToolspyFacebookFallbackClient();
+       fallbackClient = fallbackClient ?? const ToolspyFacebookFallbackClient(),
+       videoFallbackClient =
+           videoFallbackClient ?? const X2DownloadFacebookFallbackClient();
 
   @override
   VideoPlatform get platform => VideoPlatform.facebook;
@@ -179,6 +184,15 @@ class FacebookExtractor extends BaseVideoExtractor {
           : ExtractionFailureKind.facebookNoVideo,
     );
 
+    // Facebook itself showed no video. A story is the usual reason: it is
+    // served only to a logged-in reader, so no anonymous request can see it. A
+    // post that showed photographs and is not a video link is a photo post, and
+    // is left as one.
+    if (imageFallback == null || _isKnownVideoLink(cleanUrl)) {
+      final viaService = await _fromVideoService(url.trim());
+      if (viaService != null) return viaService;
+    }
+
     if (imageFallback != null) {
       if (_isKnownVideoLink(cleanUrl)) {
         throw ExtractionException(
@@ -200,6 +214,48 @@ class FacebookExtractor extends BaseVideoExtractor {
           : 'facebook_no_public_media',
       attemptedStrategies: const ['page', 'embed', 'mobile'],
       suppressedError: errors.summary,
+    );
+  }
+
+  /// The video an external service finds behind [url], when the reader allows
+  /// such services. Null when it is not asked or has nothing.
+  Future<VideoMetadata?> _fromVideoService(String url) async {
+    if (!externalServiceAccess.allowExternalServices) return null;
+    // Fixture tests that only override GET must never leak into live network.
+    if (ExtractorHttp.isUsingOverrides && !ExtractorHttp.hasPostOverride) {
+      return null;
+    }
+
+    final FacebookFallbackVideo? found;
+    try {
+      found = await videoFallbackClient.find(url);
+    } catch (_) {
+      // An unanswered request leaves Facebook's own verdict standing.
+      return null;
+    }
+    if (found == null) return null;
+
+    final id = found.id ?? DateTime.now().millisecondsSinceEpoch.toString();
+    return VideoMetadata(
+      id: id,
+      originalUrl: url,
+      title: found.title ?? 'Facebook Video ($id)',
+      author: 'Facebook',
+      coverUrl: found.thumbnailUrl ?? '',
+      duration: found.duration,
+      platform: VideoPlatform.facebook,
+      qualities: QualityHelper.sortedByQuality([
+        for (final file in found.files)
+          VideoQualityOption.video(
+            id: 'fb_service_${file.quality}_$id',
+            // "720p (HD)" is how the service names it; "720p" is what the
+            // sorting and the default selection read, and what is shown.
+            label: VideoWithAudio(file.quality.split(' ').first),
+            quality: file.quality.split(' ').first,
+            format: 'mp4',
+            downloadUrl: file.url,
+          ),
+      ]),
     );
   }
 

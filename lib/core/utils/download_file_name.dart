@@ -25,9 +25,12 @@ String downloadFileName(DownloadTask task, {String? extension}) {
       : task.platform.name;
   final ext = (extension ?? task.format).replaceAll('.', '').trim();
 
+  final author = _namePart(task.author, _maximumAuthorLength);
   final parts = [
     platformPrefix,
-    _namePart(task.author, _maximumAuthorLength),
+    // A source that names no author is credited to the platform itself, which
+    // the prefix has already said.
+    if (author.toLowerCase() != task.platform.name) author,
     // A caption runs on for paragraphs; its first line is its headline.
     _namePart(task.title.trim().split('\n').first, _maximumTitleLength),
     idPart,
