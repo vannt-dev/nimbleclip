@@ -185,7 +185,6 @@ class MainActivity : FlutterActivity() {
                                             height = call.argument<Int>("height") ?: 1920,
                                             outputPath = call.argument<String>("outputPath")!!,
                                             renderId = renderId,
-                                            audioOptional = call.argument<Boolean>("audioOptional") ?: false,
                                         ),
                                     ) { progress ->
                                         // Dart may only be addressed from the
