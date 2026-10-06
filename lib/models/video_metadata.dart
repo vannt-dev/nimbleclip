@@ -1,4 +1,5 @@
 import 'gallery_notice.dart';
+import 'hls_source.dart';
 import 'merge_source.dart';
 import 'quality_descriptor.dart';
 import 'slideshow_source.dart';
@@ -29,6 +30,10 @@ class VideoQualityOption {
   /// joined on the device. Null for everything else.
   final MergeSource? merge;
 
+  /// Set only on a video served as an HLS stream, whose segments are fetched
+  /// and joined on the device. Null for everything else.
+  final HlsSource? hls;
+
   const VideoQualityOption({
     required this.id,
     required this.label,
@@ -42,9 +47,14 @@ class VideoQualityOption {
     this.mediaId,
     this.slideshow,
     this.merge,
+    this.hls,
     bool checked = true,
   }) : assert(
-         !checked || downloadUrl != '' || slideshow != null || merge != null,
+         !checked ||
+             downloadUrl != '' ||
+             slideshow != null ||
+             merge != null ||
+             hls != null,
          'An option with no download URL must carry a source to render.',
        );
 
@@ -60,7 +70,8 @@ class VideoQualityOption {
     this.mediaId,
     this.slideshow,
   }) : kind = MediaKind.image,
-       merge = null;
+       merge = null,
+       hls = null;
 
   const VideoQualityOption.video({
     required this.id,
@@ -74,7 +85,8 @@ class VideoQualityOption {
     this.mediaId,
     this.slideshow,
   }) : kind = MediaKind.video,
-       merge = null;
+       merge = null,
+       hls = null;
 
   const VideoQualityOption.audio({
     required this.id,
@@ -88,7 +100,8 @@ class VideoQualityOption {
     this.mediaId,
     this.slideshow,
   }) : kind = MediaKind.audio,
-       merge = null;
+       merge = null,
+       hls = null;
 
   /// A video the device will render from [source]. [downloadUrl] is empty
   /// because there is nothing to fetch; `needsRendering` is what callers
@@ -106,6 +119,7 @@ class VideoQualityOption {
        sizeBytes = null,
        headers = null,
        merge = null,
+       hls = null,
        slideshow = source;
 
   /// A video the device will join from [source]'s two streams. Like a
@@ -124,14 +138,37 @@ class VideoQualityOption {
        downloadUrl = '',
        headers = null,
        slideshow = null,
+       hls = null,
        merge = source;
+
+  /// A video the device will join from the segments of [source]'s stream.
+  const VideoQualityOption.stream({
+    required this.id,
+    required this.label,
+    required this.quality,
+    required HlsSource source,
+    this.format = 'mp4',
+    this.thumbnailUrl,
+    this.mediaId,
+  }) : kind = MediaKind.video,
+       downloadUrl = '',
+       sizeBytes = null,
+       headers = null,
+       slideshow = null,
+       merge = null,
+       hls = source;
 
   bool get isAudioOnly => kind == MediaKind.audio;
   bool get isImage => kind == MediaKind.image;
   bool get isSlideshow => slideshow != null;
 
+  /// What a player is given to preview this option: its file, or for a
+  /// stream its playlist. Empty when there is nothing to play before the
+  /// download.
+  String get previewUrl => hls?.playlistUrl ?? downloadUrl;
+
   /// True when the file is produced on the device rather than fetched whole.
-  bool get needsRendering => slideshow != null || merge != null;
+  bool get needsRendering => slideshow != null || merge != null || hls != null;
 
   Map<String, dynamic> toJson() => {
     'id': id,

@@ -342,7 +342,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           MaterialPageRoute(
             builder: (_) => VideoPlayerScreen(
               title: meta.title,
-              videoUrl: quality.downloadUrl,
+              videoUrl: quality.previewUrl,
               onDownload: _onStartDownload,
               // One entry per video, not per quality: swiping is for moving
               // between videos, and the same clip at 720p and 1080p is one.

@@ -22,6 +22,8 @@ String describeExtractionFailure(
     ExtractionFailureKind.facebookAgeRestricted => l10n.facebookAgeRestricted,
     ExtractionFailureKind.genericNoVideo => l10n.genericNoVideo,
     ExtractionFailureKind.genericStreamOnly => l10n.genericStreamOnly,
+    ExtractionFailureKind.genericStreamLive => l10n.streamLive,
+    ExtractionFailureKind.genericStreamProtected => l10n.streamProtected,
     ExtractionFailureKind.instagramInvalidPost => l10n.instagramInvalidPost,
     ExtractionFailureKind.instagramLoginRequired => l10n.instagramLoginRequired,
     ExtractionFailureKind.tiktokConnectionFailed => l10n.tiktokConnectionFailed(

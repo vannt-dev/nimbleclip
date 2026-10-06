@@ -624,7 +624,18 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get genericStreamOnly =>
-      'Trang này phát video dạng luồng, không có file đơn để tải về.';
+      'Trang này phát video dạng luồng mà ở đây chưa tải về được.';
+
+  @override
+  String get streamLive =>
+      'Đây là luồng phát trực tiếp. Có thể tải về sau khi buổi phát kết thúc.';
+
+  @override
+  String get streamProtected => 'Luồng này được mã hoá nên không tải về được.';
+
+  @override
+  String get streamUnreadable =>
+      'Đã tải xong luồng, nhưng thiết bị này không ghép được nó thành file video.';
 
   @override
   String get embeddedVideo => 'Video nhúng (Web)';

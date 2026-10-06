@@ -626,7 +626,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get genericStreamOnly =>
-      'This page plays its video as a stream, with no single file to download.';
+      'This page plays its video as a stream that cannot be downloaded here.';
+
+  @override
+  String get streamLive =>
+      'This is a live stream. It can be downloaded once the broadcast has ended.';
+
+  @override
+  String get streamProtected =>
+      'This stream is encrypted and cannot be downloaded.';
+
+  @override
+  String get streamUnreadable =>
+      'The stream was fetched, but this device could not turn it into a video file.';
 
   @override
   String get embeddedVideo => 'Embedded video (Web)';

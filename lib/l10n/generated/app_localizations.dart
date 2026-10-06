@@ -1115,8 +1115,26 @@ abstract class AppLocalizations {
   /// No description provided for @genericStreamOnly.
   ///
   /// In en, this message translates to:
-  /// **'This page plays its video as a stream, with no single file to download.'**
+  /// **'This page plays its video as a stream that cannot be downloaded here.'**
   String get genericStreamOnly;
+
+  /// No description provided for @streamLive.
+  ///
+  /// In en, this message translates to:
+  /// **'This is a live stream. It can be downloaded once the broadcast has ended.'**
+  String get streamLive;
+
+  /// No description provided for @streamProtected.
+  ///
+  /// In en, this message translates to:
+  /// **'This stream is encrypted and cannot be downloaded.'**
+  String get streamProtected;
+
+  /// No description provided for @streamUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'The stream was fetched, but this device could not turn it into a video file.'**
+  String get streamUnreadable;
 
   /// No description provided for @embeddedVideo.
   ///

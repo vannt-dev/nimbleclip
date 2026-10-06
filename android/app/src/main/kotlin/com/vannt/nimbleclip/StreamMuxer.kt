@@ -15,6 +15,11 @@ import java.nio.ByteBuffer
  * copies compressed samples from two [MediaExtractor]s into one [MediaMuxer]:
  * a 1080p clip takes seconds, and the picture is bit-for-bit what YouTube sent.
  *
+ * A stream fetched as segments is joined the same way. Its picture and sound
+ * usually arrive in one file, which is then named as both inputs and read
+ * twice, once per track; such a file may carry no sound at all, and the output
+ * is then the picture alone.
+ *
  * Cancellation shares [SlideshowEncoder]'s registry, because both are started
  * and stopped through the same channel under the same render id.
  */
@@ -44,18 +49,28 @@ class StreamMuxer {
             video.setDataSource(request.videoPath)
             audio.setDataSource(request.audioPath)
             val videoFormat = selectTrack(video, "video/")
+                ?: throw SlideshowEncodeException("no video track in the input")
             val audioFormat = selectTrack(audio, "audio/")
+            // Two files promise a track each. One file read twice is a stream
+            // as it was served, and a silent clip is still a clip.
+            if (audioFormat == null && request.audioPath != request.videoPath) {
+                throw SlideshowEncodeException("no audio track in the input")
+            }
 
             muxer = MediaMuxer(output.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
             videoFormat.rotation()?.let { muxer.setOrientationHint(it) }
             val videoTrack = muxer.addTrack(videoFormat)
-            val audioTrack = muxer.addTrack(audioFormat)
+            val audioTrack = audioFormat?.let { muxer.addTrack(it) } ?: -1
             muxer.start()
             started = true
 
-            val durationUs = videoFormat.durationUs() ?: audioFormat.durationUs() ?: 0L
+            val durationUs = videoFormat.durationUs() ?: audioFormat?.durationUs() ?: 0L
             val buffer = ByteBuffer.allocate(
-                maxOf(videoFormat.maxInputSize(), audioFormat.maxInputSize(), MIN_BUFFER_SIZE),
+                maxOf(
+                    videoFormat.maxInputSize(),
+                    audioFormat?.maxInputSize() ?: 0,
+                    MIN_BUFFER_SIZE,
+                ),
             )
             val info = MediaCodec.BufferInfo()
             var lastReported = -1.0
@@ -64,7 +79,7 @@ class StreamMuxer {
             // buffers whatever arrives out of order, and feeding a whole video
             // track first would hold the entire audio track in memory.
             var videoDone = false
-            var audioDone = false
+            var audioDone = audioFormat == null
             while (!videoDone || !audioDone) {
                 if (SlideshowEncoder.isCancelled(request.renderId)) {
                     throw SlideshowCancelledException(request.renderId)
@@ -105,8 +120,8 @@ class StreamMuxer {
         }
     }
 
-    /** Selects the first track whose MIME type starts with [prefix]. */
-    private fun selectTrack(extractor: MediaExtractor, prefix: String): MediaFormat {
+    /** Selects the first track whose MIME type starts with [prefix], if any. */
+    private fun selectTrack(extractor: MediaExtractor, prefix: String): MediaFormat? {
         for (index in 0 until extractor.trackCount) {
             val format = extractor.getTrackFormat(index)
             if (format.getString(MediaFormat.KEY_MIME).orEmpty().startsWith(prefix)) {
@@ -114,7 +129,7 @@ class StreamMuxer {
                 return format
             }
         }
-        throw SlideshowEncodeException("no ${prefix.trimEnd('/')} track in the input")
+        return null
     }
 
     /** Copies one sample; false once [extractor] has none left. */
