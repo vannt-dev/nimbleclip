@@ -6,11 +6,12 @@ import '../../core/utils/http_helper.dart';
 import '../../core/utils/media_format_helper.dart';
 import '../../core/utils/quality_helper.dart';
 import '../../core/utils/text_unescape.dart';
-import '../../models/hls_source.dart';
+import '../../models/stream_source.dart';
 import '../../models/quality_descriptor.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
+import '../dash/dash_manifest.dart';
 import '../hls/hls_playlist.dart';
 import '../slideshow/slideshow_renderer.dart';
 import 'extraction_failure.dart';
@@ -46,7 +47,12 @@ class GenericExtractor extends BaseVideoExtractor {
   /// A playlist address anywhere in a page: players built in JavaScript name
   /// their stream in a script rather than in a tag. Slashes may be escaped.
   static final RegExp _playlistInPage = RegExp(
-    r'''https?:(?:\\?/){2}[^\s"'<>]+?\.m3u8(?:\?[^\s"'<>\\]*)?''',
+    r'''https?:(?:\\?/){2}[^\s"'<>]+?\.m3u8(?:\?[^\s"'<>]*)?''',
+  );
+
+  /// The same for a DASH manifest.
+  static final RegExp _manifestInPage = RegExp(
+    r'''https?:(?:\\?/){2}[^\s"'<>]+?\.mpd(?:\?[^\s"'<>]*)?''',
   );
 
   static const Map<String, String> _mediaExtensions = {
@@ -95,6 +101,9 @@ class GenericExtractor extends BaseVideoExtractor {
     if (uri.path.toLowerCase().endsWith('.m3u8')) {
       return _fromStream(cleanUrl, uri, cleanUrl, id);
     }
+    if (uri.path.toLowerCase().endsWith('.mpd')) {
+      return _fromManifest(cleanUrl, uri, cleanUrl, id);
+    }
 
     // An extensionless media URL may point at a multi-gigabyte file. Probe its
     // headers first so extraction never buffers the payload just to inspect
@@ -133,6 +142,15 @@ class GenericExtractor extends BaseVideoExtractor {
     if (_isPlaylistResponse(response)) {
       return _fromStream(cleanUrl, uri, cleanUrl, id, playlist: response.body);
     }
+    if (_isManifestResponse(response)) {
+      return _fromManifest(
+        cleanUrl,
+        uri,
+        cleanUrl,
+        id,
+        manifest: response.body,
+      );
+    }
 
     // What the page declares as files comes first. A page whose player is
     // built in JavaScript declares at most a poster picture, so when there is
@@ -146,18 +164,35 @@ class GenericExtractor extends BaseVideoExtractor {
       refusal = error;
     }
 
-    final stream = _streamIn(response.body, uri);
+    final found = _streamIn(response.body, uri);
+    final stream = found?.address;
     if (stream != null && joinStreams) {
       try {
-        return await _fromStream(
-          stream,
+        final title =
+            _meta(response.body, ['og:title']) ?? _title(response.body);
+        final author = _meta(response.body, ['og:site_name']);
+        final coverUrl = _PageMedia(
           uri,
-          cleanUrl,
-          id,
-          title: _meta(response.body, ['og:title']) ?? _title(response.body),
-          author: _meta(response.body, ['og:site_name']),
-          coverUrl: _PageMedia(uri).resolve(_meta(response.body, ['og:image'])),
-        );
+        ).resolve(_meta(response.body, ['og:image']));
+        return found!.isDash
+            ? await _fromManifest(
+                stream,
+                uri,
+                cleanUrl,
+                id,
+                title: title,
+                author: author,
+                coverUrl: coverUrl,
+              )
+            : await _fromStream(
+                stream,
+                uri,
+                cleanUrl,
+                id,
+                title: title,
+                author: author,
+                coverUrl: coverUrl,
+              );
       } on ExtractionException catch (error) {
         // A stream that is live or encrypted is the answer; one that merely
         // could not be read leaves the page's own verdict standing.
@@ -187,16 +222,128 @@ class GenericExtractor extends BaseVideoExtractor {
         response.body.trimLeft().startsWith('#EXTM3U');
   }
 
-  /// The first HLS playlist [html] names, in a tag or in a script.
-  static String? _streamIn(String html, Uri page) {
-    final match = _playlistInPage.firstMatch(html);
+  /// The first stream [html] names, in a tag or in a script: an HLS playlist
+  /// if there is one, else a DASH manifest. Where a page offers both, HLS is
+  /// the one whose sound and picture more often arrive in a form every device
+  /// can write to a file.
+  static ({String? address, bool isDash})? _streamIn(String html, Uri page) {
+    var isDash = false;
+    var match = _playlistInPage.firstMatch(html);
+    if (match == null) {
+      match = _manifestInPage.firstMatch(html);
+      isDash = true;
+    }
     if (match == null) return null;
     final address = match
         .group(0)!
+        // An escaped quote ends the string the address sits in; its backslash
+        // is not part of the address.
+        .replaceFirst(RegExp(r'\\+$'), '')
         .replaceAll(r'\/', '/')
-        .replaceAll(r'&', '&')
+        .replaceAll(r'\u0026', '&')
         .replaceAll('&amp;', '&');
-    return _PageMedia(page).resolve(address);
+    return (address: _PageMedia(page).resolve(address), isDash: isDash);
+  }
+
+  static bool _isManifestResponse(http.Response response) {
+    final contentType = (response.headers['content-type'] ?? '')
+        .split(';')
+        .first
+        .trim()
+        .toLowerCase();
+    if (contentType == 'application/dash+xml') return true;
+    // Often served as plain XML; the root element says what it is.
+    final head = response.body.length > 600
+        ? response.body.substring(0, 600)
+        : response.body;
+    return head.contains('<MPD') && head.contains('urn:mpeg:dash:schema');
+  }
+
+  /// Offers the qualities of the DASH stream at [manifestUrl].
+  Future<VideoMetadata> _fromManifest(
+    String manifestUrl,
+    Uri page,
+    String url,
+    String id, {
+    String? manifest,
+    String? title,
+    String? author,
+    String? coverUrl,
+  }) async {
+    if (!joinStreams) {
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.genericStreamOnly),
+      );
+    }
+    final base = Uri.parse(manifestUrl);
+    final DashManifest parsed;
+    try {
+      parsed = parseDashManifest(
+        manifest ?? await _playlist(manifestUrl),
+        base,
+      );
+    } on FormatException {
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.genericNoVideo),
+      );
+    }
+    if (parsed.isProtected) {
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.genericStreamProtected),
+      );
+    }
+    if (parsed.isLive) {
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.genericStreamLive),
+      );
+    }
+    // Several periods are several clips to be joined end to end - a film cut
+    // by advertisements, typically. Offering the first as the whole would be
+    // a download that silently stops part-way.
+    if (!parsed.isSinglePeriod || parsed.videos.isEmpty) {
+      throw ExtractionException(
+        const ExtractionFailure(ExtractionFailureKind.genericStreamOnly),
+      );
+    }
+
+    // One per size, as for an HLS stream, preferring the encoding every
+    // device can write to a file.
+    final bySize = <int?, DashRepresentation>{};
+    for (final video in parsed.videos) {
+      final kept = bySize[video.shortSide];
+      if (kept == null || (!kept.joinsAnywhere && video.joinsAnywhere)) {
+        bySize[video.shortSide] = video;
+      }
+    }
+    final sound = parsed.audio.firstOrNull;
+
+    return VideoMetadata(
+      id: id,
+      originalUrl: url,
+      title: title ?? _fileNameOf(base) ?? 'Web Video',
+      description: null,
+      author: author ?? page.host,
+      coverUrl: coverUrl ?? '',
+      duration: parsed.duration,
+      platform: VideoPlatform.generic,
+      qualities: [
+        for (final video in bySize.values.take(_maxStreamQualities))
+          VideoQualityOption.stream(
+            id: 'gen_dash_${video.shortSide ?? video.bandwidth}',
+            label: video.shortSide == null
+                ? const OriginalVideo()
+                : VideoWithAudio('${video.shortSide}p'),
+            quality: video.shortSide == null
+                ? 'Original'
+                : '${video.shortSide}p',
+            source: DashSource(
+              manifestUrl: manifestUrl,
+              videoId: video.id,
+              audioId: sound?.id,
+            ),
+          ),
+      ],
+    );
   }
 
   /// Offers the qualities of the stream at [playlistUrl].

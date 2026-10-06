@@ -558,6 +558,85 @@ void main() {
     },
   );
 
+  // AES-128 in CBC mode with PKCS#7 padding, which is what a playlist's
+  // METHOD=AES-128 means. The bytes below are that sentence under that key and
+  // vector, produced by another implementation.
+  group('a segment locked with a key the playlist names', () {
+    const sentence = 'A segment of a stream, as it was before it was locked.';
+    final locked = Uint8List.fromList(const [
+      98,
+      120,
+      57,
+      211,
+      30,
+      144,
+      164,
+      253,
+      100,
+      232,
+      170,
+      205,
+      89,
+      217,
+      158,
+      16, //
+      124, 82, 94, 238, 61, 78, 7, 97, 207, 32, 87, 108, 117, 120, 187, 246, //
+      32,
+      156,
+      162,
+      84,
+      117,
+      86,
+      190,
+      207,
+      94,
+      183,
+      221,
+      161,
+      88,
+      214,
+      88,
+      121, //
+      203, 24, 232, 4, 119, 79, 135, 142, 114, 98, 27, 202, 84, 7, 125, 98,
+    ]);
+    final key = Uint8List.fromList(List.generate(16, (index) => index + 1));
+    final vector = Uint8List.fromList(List.generate(16, (i) => 0xa0 + i));
+
+    test('is written out as it was', () async {
+      final directory = (await getTemporaryDirectory()).path;
+      final source = File('$directory/locked.ts')..writeAsBytesSync(locked);
+      final out = '$directory/unlocked.ts';
+
+      await channel.invokeMethod<void>('decryptSegment', {
+        'sourcePath': source.path,
+        'outputPath': out,
+        'key': key,
+        'iv': vector,
+      });
+
+      expect(File(out).readAsStringSync(), sentence);
+      await deleteAll([source.path, out]);
+    });
+
+    test('fails with the wrong key and writes no file', () async {
+      final directory = (await getTemporaryDirectory()).path;
+      final source = File('$directory/locked.ts')..writeAsBytesSync(locked);
+      final out = '$directory/unlocked_wrong.ts';
+
+      await expectLater(
+        channel.invokeMethod<void>('decryptSegment', {
+          'sourcePath': source.path,
+          'outputPath': out,
+          'key': Uint8List(16),
+          'iv': vector,
+        }),
+        throwsA(isA<PlatformException>()),
+      );
+      expect(File(out).existsSync(), isFalse);
+      await deleteAll([source.path]);
+    });
+  });
+
   // A cancel sent while Dart was still fetching reaches Kotlin with no mux
   // running. Left registered, it would kill the retry of that same task.
   test('a cancel sent before a mux starts does not stop it', () async {

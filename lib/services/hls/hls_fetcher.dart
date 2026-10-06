@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import '../slideshow/slideshow_failure.dart';
+import 'hls_decryptor.dart';
 import 'hls_playlist.dart';
 
 /// Fetches every segment of the media playlist at [playlistUrl] into the one
@@ -14,6 +15,49 @@ import 'hls_playlist.dart';
 /// segments behind their initialization header are one fragmented MP4, so the
 /// joined file is a stream the platform's demuxer reads as it stands.
 ///
+/// A live stream is refused with [SlideshowFailureKind.streamLive]. Segments
+/// encrypted with a key the playlist names are decrypted with [decryptor];
+/// without one, or when the stream is protected some other way, it is refused
+/// with [SlideshowFailureKind.streamProtected].
+///
+/// The remaining arguments are those of [fetchSegmentsToFile].
+Future<void> fetchHlsToFile(
+  String playlistUrl,
+  File into, {
+  http.Client? client,
+  HlsDecryptor? decryptor,
+  int concurrency = 4,
+  int attemptsPerSegment = 3,
+  Duration segmentTimeout = const Duration(seconds: 30),
+  void Function(double fraction, int receivedBytes)? onProgress,
+  bool Function()? isCancelled,
+}) => fetchSegmentsToFile(
+  (httpClient) async => parseHlsMedia(
+    await fetchStreamIndex(
+      httpClient,
+      playlistUrl,
+      File('${into.path}.playlist'),
+      attempts: attemptsPerSegment,
+      timeout: segmentTimeout,
+    ),
+    Uri.parse(playlistUrl),
+  ),
+  into,
+  client: client,
+  decryptor: decryptor,
+  concurrency: concurrency,
+  attemptsPerSegment: attemptsPerSegment,
+  segmentTimeout: segmentTimeout,
+  onProgress: onProgress,
+  isCancelled: isCancelled,
+);
+
+/// Fetches the segments [load] lists into the one file [into], in order, the
+/// initialization header first when there is one.
+///
+/// [load] is handed the client so that reading the list - a playlist or a
+/// manifest - shares its connections and is closed with it.
+///
 /// A request that goes quiet for [segmentTimeout] is given up and tried again:
 /// a stream is hundreds of requests, and one that hangs would otherwise hold
 /// the whole download at whatever it had reached. The limit is on silence, not
@@ -21,13 +65,12 @@ import 'hls_playlist.dart';
 ///
 /// [onProgress] reports the share of segments written and the bytes so far;
 /// [isCancelled] is polled between segments and aborts with
-/// [SlideshowFailureKind.cancelled]. A live or encrypted stream is refused
-/// with [SlideshowFailureKind.streamLive] or
-/// [SlideshowFailureKind.streamProtected].
-Future<void> fetchHlsToFile(
-  String playlistUrl,
+/// [SlideshowFailureKind.cancelled].
+Future<void> fetchSegmentsToFile(
+  Future<HlsMedia> Function(http.Client client) load,
   File into, {
   http.Client? client,
+  HlsDecryptor? decryptor,
   int concurrency = 4,
   int attemptsPerSegment = 3,
   Duration segmentTimeout = const Duration(seconds: 30),
@@ -38,21 +81,8 @@ Future<void> fetchHlsToFile(
   IOSink? sink;
   final parts = <File>[];
   try {
-    final base = Uri.parse(playlistUrl);
-    final playlist = File('${into.path}.playlist');
-    parts.add(playlist);
-    await _fetch(
-      httpClient,
-      HlsSegment(playlistUrl),
-      playlist,
-      attemptsPerSegment,
-      segmentTimeout,
-    );
-    final media = parseHlsMedia(
-      utf8.decode(await playlist.readAsBytes(), allowMalformed: true),
-      base,
-    );
-    if (media.isEncrypted) {
+    final media = await load(httpClient);
+    if (media.isEncrypted || (media.needsKey && decryptor == null)) {
       throw const SlideshowException(SlideshowFailureKind.streamProtected);
     }
     if (!media.isComplete) {
@@ -61,8 +91,53 @@ Future<void> fetchHlsToFile(
     if (media.segments.isEmpty) {
       throw const SlideshowException(
         SlideshowFailureKind.fetchFailed,
-        detail: 'the playlist lists no segments',
+        detail: 'the stream lists no segments',
       );
+    }
+
+    // A stream has one key, or a handful that rotate; each is fetched once.
+    final keys = <String, Future<List<int>>>{};
+    Future<List<int>> keyAt(String uri) => keys.putIfAbsent(uri, () async {
+      final file = File('${into.path}.key${keys.length}');
+      parts.add(file);
+      await _fetch(
+        httpClient,
+        HlsSegment(uri),
+        file,
+        attemptsPerSegment,
+        segmentTimeout,
+      );
+      final bytes = await file.readAsBytes();
+      // Anything else is not a key but a page saying the key is not for us.
+      if (bytes.length != 16) {
+        throw const SlideshowException(
+          SlideshowFailureKind.streamProtected,
+          detail: 'the key is not 16 bytes',
+        );
+      }
+      return bytes;
+    });
+
+    Future<File> fetched(HlsSegment segment, File part) async {
+      await _fetch(
+        httpClient,
+        segment,
+        part,
+        attemptsPerSegment,
+        segmentTimeout,
+      );
+      final key = segment.key;
+      if (key == null) return part;
+      final plain = File('${part.path}.plain');
+      parts.add(plain);
+      await decryptor!(
+        part,
+        plain,
+        await keyAt(key.uri),
+        segment.initializationVector,
+      );
+      await part.delete();
+      return plain;
     }
 
     final out = sink = into.openWrite();
@@ -78,21 +153,14 @@ Future<void> fetchHlsToFile(
           File('${into.path}.part${firstIndex + offset}'),
       ];
       parts.addAll(files);
-      await Future.wait([
+      final ready = await Future.wait([
         for (var offset = 0; offset < batch.length; offset++)
-          _fetch(
-            httpClient,
-            batch[offset],
-            files[offset],
-            attemptsPerSegment,
-            segmentTimeout,
-          ),
+          fetched(batch[offset], files[offset]),
       ]);
-      for (final file in files) {
+      for (final file in ready) {
         received += await file.length();
         await out.addStream(file.openRead());
         await file.delete();
-        parts.remove(file);
       }
       await out.flush();
     }
@@ -132,6 +200,22 @@ Future<void> fetchHlsToFile(
       }
     }
     if (client == null) httpClient.close();
+  }
+}
+
+/// The text at [url], for a playlist or a manifest.
+Future<String> fetchStreamIndex(
+  http.Client client,
+  String url,
+  File scratch, {
+  int attempts = 3,
+  Duration timeout = const Duration(seconds: 30),
+}) async {
+  try {
+    await _fetch(client, HlsSegment(url), scratch, attempts, timeout);
+    return utf8.decode(await scratch.readAsBytes(), allowMalformed: true);
+  } finally {
+    if (scratch.existsSync()) scratch.deleteSync();
   }
 }
 

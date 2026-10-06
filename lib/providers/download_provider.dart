@@ -12,13 +12,15 @@ import '../l10n/quality_descriptor_text.dart';
 import '../core/utils/quality_helper.dart';
 import '../models/download_task.dart';
 import '../models/download_options.dart';
-import '../models/hls_source.dart';
+import '../models/stream_source.dart';
 import '../models/merge_source.dart';
 import '../models/slideshow_source.dart';
 import '../models/video_metadata.dart';
 import '../services/download_service.dart';
 import '../services/slideshow/slideshow_asset_fetcher.dart';
 import '../services/slideshow/slideshow_renderer.dart';
+import '../services/dash/dash_fetcher.dart';
+import '../services/hls/hls_decryptor.dart';
 import '../services/hls/hls_fetcher.dart';
 import '../services/slideshow/stream_fetcher.dart';
 import '../services/background_download_service.dart';
@@ -40,9 +42,11 @@ class DownloadProvider extends ChangeNotifier {
     Future<Directory> Function()? slideshowWorkspace,
     StreamFetcher? streamFetcher,
     HlsFetcher? hlsFetcher,
+    DashFetcher? dashFetcher,
   }) : _downloadService = downloadService ?? createDefaultDownloadService(),
        _streamFetcher = streamFetcher ?? _defaultStreamFetcher,
        _hlsFetcher = hlsFetcher ?? _defaultHlsFetcher,
+       _dashFetcher = dashFetcher ?? _defaultDashFetcher,
        _storageService = storageService ?? StorageService(),
        _historyRepository =
            historyRepository ?? SharedPreferencesDownloadHistoryRepository(),
@@ -73,6 +77,7 @@ class DownloadProvider extends ChangeNotifier {
   final Future<Directory> Function() _slideshowWorkspace;
   final StreamFetcher _streamFetcher;
   final HlsFetcher _hlsFetcher;
+  final DashFetcher _dashFetcher;
 
   /// The option a rendered task was built from, so a retry can render it again
   /// rather than re-extracting it. In memory only: after a restart a finished
@@ -487,18 +492,18 @@ class DownloadProvider extends ChangeNotifier {
     }
 
     final merge = option.merge;
-    final hls = option.hls;
+    final stream = option.stream;
     await _produceRendered(
       task,
       l10n,
-      isMerge: merge != null || hls != null,
+      isMerge: merge != null || stream != null,
       autoSaveToGallery: options.autoSaveToGallery,
       produce: (outputPath) async {
         try {
-          if (hls != null) {
+          if (stream != null) {
             final path = await _joinStream(
               task,
-              hls,
+              stream,
               await scratch(),
               outputPath,
             );
@@ -782,13 +787,59 @@ class DownloadProvider extends ChangeNotifier {
   /// has no way to be handed in one piece.
   Future<String> _joinStream(
     DownloadTask task,
-    HlsSource source,
+    StreamSource source,
     Directory workspace,
     String outputPath,
   ) async {
+    // The picture, and the sound when it is served apart: each a fetch into
+    // one file, whichever kind of stream it is.
+    final (fetchVideo, fetchAudio) = switch (source) {
+      HlsSource(:final videoPlaylistUrl, :final audioPlaylistUrl) => (
+        _trackFetch(
+          (into, onProgress, isCancelled) => _hlsFetcher(
+            videoPlaylistUrl,
+            into,
+            onProgress: onProgress,
+            isCancelled: isCancelled,
+          ),
+        ),
+        audioPlaylistUrl == null
+            ? null
+            : _trackFetch(
+                (into, onProgress, isCancelled) => _hlsFetcher(
+                  audioPlaylistUrl,
+                  into,
+                  onProgress: onProgress,
+                  isCancelled: isCancelled,
+                ),
+              ),
+      ),
+      DashSource(:final manifestUrl, :final videoId, :final audioId) => (
+        _trackFetch(
+          (into, onProgress, isCancelled) => _dashFetcher(
+            manifestUrl,
+            videoId,
+            into,
+            onProgress: onProgress,
+            isCancelled: isCancelled,
+          ),
+        ),
+        audioId == null
+            ? null
+            : _trackFetch(
+                (into, onProgress, isCancelled) => _dashFetcher(
+                  manifestUrl,
+                  audioId,
+                  into,
+                  onProgress: onProgress,
+                  isCancelled: isCancelled,
+                ),
+              ),
+      ),
+    };
+
     final videoFile = File('${workspace.path}/video.stream');
-    final audioUrl = source.audioPlaylistUrl;
-    final audioFile = audioUrl == null
+    final audioFile = fetchAudio == null
         ? null
         : File('${workspace.path}/audio.stream');
     final videoShare = audioFile == null ? 1.0 : _streamVideoShare;
@@ -807,24 +858,18 @@ class DownloadProvider extends ChangeNotifier {
     }
 
     var videoBytes = 0;
-    await _hlsFetcher(
-      source.videoPlaylistUrl,
-      videoFile,
-      onProgress: (fraction, received) {
-        videoBytes = received;
-        report(fraction * videoShare, received);
-      },
-      isCancelled: stopped,
-    );
+    await fetchVideo(videoFile, (fraction, received) {
+      videoBytes = received;
+      report(fraction * videoShare, received);
+    }, stopped);
     if (audioFile != null) {
-      await _hlsFetcher(
-        audioUrl!,
+      await fetchAudio!(
         audioFile,
-        onProgress: (fraction, received) => report(
+        (fraction, received) => report(
           videoShare + fraction * (1 - videoShare),
           videoBytes + received,
         ),
-        isCancelled: stopped,
+        stopped,
       );
     }
     if (stopped()) {
@@ -853,6 +898,9 @@ class DownloadProvider extends ChangeNotifier {
       );
     }
   }
+
+  // Only names the shape, so the two kinds of stream above read alike.
+  static _TrackFetch _trackFetch(_TrackFetch fetch) => fetch;
 
   void _reportRenderProgress(DownloadTask task, double fraction) {
     // Only while it is still running: a cancel already moved the task on, and
@@ -1001,7 +1049,7 @@ class DownloadProvider extends ChangeNotifier {
     final remembered = _renderOptions[task.id];
     if (remembered != null &&
         remembered.merge == null &&
-        remembered.hls == null) {
+        remembered.stream == null) {
       await _retryRender(task, remembered, l10n, options);
       return;
     }
@@ -1262,6 +1310,39 @@ typedef HlsFetcher =
       bool Function()? isCancelled,
     });
 
+/// Fetches the segments of one representation of a DASH manifest into a
+/// local file; injectable so tests can stand in for the network.
+typedef DashFetcher =
+    Future<void> Function(
+      String manifestUrl,
+      String representationId,
+      File into, {
+      void Function(double fraction, int receivedBytes)? onProgress,
+      bool Function()? isCancelled,
+    });
+
+Future<void> _defaultDashFetcher(
+  String manifestUrl,
+  String representationId,
+  File into, {
+  void Function(double fraction, int receivedBytes)? onProgress,
+  bool Function()? isCancelled,
+}) => fetchDashToFile(
+  manifestUrl,
+  representationId,
+  into,
+  onProgress: onProgress,
+  isCancelled: isCancelled,
+);
+
+/// One track of a stream fetched into [into].
+typedef _TrackFetch =
+    Future<void> Function(
+      File into,
+      void Function(double fraction, int receivedBytes) onProgress,
+      bool Function() isCancelled,
+    );
+
 Future<void> _defaultHlsFetcher(
   String playlistUrl,
   File into, {
@@ -1270,6 +1351,7 @@ Future<void> _defaultHlsFetcher(
 }) => fetchHlsToFile(
   playlistUrl,
   into,
+  decryptor: platformHlsDecryptor(),
   onProgress: onProgress,
   isCancelled: isCancelled,
 );

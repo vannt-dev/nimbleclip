@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nimble_clip/l10n/generated/app_localizations.dart';
 import 'package:nimble_clip/models/download_options.dart';
 import 'package:nimble_clip/models/download_task.dart';
-import 'package:nimble_clip/models/hls_source.dart';
+import 'package:nimble_clip/models/stream_source.dart';
 import 'package:nimble_clip/models/quality_descriptor.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/models/video_platform.dart';
@@ -90,7 +90,7 @@ class _FakeStreams {
   }
 }
 
-VideoMetadata _metadata(HlsSource source) => VideoMetadata(
+VideoMetadata _metadata(StreamSource source) => VideoMetadata(
   id: 'clip',
   originalUrl: 'https://video.example/watch/42',
   title: 'A clip',
@@ -131,21 +131,25 @@ void main() {
     if (root.existsSync()) root.deleteSync(recursive: true);
   });
 
-  DownloadProvider provider(SlideshowRenderer renderer, _FakeStreams streams) =>
-      DownloadProvider(
-        downloadService: InertDownloadService(),
-        storageService: storage,
-        historyRepository: storage,
-        fileActions: storage,
-        slideshowRenderer: renderer,
-        hlsFetcher: streams.call,
-        slideshowWorkspace: () async =>
-            Directory('${root.path}/work')..createSync(recursive: true),
-      );
+  DownloadProvider provider(
+    SlideshowRenderer renderer,
+    _FakeStreams streams, {
+    DashFetcher? dashFetcher,
+  }) => DownloadProvider(
+    downloadService: InertDownloadService(),
+    storageService: storage,
+    historyRepository: storage,
+    fileActions: storage,
+    slideshowRenderer: renderer,
+    hlsFetcher: streams.call,
+    dashFetcher: dashFetcher,
+    slideshowWorkspace: () async =>
+        Directory('${root.path}/work')..createSync(recursive: true),
+  );
 
   Future<DownloadTask> download(
     DownloadProvider downloads,
-    HlsSource source,
+    StreamSource source,
   ) async {
     final metadata = _metadata(source);
     await downloads.startNewDownloads(
@@ -199,6 +203,67 @@ void main() {
     expect(muxer.contents[call.audio], 'sound');
     // A playlist of its own promises sound; its absence is a failure.
     expect(call.audioOptional, isFalse);
+  });
+
+  test('a DASH stream is fetched by representation and joined', () async {
+    final muxer = _FakeMuxer();
+    final asked = <String>[];
+
+    final task = await download(
+      provider(
+        muxer,
+        _FakeStreams({}),
+        dashFetcher:
+            (
+              manifestUrl,
+              representationId,
+              into, {
+              onProgress,
+              isCancelled,
+            }) async {
+              asked.add('$manifestUrl#$representationId');
+              await into.writeAsString(representationId);
+              onProgress?.call(1, representationId.length);
+            },
+      ),
+      const DashSource(
+        manifestUrl: 'https://cdn.example/film.mpd',
+        videoId: 'v720',
+        audioId: 'aac',
+      ),
+    );
+
+    expect(task.status, DownloadStatus.completed);
+    expect(asked, [
+      'https://cdn.example/film.mpd#v720',
+      'https://cdn.example/film.mpd#aac',
+    ]);
+    final call = muxer.calls.single;
+    expect(muxer.contents[call.video], 'v720');
+    expect(muxer.contents[call.audio], 'aac');
+    expect(call.audioOptional, isFalse);
+  });
+
+  test('a DASH stream with no sound is joined as picture alone', () async {
+    final muxer = _FakeMuxer();
+
+    final task = await download(
+      provider(
+        muxer,
+        _FakeStreams({}),
+        dashFetcher:
+            (manifestUrl, representationId, into, {onProgress, isCancelled}) =>
+                into.writeAsString(representationId),
+      ),
+      const DashSource(
+        manifestUrl: 'https://cdn.example/film.mpd',
+        videoId: 'v720',
+      ),
+    );
+
+    expect(task.status, DownloadStatus.completed);
+    expect(muxer.calls.single.video, muxer.calls.single.audio);
+    expect(muxer.calls.single.audioOptional, isTrue);
   });
 
   test('a stream that turns out live says so on the task', () async {
