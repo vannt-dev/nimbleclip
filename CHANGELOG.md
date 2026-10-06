@@ -38,6 +38,9 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 - An Instagram video read through the service is the video, not its
   thumbnail. The thumbnail was being offered as the Reel, which then would
   not play and saved as a picture named `.mp4`.
+- A Facebook album is whole again. The service its photos are read through
+  moved its address and answered the old one with a redirect, so every album
+  had shrunk to its cover photo; the redirect is now followed.
 - The home screen shows every supported platform at once instead of a row that
   ran off the edge, and asks for "a link" rather than "a video link".
 

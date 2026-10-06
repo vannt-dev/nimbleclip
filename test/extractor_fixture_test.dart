@@ -14,6 +14,7 @@ import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/services/extractors/base_extractor.dart';
 import 'package:nimble_clip/services/extractors/extraction_failure.dart';
 import 'package:nimble_clip/services/extractors/facebook_extractor.dart';
+import 'package:nimble_clip/services/extractors/facebook_video_fallback_client.dart';
 import 'package:nimble_clip/services/extractors/generic_extractor.dart';
 import 'package:nimble_clip/services/extractors/instagram_extractor.dart';
 import 'package:nimble_clip/services/extractors/instagram_fallback_client.dart';
@@ -495,6 +496,52 @@ void main() {
     );
 
     expect(result.qualities.where((option) => option.isImage), hasLength(4));
+  });
+
+  // And then it moved back: the www host began answering with a 307 to the
+  // bare domain, with the address in a Location header. Whichever host the
+  // API lives on, the album must come back whole.
+  test('Facebook follows the gallery service to its other host', () async {
+    ExtractorHttp.getOverride = (_, _) async =>
+        http.Response(fixture('facebook_image.html'), 200);
+    final asked = <String>[];
+    ExtractorHttp.postOverride = (uri, _, _) async {
+      asked.add(uri.host);
+      return uri.host == 'www.toolspy.net'
+          ? http.Response(fixture('facebook_fallback.json'), 200)
+          : http.Response(
+              '',
+              307,
+              headers: {'location': 'https://www.toolspy.net${uri.path}'},
+            );
+    };
+
+    final result = await const FacebookExtractor(
+      videoFallbackClient: _NoFacebookVideo(),
+    ).extract('https://www.facebook.com/example/posts/654321');
+
+    expect(asked, ['toolspy.net', 'www.toolspy.net']);
+    expect(result.qualities.where((option) => option.isImage), hasLength(4));
+  });
+
+  test('Facebook does not follow the gallery service anywhere else', () async {
+    ExtractorHttp.getOverride = (_, _) async =>
+        http.Response(fixture('facebook_image.html'), 200);
+    final asked = <String>[];
+    ExtractorHttp.postOverride = (uri, _, _) async {
+      asked.add(uri.host);
+      return http.Response(
+        '',
+        307,
+        headers: {'location': 'https://elsewhere.example${uri.path}'},
+      );
+    };
+
+    await const FacebookExtractor(
+      videoFallbackClient: _NoFacebookVideo(),
+    ).extract('https://www.facebook.com/example/posts/654321');
+
+    expect(asked, everyElement('toolspy.net'));
   });
 
   // Toolspy moved its API to the www host and answers the bare domain with a
@@ -1008,4 +1055,11 @@ class _FailingInstagramFallback implements InstagramFallbackClient {
   @override
   Future<String?> search(String postUrl) async =>
       throw Exception('service down');
+}
+
+class _NoFacebookVideo implements FacebookVideoFallbackClient {
+  const _NoFacebookVideo();
+
+  @override
+  Future<FacebookFallbackVideo?> find(String postUrl) async => null;
 }
