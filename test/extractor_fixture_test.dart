@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -763,6 +764,48 @@ void main() {
     expect(
       result.qualities.single.downloadUrl,
       'https://dl.snapcdn.app/get?token=video-download',
+    );
+  });
+
+  // The service lists an item's thumbnail before its video, each as a link
+  // with the address first and the title after. Reading "the first link
+  // followed by the word video" took the thumbnail, which was then offered,
+  // saved and played as the Reel: a picture the player could not open.
+  test('Instagram takes the video link, not the thumbnail before it', () async {
+    ExtractorHttp.getOverride = (uri, _) async {
+      if (uri.host == 'snap-insta.to') {
+        return http.Response(fixture('snapinsta_page.html'), 200);
+      }
+      return http.Response(fixture('instagram_single_image.html'), 200);
+    };
+    ExtractorHttp.postOverride = (_, _, _) async => http.Response(
+      jsonEncode({
+        'status': 'ok',
+        'data':
+            '<ul><li><div class="download-items">'
+            '<div class="download-items__thumb">'
+            '<img src="https://i.snapcdn.app/photo?token=preview">'
+            '<span class="format-icon"><i class="icon icon-dlvideo"></i></span>'
+            '</div><div class="download-items__btn dl-thumb">'
+            '<a href="https://dl.snapcdn.app/get?token=thumbnail" '
+            'class="abutton" rel="nofollow" title="Download Thumbnail">'
+            '<span>Download Thumbnail</span></a></div>'
+            '<div class="download-items__btn">'
+            '<a href="https://dl.snapcdn.app/get?token=the-video" '
+            'class="abutton" rel="nofollow" title="Download Video">'
+            '<span>Download Video</span></a></div></div></li></ul>',
+      }),
+      200,
+    );
+
+    final result = await const InstagramExtractor().extract(
+      'https://www.instagram.com/reel/videoFixture/',
+    );
+
+    expect(result.qualities.single.kind, MediaKind.video);
+    expect(
+      result.qualities.single.downloadUrl,
+      'https://dl.snapcdn.app/get?token=the-video',
     );
   });
 
