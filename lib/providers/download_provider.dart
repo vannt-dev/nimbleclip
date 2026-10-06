@@ -58,6 +58,10 @@ class DownloadProvider extends ChangeNotifier {
       maxConcurrent: defaultMaxConcurrentDownloads,
     );
     _historyReady = _loadHistory();
+    // Only the real scratch location: a test hands in its own and owns it.
+    if (slideshowWorkspace == null) {
+      unawaited(_sweepDefaultWorkspaces(DateTime.now()));
+    }
   }
 
   final List<DownloadTask> _tasks = [];
@@ -1270,11 +1274,58 @@ Future<void> _defaultHlsFetcher(
   isCancelled: isCancelled,
 );
 
+const String _workspacePrefix = 'slideshow_';
+
 Future<Directory> _defaultSlideshowWorkspace() async {
   final temp = await getTemporaryDirectory();
   return Directory(
-    '${temp.path}/slideshow_${DateTime.now().microsecondsSinceEpoch}',
+    '${temp.path}/$_workspacePrefix${DateTime.now().microsecondsSinceEpoch}',
   )..createSync(recursive: true);
+}
+
+Future<void> _sweepDefaultWorkspaces(DateTime startedAt) async {
+  try {
+    await sweepLeftoverWorkspaces(
+      await getTemporaryDirectory(),
+      createdBefore: startedAt,
+    );
+  } catch (_) {
+    // No temp directory to look in, as on Web: nothing was left there either.
+  }
+}
+
+/// Deletes the scratch directories an earlier run of the app left in [temp].
+///
+/// A render deletes its own scratch when it ends, but not when the process is
+/// ended under it: the images, the two streams of a merge or the segments of
+/// a stream then stay behind, hundreds of megabytes that nothing will read
+/// again. Nothing made before this run can still be in use, since every
+/// render dies with its process; anything made after [createdBefore] is this
+/// run's own and is left alone.
+Future<int> sweepLeftoverWorkspaces(
+  Directory temp, {
+  required DateTime createdBefore,
+}) async {
+  var removed = 0;
+  if (!temp.existsSync()) return removed;
+  await for (final entry in temp.list(followLinks: false)) {
+    if (entry is! Directory) continue;
+    final name = entry.uri.pathSegments.lastWhere(
+      (segment) => segment.isNotEmpty,
+      orElse: () => '',
+    );
+    if (!name.startsWith(_workspacePrefix)) continue;
+    // The name carries the moment the directory was made.
+    final made = int.tryParse(name.substring(_workspacePrefix.length));
+    if (made == null || made >= createdBefore.microsecondsSinceEpoch) continue;
+    try {
+      await entry.delete(recursive: true);
+      removed++;
+    } catch (_) {
+      // Locked or already gone; the next launch tries again.
+    }
+  }
+  return removed;
 }
 
 class _QueuedDownload {
