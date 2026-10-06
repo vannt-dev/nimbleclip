@@ -89,6 +89,12 @@ void main() {
       minimumMedia: 2,
       minimumVideos: 0,
     ),
+    // Seven pictures and two videos in one post.
+    'Threads carousel mixing pictures and videos': (
+      url: 'https://www.threads.com/@zuck/post/Ddt7cL5EfUG',
+      minimumMedia: 9,
+      minimumVideos: 2,
+    ),
     'Threads short link': (
       url: 'https://www.threads.com/t/Dcqa7s8gu-P',
       minimumMedia: 1,

@@ -17,6 +17,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   count as one clip, MP4 preferred.
 - A page that only plays a stream (HLS or DASH) now says so, instead of
   "no video was found".
+- A downloaded picture is named after its place in the post ("Image 3") in the
+  download list, where it used to read "Instance of 'ImageIndex'".
 
 ## [1.8.0] - 2026-09-26
 
