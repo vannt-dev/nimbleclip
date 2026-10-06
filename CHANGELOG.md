@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-06
+
 - Threads links are supported: a public post's video, pictures, or a carousel
   mixing the two, from `threads.com` and `threads.net`, including the short
   `/t/<code>` form. A text-only, private or deleted post says that it has no
