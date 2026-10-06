@@ -137,7 +137,7 @@ class MainActivity : FlutterActivity() {
                     SlideshowEncoder.cancel(call.argument<String>("renderId").orEmpty())
                     result.success(null)
                 }
-                "render", "mux", "probe", "frameColorAt" -> {
+                "render", "mux", "probe", "frameColorAt", "decryptSegment" -> {
                     // A slideshow encode runs for seconds; on the platform
                     // thread that freezes the UI and trips the ANR watchdog.
                     // The MethodChannel.Result must still be completed on the
@@ -147,6 +147,14 @@ class MainActivity : FlutterActivity() {
                             val encoder = SlideshowEncoder()
                             val payload: Any = when (call.method) {
                                 "probe" -> encoder.probe(call.argument<String>("path")!!)
+                                "decryptSegment" -> mapOf(
+                                    "filePath" to SegmentCipher.decrypt(
+                                        sourcePath = call.argument<String>("sourcePath")!!,
+                                        outputPath = call.argument<String>("outputPath")!!,
+                                        key = call.argument<ByteArray>("key")!!,
+                                        iv = call.argument<ByteArray>("iv")!!,
+                                    ),
+                                )
                                 "mux" -> {
                                     val renderId = call.argument<String>("renderId").orEmpty()
                                     val filePath = StreamMuxer().mux(

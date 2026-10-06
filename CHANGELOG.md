@@ -6,6 +6,21 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- On Android, a video served as a DASH stream can be downloaded: a link to an
+  `.mpd` manifest, or a page whose player names one. Each size is offered
+  once, its segments and those of the sound are fetched and joined into one
+  MP4, and Preview plays the stream. A broadcast still going on, content under
+  a key system, and a manifest cut into several periods say what they are.
+- An HLS stream encrypted with a key its playlist names (`AES-128`) is now
+  decrypted and downloaded like any other. Sample encryption and the key
+  systems of a DRM are still refused as protected.
+- A stream address found in a page's script keeps the part of its query that
+  was written with an escaped ampersand; it was being cut off there, which
+  broke signed addresses.
+- Scratch files an interrupted download left in the cache - the segments of a
+  stream, the images of a slideshow - are cleared the next time the app
+  starts, instead of staying until the cache is emptied by hand.
+
 ## [1.9.0] - 2026-10-06
 
 - Threads links are supported: a public post's video, pictures, or a carousel

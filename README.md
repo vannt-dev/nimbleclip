@@ -101,13 +101,15 @@ management, local playback, and gallery export.
 | Threads | Public posts containing images, videos, or carousels mixing the two |
 | Other links | A direct link to an image, video, or audio file, and pages that declare their media in a standard way: Open Graph or Twitter card tags, `<video>` / `<audio>` elements, or JSON-LD (`VideoObject`, `AudioObject`, `ImageObject`) |
 
-On Android, a video served as an HLS stream (`.m3u8`) is fetched segment by
-segment and joined into one MP4, whether the link is the playlist or a page
-that names it. A live broadcast and an encrypted stream cannot be downloaded
-and are reported as such.
+On Android, a video served as an HLS stream (`.m3u8`) or a DASH stream
+(`.mpd`) is fetched segment by segment and joined into one MP4, whether the
+link is the playlist or a page that names it. That includes an HLS stream
+encrypted with a key its playlist names (`AES-128`). A live broadcast, a
+stream under a DRM key system, and a DASH manifest cut into several periods
+cannot be downloaded and are reported as such.
 
-"Other links" is not a promise that any page works. Outside Android, and for
-DASH, a page that only plays a stream is reported as such,
+"Other links" is not a promise that any page works. Outside Android, a page
+that only plays a stream is reported as such,
 and a page that builds its player in JavaScript declares nothing to find.
 
 Threads includes a post's media in the page only for search-engine crawlers, so
