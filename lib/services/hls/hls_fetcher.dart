@@ -14,9 +14,10 @@ import 'hls_playlist.dart';
 /// segments behind their initialization header are one fragmented MP4, so the
 /// joined file is a stream the platform's demuxer reads as it stands.
 ///
-/// A request that stalls for [segmentTimeout] is given up and tried again: a
-/// stream is hundreds of requests, and one that hangs would otherwise hold the
-/// whole download at whatever it had reached.
+/// A request that goes quiet for [segmentTimeout] is given up and tried again:
+/// a stream is hundreds of requests, and one that hangs would otherwise hold
+/// the whole download at whatever it had reached. The limit is on silence, not
+/// on the whole request, so a large segment on a slow line is not cut short.
 ///
 /// [onProgress] reports the share of segments written and the bytes so far;
 /// [isCancelled] is polled between segments and aborts with
@@ -35,13 +36,20 @@ Future<void> fetchHlsToFile(
 }) async {
   final httpClient = client ?? http.Client();
   IOSink? sink;
+  final parts = <File>[];
   try {
     final base = Uri.parse(playlistUrl);
-    Future<List<int>> get(HlsSegment segment) =>
-        _get(httpClient, segment, attemptsPerSegment, segmentTimeout);
-
+    final playlist = File('${into.path}.playlist');
+    parts.add(playlist);
+    await _fetch(
+      httpClient,
+      HlsSegment(playlistUrl),
+      playlist,
+      attemptsPerSegment,
+      segmentTimeout,
+    );
     final media = parseHlsMedia(
-      utf8.decode(await get(HlsSegment(playlistUrl)), allowMalformed: true),
+      utf8.decode(await playlist.readAsBytes(), allowMalformed: true),
       base,
     );
     if (media.isEncrypted) {
@@ -57,34 +65,51 @@ Future<void> fetchHlsToFile(
       );
     }
 
-    sink = into.openWrite();
+    final out = sink = into.openWrite();
     var received = 0;
-    final initialization = media.initialization;
-    if (initialization != null) {
-      final bytes = await get(initialization);
-      sink.add(bytes);
-      received += bytes.length;
+
+    // Each segment goes to a file of its own and is then copied on in order.
+    // Never through memory: a stream cut into a few segments, or served as
+    // one, has segments of hundreds of megabytes, and a phone that holds four
+    // of those at once is a phone whose app has just been killed.
+    Future<void> append(List<HlsSegment> batch, int firstIndex) async {
+      final files = [
+        for (var offset = 0; offset < batch.length; offset++)
+          File('${into.path}.part${firstIndex + offset}'),
+      ];
+      parts.addAll(files);
+      await Future.wait([
+        for (var offset = 0; offset < batch.length; offset++)
+          _fetch(
+            httpClient,
+            batch[offset],
+            files[offset],
+            attemptsPerSegment,
+            segmentTimeout,
+          ),
+      ]);
+      for (final file in files) {
+        received += await file.length();
+        await out.addStream(file.openRead());
+        await file.delete();
+        parts.remove(file);
+      }
+      await out.flush();
     }
 
-    // A few at a time, written in order: segments are a few megabytes each,
-    // so a batch fits in memory, and one connection per segment in turn would
-    // fetch a long video at a fraction of the line's speed.
+    final initialization = media.initialization;
+    if (initialization != null) await append([initialization], -1);
+
+    // A few at a time: one connection per segment in turn would fetch a long
+    // video at a fraction of the line's speed.
     final segments = media.segments;
     for (var start = 0; start < segments.length; start += concurrency) {
       if (isCancelled?.call() ?? false) {
         throw const SlideshowException(SlideshowFailureKind.cancelled);
       }
-      final batch = segments.skip(start).take(concurrency);
-      final bodies = await Future.wait(batch.map(get));
-      for (final bytes in bodies) {
-        sink.add(bytes);
-        received += bytes.length;
-      }
-      // Not once per batch for nothing: an unflushed sink keeps every segment
-      // of a long video in memory until the end.
-      await sink.flush();
-      final done = start + bodies.length;
-      onProgress?.call(done / segments.length, received);
+      final batch = segments.skip(start).take(concurrency).toList();
+      await append(batch, start);
+      onProgress?.call((start + batch.length) / segments.length, received);
     }
   } on SlideshowException {
     rethrow;
@@ -99,13 +124,23 @@ Future<void> fetchHlsToFile(
     } catch (_) {
       // The failure that got us here is the one worth reporting.
     }
+    for (final part in parts) {
+      try {
+        if (part.existsSync()) part.deleteSync();
+      } catch (_) {
+        // The workspace is deleted whole by the caller; this is only tidiness.
+      }
+    }
     if (client == null) httpClient.close();
   }
 }
 
-Future<List<int>> _get(
+/// Writes what [segment] addresses to [into], replacing whatever an earlier
+/// attempt left there.
+Future<void> _fetch(
   http.Client client,
   HlsSegment segment,
+  File into,
   int attempts,
   Duration timeout,
 ) async {
@@ -128,7 +163,13 @@ Future<List<int>> _get(
           detail: 'HTTP ${response.statusCode}',
         );
       } else {
-        return await response.stream.toBytes().timeout(timeout);
+        final sink = into.openWrite();
+        try {
+          await sink.addStream(response.stream.timeout(timeout));
+        } finally {
+          await sink.close();
+        }
+        return;
       }
     } on TimeoutException {
       if (attempt >= attempts) rethrow;
