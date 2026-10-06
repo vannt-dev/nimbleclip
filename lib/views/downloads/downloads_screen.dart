@@ -223,7 +223,15 @@ class _DownloadsScreenState extends State<DownloadsScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(context.l10n.tabDownloading),
+                  // Flexible: with the count beside it the label is a fraction
+                  // of a pixel wider than a third of a narrow screen.
+                  Flexible(
+                    child: Text(
+                      context.l10n.tabDownloading,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
+                    ),
+                  ),
                   if (active.isNotEmpty) ...[
                     const SizedBox(width: 6),
                     Container(
