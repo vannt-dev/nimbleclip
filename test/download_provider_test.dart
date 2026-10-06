@@ -253,6 +253,24 @@ void main() {
     expect(tasks.single.qualityLabel, 'Image 1');
   });
 
+  test('a picture is titled with its label as rendered text', () async {
+    // The title is shown in the download list. Interpolating the descriptor
+    // itself put "Instance of 'ImageIndex'" there.
+    final provider = _provider(
+      _ControlledDownloadService(),
+      _MemoryStorageService(),
+    );
+
+    final tasks = await provider.startNewDownloads(
+      metadata: _metadata(1),
+      qualities: _metadata(1).qualities,
+      l10n: l10n,
+      options: const DownloadOptions(autoSaveToGallery: false),
+    );
+
+    expect(tasks.single.title, 'Post - Image 1');
+  });
+
   test(
     'queue caps concurrency globally and skips a cancelled queued task',
     () async {

@@ -235,7 +235,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('NimbleClip'), findsOneWidget);
-    expect(find.text('Paste a video link'), findsOneWidget);
+    expect(find.text('Paste a link'), findsOneWidget);
     expect(find.text('Analyze & Download'), findsOneWidget);
   });
 
@@ -434,7 +434,7 @@ void main() {
 
     expect(extractor.hasResult, isFalse);
     expect(find.text('Fixture result'), findsNothing);
-    expect(find.text('Paste a video link'), findsOneWidget);
+    expect(find.text('Paste a link'), findsOneWidget);
     expect(
       tester.widget<TextField>(find.byType(TextField)).focusNode?.hasFocus,
       isTrue,

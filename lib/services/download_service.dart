@@ -3,13 +3,13 @@ import 'package:flutter/foundation.dart';
 
 import '../core/constants/app_constants.dart';
 import '../core/utils/cors_helper.dart';
+import '../core/utils/download_file_name.dart';
 import '../core/utils/media_file_validator.dart';
 import '../core/utils/platform_file.dart';
 import '../core/utils/web_download_helper.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../models/download_task.dart';
 import '../models/video_metadata.dart' show MediaKind;
-import '../models/video_platform.dart';
 import 'storage_service.dart';
 
 typedef DownloadProgressCallback =
@@ -79,29 +79,14 @@ class DownloadService implements DownloadGateway {
 
   static const String _pauseReason = 'paused-by-user';
 
-  static final RegExp _nonAlphanumeric = RegExp('[^a-zA-Z0-9]');
   static final RegExp _pathSeparator = RegExp(r'[/\\]');
   static final RegExp _contentRangeStart = RegExp(
     r'^bytes\s+(\d+)-',
     caseSensitive: false,
   );
 
-  /// Uses the source platform plus a short UUID-style name so Gallery apps
-  /// receive a predictable, filesystem-safe display name while files from
-  /// different services remain recognisable.
-  String buildFileName(DownloadTask task, {String? extension}) {
-    final compactId = task.id.replaceAll(_nonAlphanumeric, '');
-    final idPart = compactId.isEmpty
-        ? 'NimbleClip'
-        : compactId.substring(0, compactId.length.clamp(0, 12));
-    final platformPrefix = task.platform == VideoPlatform.twitter
-        ? 'x'
-        : task.platform.name;
-    final base = '${platformPrefix}_$idPart';
-    final ext = (extension ?? task.format).replaceAll('.', '').trim();
-    final safeExtension = ext.isEmpty ? 'mp4' : ext;
-    return '$base.$safeExtension';
-  }
+  String buildFileName(DownloadTask task, {String? extension}) =>
+      downloadFileName(task, extension: extension);
 
   @override
   Future<void> startDownload({

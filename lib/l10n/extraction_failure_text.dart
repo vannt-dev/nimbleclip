@@ -21,6 +21,7 @@ String describeExtractionFailure(
     ExtractionFailureKind.facebookNoVideo => l10n.facebookNoVideo,
     ExtractionFailureKind.facebookAgeRestricted => l10n.facebookAgeRestricted,
     ExtractionFailureKind.genericNoVideo => l10n.genericNoVideo,
+    ExtractionFailureKind.genericStreamOnly => l10n.genericStreamOnly,
     ExtractionFailureKind.instagramInvalidPost => l10n.instagramInvalidPost,
     ExtractionFailureKind.instagramLoginRequired => l10n.instagramLoginRequired,
     ExtractionFailureKind.tiktokConnectionFailed => l10n.tiktokConnectionFailed(
@@ -36,6 +37,8 @@ String describeExtractionFailure(
     ExtractionFailureKind.tiktokServiceStatus => l10n.tiktokServiceStatus(
       int.tryParse(detail ?? '') ?? 0,
     ),
+    ExtractionFailureKind.threadsInvalidPost => l10n.threadsInvalidPost,
+    ExtractionFailureKind.threadsNoMedia => l10n.threadsNoMedia,
     ExtractionFailureKind.xInvalidPost => l10n.xInvalidPost,
     ExtractionFailureKind.xNoVideo => l10n.xNoVideo,
     ExtractionFailureKind.youtubeCipherUnsupported =>

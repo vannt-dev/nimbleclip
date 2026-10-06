@@ -64,11 +64,11 @@ class AppLocalizationsVi extends AppLocalizations {
   String get quickGuide => 'Hướng dẫn nhanh';
 
   @override
-  String get guideCopyTitle => 'Sao chép liên kết video';
+  String get guideCopyTitle => 'Sao chép liên kết';
 
   @override
   String get guideCopyDescription =>
-      'Mở YouTube, TikTok, Facebook hoặc X và chọn Sao chép liên kết.';
+      'Mở YouTube, TikTok, Facebook, Threads hoặc X và chọn Sao chép liên kết.';
 
   @override
   String get guidePasteTitle => 'Dán liên kết vào NimbleClip';
@@ -87,7 +87,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get clipboardPasted => 'Đã dán liên kết từ clipboard!';
 
   @override
-  String get pasteVideoLink => 'Dán liên kết video';
+  String get pasteVideoLink => 'Dán liên kết';
 
   @override
   String get clear => 'Xóa';
@@ -233,7 +233,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get noCompletedDownloadsDescription =>
-      'Dán liên kết video để bắt đầu tải về.';
+      'Dán liên kết để bắt đầu tải về.';
 
   @override
   String get emptyDownloadList => 'Danh sách tải về đang trống';
@@ -549,6 +549,14 @@ class AppLocalizationsVi extends AppLocalizations {
       'Bài đăng không có video tải được hoặc tài khoản đang được bảo vệ.';
 
   @override
+  String get threadsInvalidPost =>
+      'Không nhận diện được link Threads. Hãy dùng link bài đăng dạng threads.com/@<tài khoản>/post/<id>.';
+
+  @override
+  String get threadsNoMedia =>
+      'Không tìm thấy ảnh hay video trong bài Threads này. Bài có thể chỉ có chữ, ở chế độ riêng tư, hoặc đã bị xoá.';
+
+  @override
   String get originalMp4 => 'MP4 (Chất lượng gốc)';
 
   @override
@@ -612,7 +620,11 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get genericNoVideo =>
-      'Không tìm thấy video tại liên kết này. Hãy kiểm tra URL hoặc dán liên kết trực tiếp tới file .mp4.';
+      'Không tìm thấy video, âm thanh hay ảnh tại liên kết này. Hãy kiểm tra URL hoặc dán liên kết trực tiếp tới file.';
+
+  @override
+  String get genericStreamOnly =>
+      'Trang này phát video dạng luồng, không có file đơn để tải về.';
 
   @override
   String get embeddedVideo => 'Video nhúng (Web)';

@@ -118,6 +118,18 @@ class DownloadTask extends ChangeNotifier {
     DownloadStatus.paused,
   };
 
+  static final RegExp _descriptorInTitle = RegExp(r"Instance of '\w+'$");
+
+  /// Builds up to 1.8.0 wrote a picture's title as `Post - Instance of
+  /// 'ImageIndex'`. The label was stored beside it as text, so the title is
+  /// put right from that when it is read back.
+  static String _restoreTitle(Map<String, dynamic> json) {
+    final title = json['title'] as String? ?? 'Untitled Video';
+    final label = json['qualityLabel'] as String?;
+    if (label == null || label.isEmpty) return title;
+    return title.replaceFirst(_descriptorInTitle, label);
+  }
+
   static DownloadStatus _restoreStatus(String? name) {
     final status = DownloadStatus.values.firstWhere(
       (s) => s.name == name,
@@ -182,7 +194,7 @@ class DownloadTask extends ChangeNotifier {
   factory DownloadTask.fromJson(Map<String, dynamic> json) => DownloadTask(
     id: json['id'] as String? ?? '',
     videoId: json['videoId'] as String? ?? '',
-    title: json['title'] as String? ?? 'Untitled Video',
+    title: _restoreTitle(json),
     author: json['author'] as String? ?? 'Unknown',
     thumbnailUrl: json['thumbnailUrl'] as String? ?? '',
     downloadUrl: json['downloadUrl'] as String? ?? '',

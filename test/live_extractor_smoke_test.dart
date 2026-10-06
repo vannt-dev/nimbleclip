@@ -76,6 +76,42 @@ void main() {
       minimumMedia: 1,
       minimumVideos: 1,
     ),
+    // Threads hands a post's media only to a search crawler, so these two are
+    // the first to notice if it stops doing that.
+    'Threads video': (
+      url: 'https://www.threads.com/@nasa/post/Dcqa7s8gu-P',
+      minimumMedia: 1,
+      minimumVideos: 1,
+    ),
+    // The old domain and the tracking parameter the Share action appends.
+    'Threads carousel from a share link': (
+      url: 'https://www.threads.net/@nasa/post/DdhbVBwlRP_?xmt=share',
+      minimumMedia: 2,
+      minimumVideos: 0,
+    ),
+    // Seven pictures and two videos in one post.
+    'Threads carousel mixing pictures and videos': (
+      url: 'https://www.threads.com/@zuck/post/Ddt7cL5EfUG',
+      minimumMedia: 9,
+      minimumVideos: 2,
+    ),
+    // Words of its own, and the video of the post it quotes.
+    'Threads post quoting a video': (
+      url: 'https://www.threads.com/@natgeo/post/Dd_i0KnDfUr',
+      minimumMedia: 1,
+      minimumVideos: 1,
+    ),
+    // A video carried over from Instagram rather than attached to the post.
+    'Threads post with an inline video': (
+      url: 'https://www.threads.com/@nasa/post/DdEwHNClPdc',
+      minimumMedia: 1,
+      minimumVideos: 1,
+    ),
+    'Threads short link': (
+      url: 'https://www.threads.com/t/Dcqa7s8gu-P',
+      minimumMedia: 1,
+      minimumVideos: 1,
+    ),
   };
 
   for (final entry in cases.entries) {

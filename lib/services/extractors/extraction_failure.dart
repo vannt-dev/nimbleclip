@@ -19,6 +19,10 @@ enum ExtractionFailureKind {
   facebookAgeRestricted,
 
   genericNoVideo,
+
+  /// The page declares its video only as an HLS or DASH playlist, which has
+  /// no single file behind it.
+  genericStreamOnly,
   instagramInvalidPost,
   instagramLoginRequired,
 
@@ -32,6 +36,12 @@ enum ExtractionFailureKind {
 
   /// Detail: the HTTP status TikTok returned.
   tiktokServiceStatus,
+
+  threadsInvalidPost,
+
+  /// The post is text only, private, deleted, or Threads did not include its
+  /// media in the page.
+  threadsNoMedia,
 
   xInvalidPost,
   xNoVideo,

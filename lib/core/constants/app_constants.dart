@@ -22,6 +22,11 @@ class AppConstants {
   // User Agents
   static const String defaultUserAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+
+  /// What a search engine's crawler sends. Threads puts a post's media in the
+  /// page only for crawlers; see `ThreadsExtractor`.
+  static const String searchCrawlerUserAgent =
+      'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)';
   static const String mobileUserAgent =
       'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 }

@@ -6,6 +6,27 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- Threads links are supported: a public post's video, pictures, or a carousel
+  mixing the two, from `threads.com` and `threads.net`, including the short
+  `/t/<code>` form. A text-only, private or deleted post says that it has no
+  picture or video.
+- Links to other sites find more: `<video>` and `<audio>` elements, JSON-LD
+  media (`VideoObject`, `AudioObject`, `ImageObject`), `og:audio`, and every
+  `og:image` of a gallery page as its own picture. Several videos on one page
+  are offered as separate downloads; the encodings of one `<video>` element
+  count as one clip, MP4 preferred.
+- A page that only plays a stream (HLS or DASH) now says so, instead of
+  "no video was found".
+- A Threads post with no media of its own offers that of the post it quotes or
+  reposts, and a video carried inline from Instagram.
+- A downloaded picture is named after its place in the post ("Image 3") in the
+  download list, where it used to read "Instance of 'ImageIndex'". Entries
+  already in the list are put right when it is read.
+- Saved files carry the author and the start of the title:
+  `threads_nasa_LIFTOFF_<id>.mp4` where it was `threads_<id>.mp4`.
+- The home screen shows every supported platform at once instead of a row that
+  ran off the edge, and asks for "a link" rather than "a video link".
+
 ## [1.8.0] - 2026-09-26
 
 - On Android, a 480p-1080p YouTube download now keeps going after the app is

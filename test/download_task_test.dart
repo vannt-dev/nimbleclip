@@ -10,12 +10,13 @@ DownloadTask task({
   String format = 'mp4',
   bool isImage = false,
   VideoPlatform platform = VideoPlatform.generic,
+  String author = '',
 }) {
   return DownloadTask(
     id: id,
     videoId: 'v1',
     title: title,
-    author: 'Someone',
+    author: author,
     thumbnailUrl: '',
     downloadUrl: 'https://cdn.example.com/v.mp4',
     originalUrl: 'https://example.com/watch?v=1',
@@ -151,36 +152,74 @@ void main() {
   group('DownloadService.buildFileName', () {
     final service = DownloadService();
 
-    test('uses a compact UUID-style name', () {
+    test('names the platform, the author, the headline and the task', () {
       expect(
-        service.buildFileName(task(title: 'My Clip')),
-        'generic_abcdef012345.mp4',
+        service.buildFileName(task(title: 'My Clip', author: 'nasa')),
+        'generic_nasa_My_Clip_abcdef012345.mp4',
       );
     });
 
-    test('does not depend on the title', () {
+    test('takes only the first line of a caption', () {
+      expect(
+        service.buildFileName(
+          task(
+            title: '🚀 LIFTOFF!\n\nOur telescope lifted off.',
+            author: 'nasa',
+          ),
+        ),
+        'generic_nasa_LIFTOFF_abcdef012345.mp4',
+      );
+    });
+
+    test('keeps letters of any script', () {
+      expect(
+        service.buildFileName(task(title: 'Chào buổi sáng', author: 'vân')),
+        'generic_vân_Chào_buổi_sáng_abcdef012345.mp4',
+      );
+    });
+
+    test('leaves out what a file name cannot carry', () {
       expect(
         service.buildFileName(task(title: '///')),
         'generic_abcdef012345.mp4',
       );
       expect(
+        service.buildFileName(task(title: r'a/b\c:d*e?"f<g>h|i')),
+        'generic_a_b_c_d_e_f_g_h_i_abcdef012345.mp4',
+      );
+    });
+
+    test('stays short however long the title is', () {
+      expect(
         service.buildFileName(task(title: 'x' * 500)),
-        'generic_abcdef012345.mp4',
+        'generic_xxxxxxxxxxxxxxxx_abcdef012345.mp4',
+      );
+      expect(
+        service.buildFileName(
+          task(title: 'one two three four five six seven eight nine ten'),
+        ),
+        'generic_one_two_three_four_five_six_abcdef012345.mp4',
       );
     });
 
     test('does not crash on a short or empty id', () {
       // Regression: substring(0, 6) threw RangeError for a task restored from a
       // history entry with a missing id.
-      expect(service.buildFileName(task(id: '')), 'generic_NimbleClip.mp4');
-      expect(service.buildFileName(task(id: 'ab')), 'generic_ab.mp4');
+      expect(
+        service.buildFileName(task(id: '', title: '')),
+        'generic_NimbleClip.mp4',
+      );
+      expect(
+        service.buildFileName(task(id: 'ab', title: '')),
+        'generic_ab.mp4',
+      );
     });
 
     test('normalises the extension', () {
       expect(service.buildFileName(task(format: '.mp3')), endsWith('.mp3'));
       expect(service.buildFileName(task(format: '')), endsWith('.mp4'));
       expect(
-        service.buildFileName(task(), extension: 'webm'),
+        service.buildFileName(task(title: ''), extension: 'webm'),
         'generic_abcdef012345.webm',
       );
     });
@@ -191,10 +230,23 @@ void main() {
             ? 'x'
             : platform.name;
         expect(
-          service.buildFileName(task(platform: platform)),
+          service.buildFileName(task(platform: platform, title: '')),
           '${expectedPrefix}_abcdef012345.mp4',
         );
       }
+    });
+  });
+
+  group('a title written by an older build', () {
+    test('has its descriptor replaced by the stored label', () {
+      final json = task(title: "Post - Instance of 'ImageIndex'").toJson()
+        ..['qualityLabel'] = 'Image 7';
+      expect(DownloadTask.fromJson(json).title, 'Post - Image 7');
+    });
+
+    test('is left alone when it is already text', () {
+      final json = task(title: 'Post - Image 7').toJson();
+      expect(DownloadTask.fromJson(json).title, 'Post - Image 7');
     });
   });
 }

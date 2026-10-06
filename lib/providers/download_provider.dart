@@ -353,7 +353,7 @@ class DownloadProvider extends ChangeNotifier {
             id: _uuid.v4(),
             videoId: metadata.id,
             title: quality.isImage
-                ? '${metadata.title} - ${quality.label}'
+                ? '${metadata.title} - ${describeQuality(quality.label, l10n)}'
                 : metadata.title,
             author: metadata.author,
             thumbnailUrl: quality.isImage
