@@ -535,6 +535,29 @@ void main() {
     await deleteAll([inputs.video, inputs.withSound, ...inputs.frames]);
   });
 
+  // A stream joined from its segments is one file named as both inputs, and
+  // may be silent. Only a caller that says so gets the picture alone.
+  test(
+    'a silent input is written as picture alone when sound is optional',
+    () async {
+      final inputs = await muxInputs();
+      final out = '${(await getTemporaryDirectory()).path}/muxed_optional.mp4';
+
+      final result = await channel.invokeMapMethod<String, dynamic>('mux', {
+        'videoPath': inputs.video,
+        'audioPath': inputs.video,
+        'outputPath': out,
+        'renderId': 'mux-optional-audio',
+        'audioOptional': true,
+      });
+
+      final written = File(result!['filePath'] as String);
+      expect(written.existsSync(), isTrue);
+      expect(written.lengthSync(), greaterThan(0));
+      await deleteAll([out, inputs.video, inputs.withSound, ...inputs.frames]);
+    },
+  );
+
   // A cancel sent while Dart was still fetching reaches Kotlin with no mux
   // running. Left registered, it would kill the retry of that same task.
   test('a cancel sent before a mux starts does not stop it', () async {

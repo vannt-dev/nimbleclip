@@ -32,6 +32,7 @@ class UnsupportedSlideshowRenderer implements SlideshowRenderer {
     required String audioPath,
     required String outputPath,
     String? renderId,
+    bool audioOptional = false,
     void Function(double progress)? onProgress,
   }) async {
     throw const SlideshowException(SlideshowFailureKind.encoderUnavailable);

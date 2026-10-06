@@ -829,10 +829,11 @@ class DownloadProvider extends ChangeNotifier {
     task.downloadSpeed = 0;
     try {
       // Segments that hold both picture and sound are one file read twice,
-      // once for each track.
+      // once for each track - and may hold no sound at all.
       return await _slideshowRenderer.mux(
         videoPath: videoFile.path,
         audioPath: (audioFile ?? videoFile).path,
+        audioOptional: audioFile == null,
         outputPath: outputPath,
         renderId: task.id,
         onProgress: (fraction) => _reportRenderProgress(

@@ -34,6 +34,7 @@ class _Renderer implements SlideshowRenderer {
     required String audioPath,
     required String outputPath,
     String? renderId,
+    bool audioOptional = false,
     void Function(double progress)? onProgress,
   }) async => throw UnimplementedError();
 

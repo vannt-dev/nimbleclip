@@ -21,7 +21,7 @@ class _FakeMuxer implements SlideshowRenderer {
   _FakeMuxer({this.failWith});
 
   final SlideshowFailureKind? failWith;
-  final List<({String video, String audio})> calls = [];
+  final List<({String video, String audio, bool audioOptional})> calls = [];
   final Map<String, String> contents = {};
 
   @override
@@ -33,9 +33,14 @@ class _FakeMuxer implements SlideshowRenderer {
     required String audioPath,
     required String outputPath,
     String? renderId,
+    bool audioOptional = false,
     void Function(double progress)? onProgress,
   }) async {
-    calls.add((video: videoPath, audio: audioPath));
+    calls.add((
+      video: videoPath,
+      audio: audioPath,
+      audioOptional: audioOptional,
+    ));
     for (final path in {videoPath, audioPath}) {
       contents[path] = File(path).readAsStringSync();
     }
@@ -169,6 +174,8 @@ void main() {
     expect(task.status, DownloadStatus.completed);
     expect(streams.fetched, [video]);
     expect(muxer.calls.single.video, muxer.calls.single.audio);
+    // Such segments may be silent, which is not for the muxer to refuse.
+    expect(muxer.calls.single.audioOptional, isTrue);
     expect(muxer.contents[muxer.calls.single.video], 'segments');
     expect(File(task.filePath!).readAsStringSync(), 'mp4');
     expect(task.filePath, endsWith('.mp4'));
@@ -190,6 +197,8 @@ void main() {
     final call = muxer.calls.single;
     expect(muxer.contents[call.video], 'picture');
     expect(muxer.contents[call.audio], 'sound');
+    // A playlist of its own promises sound; its absence is a failure.
+    expect(call.audioOptional, isFalse);
   });
 
   test('a stream that turns out live says so on the task', () async {

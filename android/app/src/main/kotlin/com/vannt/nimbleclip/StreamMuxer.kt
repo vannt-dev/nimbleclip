@@ -17,8 +17,8 @@ import java.nio.ByteBuffer
  *
  * A stream fetched as segments is joined the same way. Its picture and sound
  * usually arrive in one file, which is then named as both inputs and read
- * twice, once per track; such a file may carry no sound at all, and the output
- * is then the picture alone.
+ * twice, once per track. Such a file may carry no sound at all, so the caller
+ * marks the sound as optional and the output is then the picture alone.
  *
  * Cancellation shares [SlideshowEncoder]'s registry, because both are started
  * and stopped through the same channel under the same render id.
@@ -29,6 +29,8 @@ class StreamMuxer {
         val audioPath: String,
         val outputPath: String,
         val renderId: String,
+        /** Write the picture alone when [audioPath] holds no sound. */
+        val audioOptional: Boolean = false,
     )
 
     fun mux(request: Request, onProgress: (Double) -> Unit = {}): String {
@@ -51,9 +53,9 @@ class StreamMuxer {
             val videoFormat = selectTrack(video, "video/")
                 ?: throw SlideshowEncodeException("no video track in the input")
             val audioFormat = selectTrack(audio, "audio/")
-            // Two files promise a track each. One file read twice is a stream
-            // as it was served, and a silent clip is still a clip.
-            if (audioFormat == null && request.audioPath != request.videoPath) {
+            // A merged download promises a track in each file. A stream as it
+            // was served may have none, and a silent clip is still a clip.
+            if (audioFormat == null && !request.audioOptional) {
                 throw SlideshowEncodeException("no audio track in the input")
             }
 
