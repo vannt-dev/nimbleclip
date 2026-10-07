@@ -260,12 +260,43 @@ class _DownloadsScreenState extends State<DownloadsScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildTaskList(context, all),
-          _buildActiveList(context, active),
-          _buildCompletedList(context, completed),
+          if (downloadProv.downloadsAwaitingWifi > 0)
+            Container(
+              key: const Key('awaiting_wifi_banner'),
+              width: double.infinity,
+              color: AppColors.primary.withValues(alpha: 0.12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.wifi_off_rounded,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      context.l10n.downloadsAwaitingWifi(
+                        downloadProv.downloadsAwaitingWifi,
+                      ),
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildTaskList(context, all),
+                _buildActiveList(context, active),
+                _buildCompletedList(context, completed),
+              ],
+            ),
+          ),
         ],
       ),
     );

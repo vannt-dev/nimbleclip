@@ -5,12 +5,18 @@ class AsyncWorkQueue<T> {
   AsyncWorkQueue({
     required this.worker,
     bool Function(T item)? shouldRun,
+    bool Function()? canStart,
     int maxConcurrent = 3,
   }) : _shouldRun = shouldRun ?? ((_) => true),
+       _canStart = canStart ?? (() => true),
        _maxConcurrent = maxConcurrent.clamp(1, 5).toInt();
 
   final Future<void> Function(T item) worker;
   final bool Function(T item) _shouldRun;
+
+  /// Asked before anything is taken off the queue. While it answers false
+  /// the items wait where they are; [resume] looks again.
+  final bool Function() _canStart;
 
   /// A queue rather than a list: draining took the head with `removeAt(0)`,
   /// which shifts every remaining element down on each dequeue.
@@ -38,8 +44,11 @@ class AsyncWorkQueue<T> {
 
   void clear() => _pending.clear();
 
+  /// Starts whatever was held back once [_canStart] may answer differently.
+  void resume() => _drain();
+
   void _drain() {
-    while (_running < _maxConcurrent && _pending.isNotEmpty) {
+    while (_running < _maxConcurrent && _pending.isNotEmpty && _canStart()) {
       final item = _pending.removeFirst();
       if (!_shouldRun(item)) continue;
       _running++;

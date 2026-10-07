@@ -326,6 +326,24 @@ abstract class AppLocalizations {
   /// **'Analyzed links ({count})'**
   String batchResults(int count);
 
+  /// No description provided for @wifiOnlyDownloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Download on Wi-Fi only'**
+  String get wifiOnlyDownloads;
+
+  /// No description provided for @wifiOnlyDownloadsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'On mobile data, downloads wait and start when Wi-Fi is back'**
+  String get wifiOnlyDownloadsDescription;
+
+  /// No description provided for @downloadsAwaitingWifi.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 download is waiting for Wi-Fi} other{{count} downloads are waiting for Wi-Fi}}'**
+  String downloadsAwaitingWifi(int count);
+
   /// No description provided for @batchLimitReached.
   ///
   /// In en, this message translates to:

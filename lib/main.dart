@@ -61,6 +61,7 @@ class NimbleClipApp extends StatelessWidget {
                   extractorRegistry: context.read<ExtractorRegistry>(),
                 );
             provider.maxConcurrentDownloads = settings.maxConcurrentDownloads;
+            provider.wifiOnlyDownloads = settings.wifiOnlyDownloads;
             return provider;
           },
         ),

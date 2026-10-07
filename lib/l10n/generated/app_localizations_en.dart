@@ -156,6 +156,24 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get wifiOnlyDownloads => 'Download on Wi-Fi only';
+
+  @override
+  String get wifiOnlyDownloadsDescription =>
+      'On mobile data, downloads wait and start when Wi-Fi is back';
+
+  @override
+  String downloadsAwaitingWifi(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count downloads are waiting for Wi-Fi',
+      one: '1 download is waiting for Wi-Fi',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String batchLimitReached(int count) {
     return 'Only the first $count links will be analyzed.';
   }

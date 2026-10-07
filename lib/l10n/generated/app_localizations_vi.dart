@@ -154,6 +154,23 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String get wifiOnlyDownloads => 'Chỉ tải qua Wi-Fi';
+
+  @override
+  String get wifiOnlyDownloadsDescription =>
+      'Khi dùng dữ liệu di động, lượt tải sẽ chờ và tự bắt đầu khi có Wi-Fi';
+
+  @override
+  String downloadsAwaitingWifi(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count lượt tải đang chờ Wi-Fi',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String batchLimitReached(int count) {
     return 'Chỉ $count liên kết đầu tiên được phân tích.';
   }

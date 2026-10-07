@@ -35,6 +35,20 @@ void main() {
     expect(provider.locale, isNull);
   });
 
+  test('Wi-Fi only downloads is off by default and remembered', () async {
+    final provider = SettingsProvider();
+    await provider.initialized;
+    expect(provider.wifiOnlyDownloads, isFalse);
+
+    await provider.setWifiOnlyDownloads(true);
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(AppConstants.keyWifiOnlyDownloads), isTrue);
+    final restored = SettingsProvider();
+    await restored.initialized;
+    expect(restored.wifiOnlyDownloads, isTrue);
+  });
+
   test('persists and restores an explicit locale', () async {
     final provider = SettingsProvider();
     await provider.initialized;

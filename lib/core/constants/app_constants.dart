@@ -14,6 +14,7 @@ class AppConstants {
   static const String keyAllowExternalServices = 'allow_external_services';
   static const String keyRemoveCacheAfterGallery = 'remove_cache_after_gallery';
   static const String keyMaxConcurrentDownloads = 'max_concurrent_downloads';
+  static const String keyWifiOnlyDownloads = 'wifi_only_downloads';
 
   // Network timeouts
   static const Duration connectTimeout = Duration(seconds: 15);

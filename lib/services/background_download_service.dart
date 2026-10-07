@@ -30,7 +30,11 @@ DownloadGateway createDefaultDownloadService() {
 /// Mobile download gateway backed by Android DownloadWorker and iOS
 /// URLSession. Transfers therefore keep running while Flutter is suspended.
 class BackgroundDownloadService
-    implements DownloadGateway, RecoverableDownloadGateway, StreamPairGateway {
+    implements
+        DownloadGateway,
+        RecoverableDownloadGateway,
+        StreamPairGateway,
+        NetworkPolicyGateway {
   BackgroundDownloadService({
     StorageService? storageService,
     this.validator = const MediaFileValidator(),
@@ -262,6 +266,21 @@ class BackgroundDownloadService
       }
     } catch (_) {
       // Notification permission is optional; the transfer itself can proceed.
+    }
+  }
+
+  /// A running transfer is paused by the system when Wi-Fi goes away and
+  /// picked up again when it returns, with the app open or not.
+  @override
+  Future<void> setWifiOnly(bool wifiOnly) async {
+    try {
+      await bg.FileDownloader().requireWiFi(
+        wifiOnly ? bg.RequireWiFi.forAllTasks : bg.RequireWiFi.asSetByTask,
+        rescheduleRunningTasks: true,
+      );
+    } catch (_) {
+      // The queue still holds new downloads back; only transfers already
+      // handed to the system are beyond reach.
     }
   }
 

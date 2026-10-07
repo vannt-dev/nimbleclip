@@ -10,6 +10,7 @@ import 'package:nimble_clip/models/download_options.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/providers/download_provider.dart';
+import 'package:nimble_clip/services/connection_monitor.dart';
 import 'package:nimble_clip/services/download_service.dart';
 import 'package:nimble_clip/services/download_history_repository.dart';
 import 'package:nimble_clip/services/media_file_actions.dart';
@@ -158,13 +159,49 @@ class _MemoryStorageService
 
 DownloadProvider _provider(
   DownloadGateway downloads,
-  _MemoryStorageService storage,
-) => DownloadProvider(
+  _MemoryStorageService storage, {
+  ConnectionMonitor? connection,
+}) => DownloadProvider(
   downloadService: downloads,
   storageService: storage,
   historyRepository: storage,
   fileActions: storage,
+  connectionMonitor: connection,
 );
+
+/// A connection the test switches between Wi-Fi and mobile data.
+class _FakeConnection implements ConnectionMonitor {
+  _FakeConnection({required this.unmetered});
+
+  bool unmetered;
+  int checks = 0;
+  int listeners = 0;
+  late final StreamController<bool> _changes = StreamController<bool>.broadcast(
+    onListen: () => listeners++,
+  );
+
+  void set(bool unmetered) {
+    this.unmetered = unmetered;
+    _changes.add(unmetered);
+  }
+
+  @override
+  Future<bool> isUnmetered() async {
+    checks++;
+    return unmetered;
+  }
+
+  @override
+  Stream<bool> get unmeteredChanges => _changes.stream;
+}
+
+class _PolicyDownloadService extends _ControlledDownloadService
+    implements NetworkPolicyGateway {
+  final List<bool> wifiOnlyCalls = [];
+
+  @override
+  Future<void> setWifiOnly(bool wifiOnly) async => wifiOnlyCalls.add(wifiOnly);
+}
 
 VideoMetadata _metadata(int count) => VideoMetadata(
   id: 'post',
@@ -577,4 +614,175 @@ void main() {
       expect(storage.receipts, isEmpty);
     },
   );
+
+  group('Wi-Fi only downloads', () {
+    Future<List<DownloadTask>> start(DownloadProvider provider, int count) {
+      final metadata = _metadata(count);
+      return provider.startNewDownloads(
+        metadata: metadata,
+        qualities: metadata.qualities,
+        l10n: l10n,
+        options: const DownloadOptions(autoSaveToGallery: false),
+      );
+    }
+
+    test(
+      'downloads wait off Wi-Fi and start by themselves when it is back',
+      () async {
+        final downloads = _ControlledDownloadService();
+        final connection = _FakeConnection(unmetered: false);
+        final provider = _provider(
+          downloads,
+          _MemoryStorageService(),
+          connection: connection,
+        );
+        var notified = 0;
+        provider.addListener(() => notified++);
+        provider.wifiOnlyDownloads = true;
+        await _flush();
+
+        final tasks = await start(provider, 2);
+        await _flush();
+
+        expect(downloads.started, isEmpty);
+        expect(
+          tasks.map((task) => task.status),
+          everyElement(DownloadStatus.queued),
+        );
+        expect(provider.networkAllowsDownloads, isFalse);
+        expect(provider.downloadsAwaitingWifi, 2);
+
+        final before = notified;
+        connection.set(true);
+        await _waitUntil(() => downloads.started.length == 2);
+
+        expect(downloads.started, [tasks[0].id, tasks[1].id]);
+        expect(provider.downloadsAwaitingWifi, 0);
+        expect(notified, greaterThan(before));
+        for (final id in downloads.started.toList()) {
+          downloads.finish(id);
+        }
+        await _flush();
+      },
+    );
+
+    test('turning the setting off releases what was waiting', () async {
+      final downloads = _ControlledDownloadService();
+      final connection = _FakeConnection(unmetered: false);
+      final provider = _provider(
+        downloads,
+        _MemoryStorageService(),
+        connection: connection,
+      );
+      provider.wifiOnlyDownloads = true;
+      await _flush();
+      final tasks = await start(provider, 1);
+      await _flush();
+      expect(downloads.started, isEmpty);
+
+      provider.wifiOnlyDownloads = false;
+      await _waitUntil(() => downloads.started.isNotEmpty);
+
+      expect(downloads.started, [tasks.single.id]);
+      expect(provider.downloadsAwaitingWifi, 0);
+      downloads.finish(tasks.single.id);
+      await _flush();
+    });
+
+    test('with the setting off the connection is never asked about', () async {
+      final downloads = _ControlledDownloadService();
+      final connection = _FakeConnection(unmetered: false);
+      final provider = _provider(
+        downloads,
+        _MemoryStorageService(),
+        connection: connection,
+      );
+
+      final tasks = await start(provider, 1);
+      await _waitUntil(() => downloads.started.isNotEmpty);
+
+      expect(downloads.started, [tasks.single.id]);
+      expect(connection.checks, 0);
+      expect(connection.listeners, 0);
+      downloads.finish(tasks.single.id);
+      await _flush();
+    });
+
+    test(
+      'a download cancelled while it waits does not start when Wi-Fi returns',
+      () async {
+        final downloads = _ControlledDownloadService();
+        final connection = _FakeConnection(unmetered: false);
+        final provider = _provider(
+          downloads,
+          _MemoryStorageService(),
+          connection: connection,
+        );
+        provider.wifiOnlyDownloads = true;
+        await _flush();
+        final tasks = await start(provider, 2);
+        await _flush();
+
+        provider.cancelTask(tasks[0].id);
+        connection.set(true);
+        await _waitUntil(() => downloads.started.isNotEmpty);
+        await _flush();
+
+        expect(downloads.started, [tasks[1].id]);
+        downloads.finish(tasks[1].id);
+        await _flush();
+      },
+    );
+
+    test(
+      'losing Wi-Fi holds the next download, not the one already running',
+      () async {
+        final downloads = _ControlledDownloadService();
+        final connection = _FakeConnection(unmetered: true);
+        final provider = _provider(
+          downloads,
+          _MemoryStorageService(),
+          connection: connection,
+        );
+        provider.maxConcurrentDownloads = 1;
+        provider.wifiOnlyDownloads = true;
+        await _flush();
+        final tasks = await start(provider, 2);
+        await _waitUntil(() => downloads.started.length == 1);
+
+        connection.set(false);
+        await _flush();
+        downloads.finish(tasks[0].id);
+        await _flush();
+
+        expect(downloads.started, [tasks[0].id]);
+        expect(provider.downloadsAwaitingWifi, 1);
+
+        connection.set(true);
+        await _waitUntil(() => downloads.started.length == 2);
+        expect(downloads.started.last, tasks[1].id);
+        downloads.finish(tasks[1].id);
+        await _flush();
+      },
+    );
+
+    test(
+      'the native gateway is told, so the system holds its own transfers',
+      () async {
+        final downloads = _PolicyDownloadService();
+        final provider = _provider(
+          downloads,
+          _MemoryStorageService(),
+          connection: _FakeConnection(unmetered: true),
+        );
+
+        provider.wifiOnlyDownloads = true;
+        provider.wifiOnlyDownloads = true;
+        provider.wifiOnlyDownloads = false;
+        await _flush();
+
+        expect(downloads.wifiOnlyCalls, [true, false]);
+      },
+    );
+  });
 }

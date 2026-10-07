@@ -52,6 +52,9 @@ management, local playback, and gallery export.
 - Uses one shared download queue with a configurable limit of one to five
   concurrent transfers, so separate batches cannot overload the device or
   network.
+- Can hold downloads back until the device is on Wi-Fi or a cable (Settings →
+  **Download on Wi-Fi only**): queued downloads wait and start by themselves,
+  and on Android and iOS the system pauses and resumes running transfers.
 - Prevents the same source option from being queued twice while it is already
   downloading, and asks for confirmation before downloading an existing
   completed file again.
