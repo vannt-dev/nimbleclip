@@ -537,6 +537,10 @@ class AppLocalizationsVi extends AppLocalizations {
       'Không tìm thấy luồng tải nào cho video YouTube này.';
 
   @override
+  String get youtubePlaylistUnavailable =>
+      'Không tìm thấy video nào trong danh sách phát YouTube này. Danh sách có thể ở chế độ riêng tư, đã bị xoá hoặc đang trống.';
+
+  @override
   String get youtubeTemporarilyUnavailable =>
       'YouTube đang tạm từ chối yêu cầu từ thiết bị này. Hãy đợi vài phút rồi thử lại.';
 

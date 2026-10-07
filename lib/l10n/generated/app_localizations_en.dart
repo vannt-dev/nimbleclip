@@ -539,6 +539,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'No downloadable stream was found for this YouTube video.';
 
   @override
+  String get youtubePlaylistUnavailable =>
+      'No videos were found in this YouTube playlist. It may be private, removed or empty.';
+
+  @override
   String get youtubeTemporarilyUnavailable =>
       'YouTube is refusing requests from this device for now. Wait a few minutes and try again.';
 

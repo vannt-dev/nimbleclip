@@ -980,6 +980,12 @@ abstract class AppLocalizations {
   /// **'No downloadable stream was found for this YouTube video.'**
   String get youtubeNoStreams;
 
+  /// No description provided for @youtubePlaylistUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No videos were found in this YouTube playlist. It may be private, removed or empty.'**
+  String get youtubePlaylistUnavailable;
+
   /// No description provided for @youtubeTemporarilyUnavailable.
   ///
   /// In en, this message translates to:
