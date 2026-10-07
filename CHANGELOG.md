@@ -6,6 +6,14 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- A **Download on Wi-Fi only** switch in Settings. While it is on and the
+  device is on mobile data or offline, new downloads wait in the queue and
+  start by themselves when Wi-Fi or a cable is back; the Downloads screen says
+  how many are waiting. On Android and iOS the system also pauses a file
+  transfer that is already running and resumes it later. A stream being
+  fetched segment by segment (HLS, DASH) or a slideshow being rendered is not
+  interrupted once it has started.
+
 - A link to a YouTube playlist (`youtube.com/playlist?list=…`, also from
   YouTube Music) is replaced by its videos, which are analyzed and queued like
   any other batch. Up to 20 are taken, the size of a batch, in the playlist's

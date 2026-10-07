@@ -26,6 +26,7 @@ import '../services/slideshow/stream_fetcher.dart';
 import '../services/background_download_service.dart';
 import '../services/download_history_repository.dart';
 import '../services/async_work_queue.dart';
+import '../services/connection_monitor.dart';
 import '../services/extractors/registry.dart';
 import '../services/media_file_actions.dart';
 import '../services/storage_service.dart';
@@ -43,7 +44,9 @@ class DownloadProvider extends ChangeNotifier {
     StreamFetcher? streamFetcher,
     HlsFetcher? hlsFetcher,
     DashFetcher? dashFetcher,
+    ConnectionMonitor? connectionMonitor,
   }) : _downloadService = downloadService ?? createDefaultDownloadService(),
+       _connectionMonitor = connectionMonitor ?? PlatformConnectionMonitor(),
        _streamFetcher = streamFetcher ?? _defaultStreamFetcher,
        _hlsFetcher = hlsFetcher ?? _defaultHlsFetcher,
        _dashFetcher = dashFetcher ?? _defaultDashFetcher,
@@ -59,6 +62,7 @@ class DownloadProvider extends ChangeNotifier {
       shouldRun: (queued) =>
           queued.task.status == DownloadStatus.queued &&
           _tasks.contains(queued.task),
+      canStart: () => networkAllowsDownloads,
       maxConcurrent: defaultMaxConcurrentDownloads,
     );
     _historyReady = _loadHistory();
@@ -98,6 +102,82 @@ class DownloadProvider extends ChangeNotifier {
   int get maxConcurrentDownloads => _queue.maxConcurrent;
   set maxConcurrentDownloads(int value) {
     _queue.maxConcurrent = value;
+  }
+
+  final ConnectionMonitor _connectionMonitor;
+  StreamSubscription<bool>? _connectionChanges;
+  bool _wifiOnlyDownloads = false;
+
+  /// Assumed until the platform says otherwise: not knowing must not hold
+  /// every download back.
+  bool _onUnmeteredConnection = true;
+
+  /// Renders waiting for Wi-Fi. They do not go through the queue, so it
+  /// cannot count them.
+  int _rendersAwaitingNetwork = 0;
+  Completer<void>? _networkOpened;
+
+  bool get wifiOnlyDownloads => _wifiOnlyDownloads;
+
+  /// Whether a download may start now: always, unless the Wi-Fi only setting
+  /// is on and the device is on mobile data or offline.
+  bool get networkAllowsDownloads =>
+      !_wifiOnlyDownloads || _onUnmeteredConnection;
+
+  /// How many downloads are held back until Wi-Fi returns.
+  int get downloadsAwaitingWifi =>
+      networkAllowsDownloads ? 0 : _queue.pending + _rendersAwaitingNetwork;
+
+  /// The Wi-Fi only setting. Downloads not yet started wait in the queue
+  /// while the device is off Wi-Fi and start by themselves when it is back;
+  /// transfers the system already runs are paused and resumed by it.
+  set wifiOnlyDownloads(bool value) {
+    if (value == _wifiOnlyDownloads) return;
+    _wifiOnlyDownloads = value;
+    final gateway = _downloadService;
+    if (gateway is NetworkPolicyGateway) {
+      unawaited((gateway as NetworkPolicyGateway).setWifiOnly(value));
+    }
+    if (value) {
+      _connectionChanges ??= _connectionMonitor.unmeteredChanges.listen(
+        _onConnectionChanged,
+      );
+      unawaited(_connectionMonitor.isUnmetered().then(_onConnectionChanged));
+    }
+    _networkPolicyChanged();
+  }
+
+  void _onConnectionChanged(bool unmetered) {
+    if (_isDisposed || unmetered == _onUnmeteredConnection) return;
+    _onUnmeteredConnection = unmetered;
+    _networkPolicyChanged();
+  }
+
+  void _networkPolicyChanged() {
+    if (networkAllowsDownloads) {
+      _networkOpened?.complete();
+      _networkOpened = null;
+      _queue.resume();
+    }
+    // Deferred: the setting is pushed from a provider's update callback,
+    // which runs while the widget tree is building.
+    scheduleMicrotask(() {
+      if (!_isDisposed) notifyListeners();
+    });
+  }
+
+  /// Completes once a download may start. A render calls this before it
+  /// begins, because it is not started by the queue.
+  Future<void> _whenNetworkAllows() async {
+    while (!networkAllowsDownloads && !_isDisposed) {
+      _rendersAwaitingNetwork++;
+      notifyListeners();
+      try {
+        await (_networkOpened ??= Completer<void>()).future;
+      } finally {
+        _rendersAwaitingNetwork--;
+      }
+    }
   }
 
   bool _isDisposed = false;
@@ -148,6 +228,10 @@ class DownloadProvider extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    unawaited(_connectionChanges?.cancel());
+    // Lets a render waiting for Wi-Fi fall out of its wait.
+    _networkOpened?.complete();
+    _networkOpened = null;
     _queue.clear();
     for (final task in _tasks) {
       task.dispose();
@@ -412,6 +496,13 @@ class DownloadProvider extends ChangeNotifier {
     DownloadOptions options,
   ) async {
     for (final quality in renderable) {
+      // Only when there is something to wait for: an await that has nothing
+      // to wait for still lets a turn of the event loop pass, and a render
+      // is expected to have started by the time its caller looks.
+      if (!networkAllowsDownloads) {
+        await _whenNetworkAllows();
+        if (_isDisposed) return;
+      }
       // Checked again per option: tasks are created one at a time, so a second
       // batch started meanwhile may already be producing this one.
       if (_isInFlight(metadata, quality, l10n)) continue;
@@ -451,6 +542,10 @@ class DownloadProvider extends ChangeNotifier {
     AppLocalizations l10n,
     DownloadOptions options,
   ) async {
+    if (!networkAllowsDownloads) {
+      await _whenNetworkAllows();
+      if (_isDisposed || !_tasks.contains(task)) return;
+    }
     if (task.filePath != null) {
       await _fileActions.delete(task.filePath!);
     }

@@ -16,6 +16,7 @@ class SettingsProvider extends ChangeNotifier {
   bool _allowExternalServices = true;
   bool _removeCacheAfterGallery = true;
   int _maxConcurrentDownloads = 3;
+  bool _wifiOnlyDownloads = false;
 
   ThemeMode get themeMode => _themeMode;
   Locale? get locale => _locale;
@@ -26,6 +27,7 @@ class SettingsProvider extends ChangeNotifier {
   bool get allowExternalServices => _allowExternalServices;
   bool get removeCacheAfterGallery => _removeCacheAfterGallery;
   int get maxConcurrentDownloads => _maxConcurrentDownloads;
+  bool get wifiOnlyDownloads => _wifiOnlyDownloads;
   DownloadOptions get downloadOptions => DownloadOptions(
     autoSaveToGallery: autoSaveGallery,
     removeCacheAfterGallery: removeCacheAfterGallery,
@@ -62,6 +64,8 @@ class SettingsProvider extends ChangeNotifier {
         (prefs.getInt(AppConstants.keyMaxConcurrentDownloads) ?? 3)
             .clamp(1, 5)
             .toInt();
+    _wifiOnlyDownloads =
+        prefs.getBool(AppConstants.keyWifiOnlyDownloads) ?? false;
     final languageCode = prefs.getString(AppConstants.keyLanguageCode);
     _locale = languageCode == null ? null : Locale(languageCode);
 
@@ -136,6 +140,13 @@ class SettingsProvider extends ChangeNotifier {
       AppConstants.keyMaxConcurrentDownloads,
       _maxConcurrentDownloads,
     );
+  }
+
+  Future<void> setWifiOnlyDownloads(bool value) async {
+    _wifiOnlyDownloads = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(AppConstants.keyWifiOnlyDownloads, value);
   }
 
   Future<void> refreshCacheSize() async {

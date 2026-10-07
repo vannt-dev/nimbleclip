@@ -232,6 +232,21 @@ class SettingsScreen extends StatelessWidget {
                   onChanged: settings.setAllowExternalServices,
                 ),
                 const Divider(height: 1),
+                SwitchListTile(
+                  key: const Key('wifi_only_downloads_switch'),
+                  secondary: const Icon(
+                    Icons.wifi_rounded,
+                    color: AppColors.primary,
+                  ),
+                  title: Text(l10n.wifiOnlyDownloads),
+                  subtitle: Text(
+                    l10n.wifiOnlyDownloadsDescription,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  value: settings.wifiOnlyDownloads,
+                  onChanged: settings.setWifiOnlyDownloads,
+                ),
+                const Divider(height: 1),
                 ListTile(
                   leading: const Icon(
                     Icons.multiple_stop_rounded,

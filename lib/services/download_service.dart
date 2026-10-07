@@ -42,6 +42,13 @@ abstract interface class DownloadGateway {
   void dispose();
 }
 
+/// Optional capability of gateways whose transfers run outside the app, where
+/// only the operating system can hold one back until Wi-Fi returns.
+abstract interface class NetworkPolicyGateway {
+  /// Applies to transfers already running as well as to new ones.
+  Future<void> setWifiOnly(bool wifiOnly);
+}
+
 /// Optional capability implemented by native gateways whose operating-system
 /// workers and task database survive the Flutter process.
 abstract interface class RecoverableDownloadGateway {
