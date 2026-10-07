@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-10-07
+
 - On Android, a video served as a DASH stream can be downloaded: a link to an
   `.mpd` manifest, or a page whose player names one. Each size is offered
   once, its segments and those of the sound are fetched and joined into one
