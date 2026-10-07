@@ -26,6 +26,9 @@ management, local playback, and gallery export.
   options together, and keeps the latest 20 analyzed links locally.
 - Limits batch analysis to 20 links with three concurrent extractors, while
   allowing per-link quality selection, retry, and cancellation.
+- Expands a YouTube playlist link into its videos and analyzes them as a
+  batch: the first 20 in the playlist's order, with a notice when the playlist
+  holds more.
 - Parses large posts on a background isolate, so the interface keeps responding
   while a link whose page embeds megabytes of inline data is analyzed.
 - Extracts available video, audio, and image options before downloading.
@@ -93,7 +96,7 @@ management, local playback, and gallery export.
 
 | Source | Supported content |
 | --- | --- |
-| YouTube | Public videos and available M4A audio streams |
+| YouTube | Public videos and available M4A audio streams; a public playlist link (`/playlist?list=…`) stands for its first 20 videos |
 | TikTok | Public videos, slideshows/image posts, including watermark-free variants when exposed by the source, and audio |
 | Facebook | Public videos, Watch links, Reels, image posts, carousels, mixed-media posts, and story links (these need external services) |
 | X / Twitter | Public posts containing images, videos, or mixed media |

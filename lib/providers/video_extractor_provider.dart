@@ -7,12 +7,16 @@ import '../models/video_metadata.dart';
 import '../services/extractors/registry.dart';
 import '../l10n/extraction_failure_text.dart';
 import '../services/extractors/base_extractor.dart';
+import '../services/extractors/youtube_playlist.dart';
 
 class VideoExtractorProvider extends ChangeNotifier {
-  VideoExtractorProvider({ExtractorRegistry? extractorRegistry})
-    : _extractorRegistry = extractorRegistry ?? ExtractorRegistry();
+  VideoExtractorProvider({
+    ExtractorRegistry? extractorRegistry,
+    this._playlistReader = const YouTubePlaylistReader(),
+  }) : _extractorRegistry = extractorRegistry ?? ExtractorRegistry();
 
   final ExtractorRegistry _extractorRegistry;
+  final YouTubePlaylistReader _playlistReader;
   VideoMetadata? _metadata;
   VideoQualityOption? _selectedQuality;
   bool _isAnalyzing = false;
@@ -22,6 +26,7 @@ class VideoExtractorProvider extends ChangeNotifier {
   List<String> _attemptedStrategies = const [];
   String? _suppressedError;
   List<BatchAnalysisResult> _batchResults = const [];
+  bool _batchTruncated = false;
   Duration? _lastAnalysisDuration;
   DateTime? _lastAnalyzedAt;
 
@@ -30,6 +35,10 @@ class VideoExtractorProvider extends ChangeNotifier {
   int _requestSequence = 0;
   static const int maximumBatchUrls = 20;
   static const int maximumParallelAnalyses = 3;
+
+  /// Whether [url] names a playlist, which [analyzeUrls] turns into a batch
+  /// of its videos and [analyzeUrl] cannot read.
+  static bool isPlaylistLink(String url) => youtubePlaylistIdFrom(url) != null;
 
   VideoMetadata? get metadata => _metadata;
   VideoQualityOption? get selectedQuality => _selectedQuality;
@@ -43,6 +52,10 @@ class VideoExtractorProvider extends ChangeNotifier {
   String? get suppressedError => _suppressedError;
   List<BatchAnalysisResult> get batchResults =>
       List.unmodifiable(_batchResults);
+
+  /// Whether the last [analyzeUrls] call left links out: more than
+  /// [maximumBatchUrls] were given, or a playlist held more than fit.
+  bool get batchTruncated => _batchTruncated;
   Duration? get lastAnalysisDuration => _lastAnalysisDuration;
   DateTime? get lastAnalyzedAt => _lastAnalyzedAt;
 
@@ -115,20 +128,43 @@ class VideoExtractorProvider extends ChangeNotifier {
     String preferredQuality = 'Highest',
     required AppLocalizations l10n,
   }) async {
-    final cleanUrls = urls
+    var candidates = urls
         .map(UrlHelper.extractCleanUrl)
         .where(UrlHelper.isValidVideoUrl)
-        .toSet()
-        .take(maximumBatchUrls)
-        .toList(growable: false);
-    if (cleanUrls.isEmpty) {
-      _isAnalyzing = false;
-      _errorMessage = l10n.invalidVideoUrl;
+        .toSet();
+    _batchTruncated = false;
+
+    // A playlist link stands for its videos, so it is replaced by their
+    // links before the batch is cut to size. One that cannot be read stays
+    // in the results as a failed row instead of disappearing.
+    var unreadPlaylists = const <BatchAnalysisResult>[];
+    if (candidates.any((url) => youtubePlaylistIdFrom(url) != null)) {
+      final sequence = ++_requestSequence;
+      _isAnalyzing = true;
+      _errorMessage = null;
+      _metadata = null;
+      _selectedQuality = null;
       _batchResults = const [];
       notifyListeners();
-      return const [];
+
+      final expanded = await _expandPlaylists(candidates, l10n);
+      if (sequence != _requestSequence) return const [];
+      candidates = expanded.urls;
+      unreadPlaylists = expanded.failures;
     }
-    if (cleanUrls.length == 1) {
+
+    if (candidates.length > maximumBatchUrls) _batchTruncated = true;
+    final cleanUrls = candidates.take(maximumBatchUrls).toList(growable: false);
+    if (cleanUrls.isEmpty) {
+      _isAnalyzing = false;
+      _errorMessage = unreadPlaylists.isEmpty
+          ? l10n.invalidVideoUrl
+          : unreadPlaylists.first.error;
+      _batchResults = const [];
+      notifyListeners();
+      return unreadPlaylists;
+    }
+    if (cleanUrls.length == 1 && unreadPlaylists.isEmpty) {
       await analyzeUrl(
         cleanUrls.single,
         preferredQuality: preferredQuality,
@@ -174,9 +210,10 @@ class VideoExtractorProvider extends ChangeNotifier {
           );
         }
         if (sequence != _requestSequence) return;
-        _batchResults = List.unmodifiable(
-          results.whereType<BatchAnalysisResult>(),
-        );
+        _batchResults = List.unmodifiable([
+          ...results.whereType<BatchAnalysisResult>(),
+          ...unreadPlaylists,
+        ]);
         notifyListeners();
       }
     }
@@ -191,6 +228,43 @@ class VideoExtractorProvider extends ChangeNotifier {
     _isAnalyzing = false;
     notifyListeners();
     return _batchResults;
+  }
+
+  /// Replaces each playlist link in [urls] with links to its videos, keeping
+  /// the order the links were given in.
+  ///
+  /// A playlist is asked for no more videos than a whole batch holds; one
+  /// that lists more marks the batch as truncated.
+  Future<({Set<String> urls, List<BatchAnalysisResult> failures})>
+  _expandPlaylists(Set<String> urls, AppLocalizations l10n) async {
+    final expanded = <String>{};
+    final failures = <BatchAnalysisResult>[];
+    for (final url in urls) {
+      if (youtubePlaylistIdFrom(url) == null) {
+        expanded.add(url);
+        continue;
+      }
+      final stopwatch = Stopwatch()..start();
+      try {
+        final playlist = await _playlistReader.read(url);
+        if (playlist.videoIds.length > maximumBatchUrls) {
+          _batchTruncated = true;
+        }
+        expanded.addAll(playlist.videoUrls(limit: maximumBatchUrls));
+      } catch (error) {
+        failures.add(
+          BatchAnalysisResult(
+            url: url,
+            error: _readableError(error, l10n.unableToAnalyze, l10n),
+            diagnosticCode: error is ExtractionException
+                ? error.diagnosticCode ?? 'youtube_playlist_failed'
+                : 'youtube_playlist_failed',
+            analysisDuration: stopwatch.elapsed,
+          ),
+        );
+      }
+    }
+    return (urls: expanded, failures: failures);
   }
 
   Future<void> retryBatchResult(
@@ -285,6 +359,7 @@ class VideoExtractorProvider extends ChangeNotifier {
     _attemptedStrategies = const [];
     _suppressedError = null;
     _batchResults = const [];
+    _batchTruncated = false;
     _lastAnalysisDuration = null;
     _lastAnalyzedAt = null;
     notifyListeners();

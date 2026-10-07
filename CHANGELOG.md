@@ -6,6 +6,13 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- A link to a YouTube playlist (`youtube.com/playlist?list=…`, also from
+  YouTube Music) is replaced by its videos, which are analyzed and queued like
+  any other batch. Up to 20 are taken, the size of a batch, in the playlist's
+  order; a longer playlist says that the rest were left out. A private,
+  removed or empty playlist says so. A video link that only carries a
+  `list=` parameter is still treated as that one video.
+
 ## [1.10.0] - 2026-10-07
 
 - On Android, a video served as a DASH stream can be downloaded: a link to an

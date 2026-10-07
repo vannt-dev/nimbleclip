@@ -114,18 +114,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       FocusScope.of(context).unfocus();
       final preferred = context.read<SettingsProvider>().preferredQuality;
       final extractor = context.read<VideoExtractorProvider>();
-      if (urls.length > VideoExtractorProvider.maximumBatchUrls) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              context.l10n.batchLimitReached(
-                VideoExtractorProvider.maximumBatchUrls,
-              ),
-            ),
-          ),
-        );
-      }
-      if (urls.length == 1) {
+      final overLimit = urls.length > VideoExtractorProvider.maximumBatchUrls;
+      if (overLimit) _showBatchLimitNotice();
+      // A playlist link is one link that stands for many videos, so it takes
+      // the batch path even when it is the only thing pasted.
+      final isPlaylist = VideoExtractorProvider.isPlaylistLink(urls.first);
+      if (urls.length == 1 && !isPlaylist) {
         final ok = await extractor.analyzeUrl(
           urls.single,
           preferredQuality: preferred,
@@ -143,12 +137,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           l10n: context.l10n,
         );
         if (!mounted) return;
+        // Only the playlist's own length can still be news here: too many
+        // pasted links were already announced before the analysis began.
+        if (extractor.batchTruncated && !overLimit) _showBatchLimitNotice();
         final history = context.read<AnalysisHistoryProvider>();
         for (final result in results) {
           if (result.metadata != null) await history.add(result.metadata!);
         }
       }
     }
+  }
+
+  void _showBatchLimitNotice() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          context.l10n.batchLimitReached(
+            VideoExtractorProvider.maximumBatchUrls,
+          ),
+        ),
+      ),
+    );
   }
 
   void _consumeSharedIntent() {

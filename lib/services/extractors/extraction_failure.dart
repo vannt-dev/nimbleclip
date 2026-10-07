@@ -56,6 +56,9 @@ enum ExtractionFailureKind {
   youtubeNoPlayerData,
   youtubeNoStreams,
 
+  /// A playlist page listed no videos: it is private, removed or empty.
+  youtubePlaylistUnavailable,
+
   /// Detail: the underlying error.
   youtubeInvalidData,
 

@@ -48,6 +48,8 @@ String describeExtractionFailure(
     ExtractionFailureKind.youtubeInvalidId => l10n.youtubeInvalidId,
     ExtractionFailureKind.youtubeNoPlayerData => l10n.youtubeNoPlayerData,
     ExtractionFailureKind.youtubeNoStreams => l10n.youtubeNoStreams,
+    ExtractionFailureKind.youtubePlaylistUnavailable =>
+      l10n.youtubePlaylistUnavailable,
     ExtractionFailureKind.youtubeTemporarilyUnavailable =>
       l10n.youtubeTemporarilyUnavailable,
     ExtractionFailureKind.youtubeInvalidData => l10n.youtubeInvalidData(
