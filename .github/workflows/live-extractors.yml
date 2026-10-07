@@ -19,6 +19,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/fetch-core
+        with:
+          deploy-key: ${{ secrets.CORE_DEPLOY_KEY }}
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.0'

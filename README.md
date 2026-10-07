@@ -161,8 +161,13 @@ The exact Dart SDK constraint is defined in `pubspec.yaml`.
 
 ### Install
 
+The per-site extractors (`lib/services/extractors`) are a git submodule of a
+private repository. The rest of the app is in this repository, but it does not
+build without them, so a clone needs read access to
+`vannt-dev/nimbleclip-core`:
+
 ```bash
-git clone https://github.com/vannt-dev/nimbleclip.git
+git clone --recurse-submodules https://github.com/vannt-dev/nimbleclip.git
 cd nimbleclip
 flutter pub get
 git config core.hooksPath .githooks
