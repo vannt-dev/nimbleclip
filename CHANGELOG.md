@@ -6,6 +6,17 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-10-07
+
+- Preview plays a YouTube video again. On Android the default quality above
+  360p is joined on the device from separate picture and sound streams, which
+  left Preview with "No video source is available"; it now plays the same
+  video at the quality that comes whole.
+- Downloaded files are named after the platform and a short id only
+  (`tiktok_a474a6364e1b.mp4`). The author and the start of the caption are no
+  longer in the name: a caption in decorated letters made names that were
+  long and hard to read.
+
 - A **Download on Wi-Fi only** switch in Settings. While it is on and the
   device is on mobile data or offline, new downloads wait in the queue and
   start by themselves when Wi-Fi or a cable is back; the Downloads screen says
