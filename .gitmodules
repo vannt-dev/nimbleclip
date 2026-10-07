@@ -1,0 +1,3 @@
+[submodule "lib/services/extractors"]
+	path = lib/services/extractors
+	url = https://github.com/vannt-dev/nimbleclip-core.git

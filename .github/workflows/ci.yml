@@ -51,6 +51,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/fetch-core
+        with:
+          deploy-key: ${{ secrets.CORE_DEPLOY_KEY }}
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.0'
@@ -84,6 +87,9 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/fetch-core
+        with:
+          deploy-key: ${{ secrets.CORE_DEPLOY_KEY }}
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -124,6 +130,9 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/fetch-core
+        with:
+          deploy-key: ${{ secrets.CORE_DEPLOY_KEY }}
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.0'

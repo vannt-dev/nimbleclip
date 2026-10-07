@@ -38,6 +38,9 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ inputs.ref || github.ref }}
+      - uses: ./.github/actions/fetch-core
+        with:
+          deploy-key: ${{ secrets.CORE_DEPLOY_KEY }}
 
       - name: Validate tag, version, and release notes
         id: version
@@ -119,7 +122,11 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          flutter build apk --release --build-name="$VERSION" --build-number="${{ github.run_number }}"
+          # Obfuscated: the names in the shipped Dart code are replaced, which
+          # makes the APK harder to read back. The symbol files stay on the
+          # runner: an artifact of a public repository can be downloaded by
+          # anyone, and with the APK they undo the obfuscation.
+          flutter build apk --release --obfuscate --split-debug-info=build/symbols --build-name="$VERSION" --build-number="${{ github.run_number }}"
           flutter build web --release --no-wasm-dry-run --build-name="$VERSION" --build-number="${{ github.run_number }}"
 
       - name: Verify signing and package artifacts
