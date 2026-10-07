@@ -339,19 +339,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         );
         return;
       }
-      final seen = <String>{};
-      final videos = [
-        for (final option in meta.qualities)
-          if (!option.isImage && !option.isAudioOnly)
-            if (seen.add(MediaSelectionHelper.videoKeyOf(option))) option,
-      ];
+      // What is previewed is not always what is downloaded: a quality joined
+      // on the device has nothing to play yet, so the same video is shown at
+      // one that does.
+      final videos = MediaSelectionHelper.previewPlaylist(meta.qualities);
+      final playable = MediaSelectionHelper.previewOptionFor(
+        quality,
+        meta.qualities,
+      );
       unawaited(
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => VideoPlayerScreen(
               title: meta.title,
-              videoUrl: quality.previewUrl,
+              videoUrl: playable.previewUrl,
               onDownload: _onStartDownload,
               // One entry per video, not per quality: swiping is for moving
               // between videos, and the same clip at 720p and 1080p is one.

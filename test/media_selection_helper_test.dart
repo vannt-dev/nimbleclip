@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nimble_clip/core/utils/media_selection_helper.dart';
+import 'package:nimble_clip/models/merge_source.dart';
 import 'package:nimble_clip/models/quality_descriptor.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
 
@@ -107,5 +108,67 @@ void main() {
       ),
       [audio],
     );
+  });
+
+  group('what a preview plays', () {
+    VideoQualityOption merged(String id, String? mediaId) =>
+        VideoQualityOption.merged(
+          id: id,
+          mediaId: mediaId,
+          label: const OriginalMp4(),
+          quality: id,
+          source: const MergeSource(
+            videoUrl: 'https://example.com/picture.mp4',
+            audioUrl: 'https://example.com/sound.m4a',
+          ),
+        );
+
+    test('a quality joined on the device is previewed at one that plays', () {
+      // YouTube on Android: 1080p and 720p are joined, 360p comes whole.
+      final hd = merged('1080p', null);
+      final mid = merged('720p', null);
+      final sd = VideoQualityOption.video(
+        id: '360p',
+        label: const OriginalMp4(),
+        quality: '360p',
+        format: 'mp4',
+        downloadUrl: 'https://example.com/360.mp4',
+      );
+      final audio = VideoQualityOption(
+        id: 'audio',
+        label: const OriginalMp4(),
+        quality: 'Audio',
+        format: 'm4a',
+        downloadUrl: 'https://example.com/sound.m4a',
+        kind: MediaKind.audio,
+      );
+      final options = [hd, mid, sd, audio];
+
+      expect(hd.previewUrl, isEmpty);
+      expect(MediaSelectionHelper.previewOptionFor(hd, options), sd);
+      expect(MediaSelectionHelper.previewOptionFor(mid, options), sd);
+      expect(MediaSelectionHelper.previewOptionFor(sd, options), sd);
+      // One entry for the one video, and it is the one that can be played.
+      expect(MediaSelectionHelper.previewPlaylist(options), [sd]);
+    });
+
+    test('another video is never played in its place', () {
+      final first = merged('first-1080p', 'first');
+      final second = video('second', 'second');
+      final options = [first, second];
+
+      expect(MediaSelectionHelper.previewOptionFor(first, options), first);
+      expect(MediaSelectionHelper.previewPlaylist(options), [first, second]);
+    });
+
+    test('an option that already plays is left as it is', () {
+      final hd = video('first-hd', 'first');
+      final sd = video('first-sd', 'first');
+      final picture = image('image-1', 1);
+      final options = [hd, sd, picture];
+
+      expect(MediaSelectionHelper.previewOptionFor(sd, options), sd);
+      expect(MediaSelectionHelper.previewPlaylist(options), [hd]);
+    });
   });
 }

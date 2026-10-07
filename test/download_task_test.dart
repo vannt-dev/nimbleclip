@@ -152,53 +152,32 @@ void main() {
   group('DownloadService.buildFileName', () {
     final service = DownloadService();
 
-    test('names the platform, the author, the headline and the task', () {
+    test('names the platform and the task, nothing else', () {
       expect(
         service.buildFileName(task(title: 'My Clip', author: 'nasa')),
-        'generic_nasa_My_Clip_abcdef012345.mp4',
+        'generic_abcdef012345.mp4',
       );
     });
 
-    test('takes only the first line of a caption', () {
+    test('keeps the author and the caption out, whatever they hold', () {
+      // A TikTok caption in decorated letters once produced
+      // tiktok_ℂ𝕙𝕚𝕝𝕖_𝕚𝕦_𝕠𝕚_Xộn_lào_quâ_à_rhycap_hungan_<id>.
       expect(
         service.buildFileName(
           task(
-            title: '🚀 LIFTOFF!\n\nOur telescope lifted off.',
-            author: 'nasa',
+            title: 'ℂ𝕙𝕚𝕝𝕖 𝕚𝕦 𝕠𝕚\nXộn lào quâ à #rhycap',
+            author: 'hungan',
           ),
         ),
-        'generic_nasa_LIFTOFF_abcdef012345.mp4',
-      );
-    });
-
-    test('keeps letters of any script', () {
-      expect(
-        service.buildFileName(task(title: 'Chào buổi sáng', author: 'vân')),
-        'generic_vân_Chào_buổi_sáng_abcdef012345.mp4',
-      );
-    });
-
-    test('leaves out what a file name cannot carry', () {
-      expect(
-        service.buildFileName(task(title: '///')),
         'generic_abcdef012345.mp4',
       );
       expect(
         service.buildFileName(task(title: r'a/b\c:d*e?"f<g>h|i')),
-        'generic_a_b_c_d_e_f_g_h_i_abcdef012345.mp4',
-      );
-    });
-
-    test('stays short however long the title is', () {
-      expect(
-        service.buildFileName(task(title: 'x' * 500)),
-        'generic_xxxxxxxxxxxxxxxx_abcdef012345.mp4',
+        'generic_abcdef012345.mp4',
       );
       expect(
-        service.buildFileName(
-          task(title: 'one two three four five six seven eight nine ten'),
-        ),
-        'generic_one_two_three_four_five_six_abcdef012345.mp4',
+        service.buildFileName(task(title: 'x' * 500, author: 'y' * 500)),
+        'generic_abcdef012345.mp4',
       );
     });
 

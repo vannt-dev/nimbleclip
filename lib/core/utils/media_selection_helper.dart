@@ -8,6 +8,38 @@ class MediaSelectionHelper {
   static String videoKeyOf(VideoQualityOption option) =>
       option.mediaId ?? 'primary-video';
 
+  /// The option a player should be given to preview [option]'s video.
+  ///
+  /// A quality that is joined on the device from separate picture and sound
+  /// streams, such as YouTube above 360p, has nothing to play before it is
+  /// downloaded. The same video at a quality that does is previewed in its
+  /// place; [option] itself comes back when no quality of it can be played.
+  static VideoQualityOption previewOptionFor(
+    VideoQualityOption option,
+    List<VideoQualityOption> options,
+  ) {
+    if (option.previewUrl.isNotEmpty) return option;
+    final key = videoKeyOf(option);
+    for (final candidate in options) {
+      if (candidate.isImage || candidate.isAudioOnly) continue;
+      if (candidate.previewUrl.isEmpty) continue;
+      if (videoKeyOf(candidate) == key) return candidate;
+    }
+    return option;
+  }
+
+  /// One entry per video in [options], each the option to preview it with.
+  static List<VideoQualityOption> previewPlaylist(
+    List<VideoQualityOption> options,
+  ) {
+    final seen = <String>{};
+    return [
+      for (final option in options)
+        if (!option.isImage && !option.isAudioOnly)
+          if (seen.add(videoKeyOf(option))) previewOptionFor(option, options),
+    ];
+  }
+
   /// Selects one quality for each checked video plus every checked image.
   /// Audio is mutually exclusive with visual media.
   ///
