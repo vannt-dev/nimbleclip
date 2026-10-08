@@ -17,7 +17,7 @@ import 'package:nimble_clip/providers/download_provider.dart';
 import 'package:nimble_clip/services/extractors/registry.dart';
 import 'package:nimble_clip/services/extractors/youtube_extractor.dart';
 import 'package:nimble_clip/services/slideshow/slideshow_renderer.dart';
-import 'package:nimble_clip/services/slideshow/stream_fetcher.dart';
+import 'package:nimble_clip/services/extractors/streams/stream_fetcher.dart';
 import 'package:nimble_clip/services/stream_pair_gateway.dart';
 
 import 'support/inert_download_service.dart';

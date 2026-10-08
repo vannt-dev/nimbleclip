@@ -15,6 +15,10 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   while the app is closed are not converted. The encoder is LAME 3.100
   (LGPL), built from source into its own library; see
   `android/app/src/main/cpp/README.md`.
+- More of the app now lives in the private core (the submodule under
+  `lib/services/extractors`): the HLS and DASH stream code, the Android
+  encoders (slideshow, stream join, segment cipher, MP3) and the extractor
+  tests with their fixtures. Nothing changes in the app itself.
 - A finished download that carries a note, such as a slideshow rendered
   without its music, now shows it on its card.
 

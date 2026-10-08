@@ -45,6 +45,14 @@ android {
         }
     }
 
+    // The encoders (slideshow, stream join, segment cipher, MP3) are part of
+    // the private core, a submodule under lib/services/extractors.
+    sourceSets {
+        getByName("main") {
+            kotlin.srcDir("../../lib/services/extractors/android/kotlin")
+        }
+    }
+
     // libmp3lame and its JNI layer; see src/main/cpp/CMakeLists.txt.
     externalNativeBuild {
         cmake {

@@ -95,7 +95,7 @@ try {
     Invoke-CheckedCommand 'node' @('--check', 'tool/summarize_live_extractors.js')
 
     Write-Host '4/7 Running Flutter tests...' -ForegroundColor Cyan
-    Invoke-CheckedCommand 'flutter' @('test')
+    Invoke-CheckedCommand 'flutter' @('test', 'test', 'lib/services/extractors/test')
     if ($RunLiveExtractors) {
         Write-Host 'Running opt-in live extractor smoke tests...' -ForegroundColor Cyan
         $liveArguments = @(

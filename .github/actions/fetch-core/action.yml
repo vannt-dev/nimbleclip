@@ -1,8 +1,9 @@
 name: Fetch the private core
 description: >-
   Checks out lib/services/extractors, a submodule of the private repository
-  vannt-dev/nimbleclip-core, with a read-only deploy key. Run it after
-  actions/checkout in every job that analyzes, tests or builds the app.
+  vannt-dev/nimbleclip-core, with a read-only deploy key. It holds the
+  extractors, the stream code, the Android encoders and their tests. Run it
+  after actions/checkout in every job that analyzes, tests or builds the app.
 
 inputs:
   deploy-key:
@@ -38,3 +39,4 @@ runs:
         rm -f "$key"
 
         test -f lib/services/extractors/registry.dart
+        test -d lib/services/extractors/android/kotlin
