@@ -402,6 +402,20 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const Divider(height: 1),
                 ListTile(
+                  key: const Key('open_source_licences_tile'),
+                  leading: const Icon(
+                    Icons.description_outlined,
+                    color: AppColors.primary,
+                  ),
+                  title: Text(l10n.openSourceLicences),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => showLicensePage(
+                    context: context,
+                    applicationName: 'NimbleClip',
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
                   leading: const Icon(
                     Icons.support_rounded,
                     color: AppColors.accent,

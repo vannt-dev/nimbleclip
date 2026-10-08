@@ -926,6 +926,12 @@ abstract class AppLocalizations {
   /// **'Version'**
   String get version;
 
+  /// No description provided for @openSourceLicences.
+  ///
+  /// In en, this message translates to:
+  /// **'Open-source licences'**
+  String get openSourceLicences;
+
   /// No description provided for @supportedPlatforms.
   ///
   /// In en, this message translates to:

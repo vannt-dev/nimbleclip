@@ -501,6 +501,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get version => 'Phiên bản';
 
   @override
+  String get openSourceLicences => 'Giấy phép mã nguồn mở';
+
+  @override
   String get supportedPlatforms => 'Nền tảng hỗ trợ';
 
   @override
