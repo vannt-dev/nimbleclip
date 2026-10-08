@@ -154,6 +154,17 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String get convertAudioToMp3 => 'Lưu âm thanh dạng MP3';
+
+  @override
+  String get convertAudioToMp3Description =>
+      'Âm thanh tải về ở định dạng khác (M4A, WebM) được chuyển sang MP3 ngay trên máy';
+
+  @override
+  String get mp3ConversionFailed =>
+      'Không chuyển được sang MP3 — giữ nguyên định dạng gốc';
+
+  @override
   String get wifiOnlyDownloads => 'Chỉ tải qua Wi-Fi';
 
   @override

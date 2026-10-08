@@ -17,6 +17,7 @@ class SettingsProvider extends ChangeNotifier {
   bool _removeCacheAfterGallery = true;
   int _maxConcurrentDownloads = 3;
   bool _wifiOnlyDownloads = false;
+  bool _convertAudioToMp3 = false;
 
   ThemeMode get themeMode => _themeMode;
   Locale? get locale => _locale;
@@ -28,6 +29,7 @@ class SettingsProvider extends ChangeNotifier {
   bool get removeCacheAfterGallery => _removeCacheAfterGallery;
   int get maxConcurrentDownloads => _maxConcurrentDownloads;
   bool get wifiOnlyDownloads => _wifiOnlyDownloads;
+  bool get convertAudioToMp3 => _convertAudioToMp3;
   DownloadOptions get downloadOptions => DownloadOptions(
     autoSaveToGallery: autoSaveGallery,
     removeCacheAfterGallery: removeCacheAfterGallery,
@@ -66,6 +68,8 @@ class SettingsProvider extends ChangeNotifier {
             .toInt();
     _wifiOnlyDownloads =
         prefs.getBool(AppConstants.keyWifiOnlyDownloads) ?? false;
+    _convertAudioToMp3 =
+        prefs.getBool(AppConstants.keyConvertAudioToMp3) ?? false;
     final languageCode = prefs.getString(AppConstants.keyLanguageCode);
     _locale = languageCode == null ? null : Locale(languageCode);
 
@@ -140,6 +144,13 @@ class SettingsProvider extends ChangeNotifier {
       AppConstants.keyMaxConcurrentDownloads,
       _maxConcurrentDownloads,
     );
+  }
+
+  Future<void> setConvertAudioToMp3(bool value) async {
+    _convertAudioToMp3 = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(AppConstants.keyConvertAudioToMp3, value);
   }
 
   Future<void> setWifiOnlyDownloads(bool value) async {

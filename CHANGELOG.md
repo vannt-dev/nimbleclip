@@ -6,6 +6,18 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- A **Save audio as MP3** switch in Settings, on Android. With it on, an audio
+  download that arrives in another format (YouTube's M4A, for one) is
+  converted to MP3 on the device when it finishes: 128, 192 or 256 kbps,
+  following the source's own bitrate. The Downloads screen shows the
+  conversion as progress and it can be cancelled; if it cannot be done, the
+  file is kept as it was fetched and its card says so. Downloads that finish
+  while the app is closed are not converted. The encoder is LAME 3.100
+  (LGPL), built from source into its own library; see
+  `android/app/src/main/cpp/README.md`.
+- A finished download that carries a note, such as a slideshow rendered
+  without its music, now shows it on its card.
+
 ## [1.11.0] - 2026-10-07
 
 - Preview plays a YouTube video again. On Android the default quality above

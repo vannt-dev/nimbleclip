@@ -247,6 +247,25 @@ class SettingsScreen extends StatelessWidget {
                   onChanged: settings.setWifiOnlyDownloads,
                 ),
                 const Divider(height: 1),
+                // Only where the encoder exists: a switch that does nothing
+                // would be a promise the app cannot keep.
+                if (context.read<DownloadProvider>().canConvertAudioToMp3) ...[
+                  SwitchListTile(
+                    key: const Key('convert_audio_to_mp3_switch'),
+                    secondary: const Icon(
+                      Icons.audio_file_rounded,
+                      color: AppColors.primary,
+                    ),
+                    title: Text(l10n.convertAudioToMp3),
+                    subtitle: Text(
+                      l10n.convertAudioToMp3Description,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    value: settings.convertAudioToMp3,
+                    onChanged: settings.setConvertAudioToMp3,
+                  ),
+                  const Divider(height: 1),
+                ],
                 ListTile(
                   leading: const Icon(
                     Icons.multiple_stop_rounded,
