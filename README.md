@@ -49,6 +49,11 @@ management, local playback, and gallery export.
   picture and sound streams and joining them on the device without
   re-encoding. Other platforms offer YouTube's 360p stream, the highest it
   serves with sound.
+- Can save audio as MP3 on Android (Settings → **Save audio as MP3**): an
+  audio download that arrives as M4A or WebM is converted on the device once
+  it is whole, with the bundled LAME encoder, at a bitrate chosen from the
+  source's own. If the conversion cannot be done the download is kept in its
+  original format. The switch is hidden on platforms without the encoder.
 - Uses one shared download queue with a configurable limit of one to five
   concurrent transfers, so separate batches cannot overload the device or
   network.

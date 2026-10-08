@@ -156,6 +156,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get convertAudioToMp3 => 'Save audio as MP3';
+
+  @override
+  String get convertAudioToMp3Description =>
+      'Audio that arrives in another format (M4A, WebM) is converted to MP3 on this device';
+
+  @override
+  String get mp3ConversionFailed =>
+      'Could not convert to MP3 — kept in the original format';
+
+  @override
   String get wifiOnlyDownloads => 'Download on Wi-Fi only';
 
   @override

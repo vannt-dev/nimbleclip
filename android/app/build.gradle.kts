@@ -45,6 +45,14 @@ android {
         }
     }
 
+    // libmp3lame and its JNI layer; see src/main/cpp/CMakeLists.txt.
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
     buildTypes {
         release {
             // Local release builds remain installable without secrets. The tag

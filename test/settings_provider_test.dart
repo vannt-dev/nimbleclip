@@ -35,6 +35,20 @@ void main() {
     expect(provider.locale, isNull);
   });
 
+  test('Save audio as MP3 is off by default and remembered', () async {
+    final provider = SettingsProvider();
+    await provider.initialized;
+    expect(provider.convertAudioToMp3, isFalse);
+
+    await provider.setConvertAudioToMp3(true);
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(AppConstants.keyConvertAudioToMp3), isTrue);
+    final restored = SettingsProvider();
+    await restored.initialized;
+    expect(restored.convertAudioToMp3, isTrue);
+  });
+
   test('Wi-Fi only downloads is off by default and remembered', () async {
     final provider = SettingsProvider();
     await provider.initialized;

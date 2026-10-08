@@ -234,6 +234,52 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        val audioChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.vannt.nimbleclip/audio",
+        )
+        audioChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                // On the platform thread for the same reason as the slideshow
+                // cancel: it must not queue behind the job it is stopping.
+                "cancel" -> {
+                    Mp3Transcoder.cancel(call.argument<String>("jobId").orEmpty())
+                    result.success(null)
+                }
+                "toMp3" -> {
+                    val jobId = call.argument<String>("jobId").orEmpty()
+                    val request = Mp3Transcoder.Request(
+                        sourcePath = call.argument<String>("sourcePath")!!,
+                        outputPath = call.argument<String>("outputPath")!!,
+                        jobId = jobId,
+                    )
+                    Thread {
+                        try {
+                            val filePath = Mp3Transcoder().transcode(request) { progress ->
+                                runOnUiThread {
+                                    audioChannel.invokeMethod(
+                                        "progress",
+                                        mapOf("jobId" to jobId, "progress" to progress),
+                                    )
+                                }
+                            }
+                            runOnUiThread { result.success(mapOf("filePath" to filePath)) }
+                        } catch (error: Throwable) {
+                            // Throwable for the same reason as above; it also
+                            // covers a library that failed to load.
+                            val code = when {
+                                error is Mp3CancelledException -> "cancelled"
+                                isOutOfSpace(error) -> "out_of_space"
+                                else -> "convert_failed"
+                            }
+                            val message = error.message ?: error.toString()
+                            runOnUiThread { result.error(code, message, null) }
+                        }
+                    }.start()
+                }
+                else -> result.notImplemented()
+            }
+        }
     }
 
     /**

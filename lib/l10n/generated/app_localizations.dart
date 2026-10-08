@@ -326,6 +326,24 @@ abstract class AppLocalizations {
   /// **'Analyzed links ({count})'**
   String batchResults(int count);
 
+  /// No description provided for @convertAudioToMp3.
+  ///
+  /// In en, this message translates to:
+  /// **'Save audio as MP3'**
+  String get convertAudioToMp3;
+
+  /// No description provided for @convertAudioToMp3Description.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio that arrives in another format (M4A, WebM) is converted to MP3 on this device'**
+  String get convertAudioToMp3Description;
+
+  /// No description provided for @mp3ConversionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not convert to MP3 — kept in the original format'**
+  String get mp3ConversionFailed;
+
   /// No description provided for @wifiOnlyDownloads.
   ///
   /// In en, this message translates to:

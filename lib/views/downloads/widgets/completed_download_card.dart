@@ -232,6 +232,39 @@ class CompletedDownloadCard extends StatelessWidget {
             ),
           ],
 
+          // A finished download can carry a note about what it had to do
+          // without: a slideshow rendered silent, audio left unconverted.
+          if (isCompleted && task.errorMessage != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              key: const Key('completed_download_note'),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.info.withAlpha(20),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    size: 14,
+                    color: AppColors.info,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      task.errorMessage!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.info,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           if (isHandedOff) ...[
             const SizedBox(height: 8),
             Container(

@@ -26,6 +26,7 @@ import '../services/slideshow/stream_fetcher.dart';
 import '../services/background_download_service.dart';
 import '../services/download_history_repository.dart';
 import '../services/async_work_queue.dart';
+import '../services/audio/audio_converter.dart';
 import '../services/connection_monitor.dart';
 import '../services/extractors/registry.dart';
 import '../services/media_file_actions.dart';
@@ -45,8 +46,10 @@ class DownloadProvider extends ChangeNotifier {
     HlsFetcher? hlsFetcher,
     DashFetcher? dashFetcher,
     ConnectionMonitor? connectionMonitor,
+    AudioConverter? audioConverter,
   }) : _downloadService = downloadService ?? createDefaultDownloadService(),
        _connectionMonitor = connectionMonitor ?? PlatformConnectionMonitor(),
+       _audioConverter = audioConverter ?? createAudioConverter(),
        _streamFetcher = streamFetcher ?? _defaultStreamFetcher,
        _hlsFetcher = hlsFetcher ?? _defaultHlsFetcher,
        _dashFetcher = dashFetcher ?? _defaultDashFetcher,
@@ -103,6 +106,19 @@ class DownloadProvider extends ChangeNotifier {
   set maxConcurrentDownloads(int value) {
     _queue.maxConcurrent = value;
   }
+
+  final AudioConverter _audioConverter;
+
+  /// Ids of audio downloads being converted to MP3, so `cancelTask` knows the
+  /// converter is the one to stop.
+  final Set<String> _mp3Conversions = {};
+
+  /// Whether this device can turn a downloaded audio file into an MP3.
+  bool get canConvertAudioToMp3 => _audioConverter.isSupported;
+
+  /// The Save audio as MP3 setting. Read when an audio download finishes, so
+  /// a change applies to downloads already under way.
+  bool convertAudioToMp3 = false;
 
   final ConnectionMonitor _connectionMonitor;
   StreamSubscription<bool>? _connectionChanges;
@@ -1039,12 +1055,18 @@ class DownloadProvider extends ChangeNotifier {
       onProgress: (changedTask, _, _, _, _) =>
           changedTask.notifyProgressChanged(),
       onComplete: (_, _) {
-        notifyListeners();
+        // A download about to be converted is not finished yet: announcing
+        // it here would show it as done for the moment before it goes back
+        // to converting.
+        if (!_wantsMp3(task)) notifyListeners();
       },
       onError: (_, _) {
         notifyListeners();
       },
     );
+    if (task.status == DownloadStatus.completed && _wantsMp3(task)) {
+      await _convertToMp3(task, l10n);
+    }
     final localPath = task.filePath;
     if (task.status == DownloadStatus.completed &&
         task.isSavedToGallery &&
@@ -1069,6 +1091,71 @@ class DownloadProvider extends ChangeNotifier {
     );
   }
 
+  bool _wantsMp3(DownloadTask task) =>
+      convertAudioToMp3 &&
+      _audioConverter.isSupported &&
+      task.isAudioOnly &&
+      task.filePath != null &&
+      task.format.toLowerCase() != 'mp3';
+
+  /// Re-encodes a finished audio download as an MP3 and swaps the file.
+  ///
+  /// The download is already whole when this runs, so a conversion that
+  /// cannot be done never fails it: the file stays as it was fetched and the
+  /// task says so. Only a cancel removes it, as it would mid-download.
+  Future<void> _convertToMp3(DownloadTask task, AppLocalizations l10n) async {
+    final sourcePath = task.filePath!;
+    final separator = sourcePath.lastIndexOf(RegExp(r'[/\\]'));
+    final outputPath =
+        '${sourcePath.substring(0, separator + 1)}'
+        '${downloadFileName(task, extension: 'mp3')}';
+    task
+      ..status = DownloadStatus.downloading
+      ..progress = 0
+      ..downloadSpeed = 0;
+    _mp3Conversions.add(task.id);
+    notifyListeners();
+    String? note;
+    try {
+      await _audioConverter.toMp3(
+        sourcePath: sourcePath,
+        outputPath: outputPath,
+        jobId: task.id,
+        onProgress: (fraction) => _reportRenderProgress(task, fraction),
+      );
+      if (task.status != DownloadStatus.cancelled) {
+        final size = await File(outputPath).length();
+        await _fileActions.delete(sourcePath).catchError((_) {});
+        task
+          ..filePath = outputPath
+          ..format = 'mp3'
+          ..totalBytes = size
+          ..receivedBytes = size;
+      }
+    } catch (error) {
+      // Whatever went wrong, the fetched file is still there and still plays.
+      if (task.status != DownloadStatus.cancelled) {
+        note = l10n.mp3ConversionFailed;
+        debugPrint('MP3 conversion failed: $error');
+      }
+    } finally {
+      _mp3Conversions.remove(task.id);
+    }
+    if (task.status == DownloadStatus.cancelled) {
+      await _fileActions.delete(sourcePath).catchError((_) {});
+      await _fileActions.delete(outputPath).catchError((_) {});
+      task
+        ..filePath = null
+        ..progress = 0;
+      return;
+    }
+    task
+      ..status = DownloadStatus.completed
+      ..progress = 1
+      ..errorMessage = note;
+    notifyListeners();
+  }
+
   void cancelTask(String taskId) {
     _queue.removeWhere((queued) => queued.task.id == taskId);
     // A render never entered the queue and the download gateway has never
@@ -1076,6 +1163,9 @@ class DownloadProvider extends ChangeNotifier {
     // and it has to be told before the status is set: the render's own catch
     // reads that status to tell a cancel apart from a failure.
     _stopRender(taskId);
+    if (_mp3Conversions.contains(taskId)) {
+      unawaited(_audioConverter.cancel(taskId));
+    }
     _downloadService.cancelDownload(taskId);
     final task = _findTask(taskId);
     if (task == null) return;
