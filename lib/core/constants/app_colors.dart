@@ -16,6 +16,9 @@ class AppColors {
   static const Color instagram = Color(0xFFE1306C);
   // Threads' own mark is black, which vanishes on the dark theme's surfaces.
   static const Color threads = Color(0xFF64748B);
+  static const Color pinterest = Color(0xFFE60023);
+  static const Color soundcloud = Color(0xFFFF5500);
+  static const Color flickr = Color(0xFFFF0084);
 
   // Dark Theme Neutral Colors
   static const Color darkBg = Color(0xFF0F172A); // Slate 900

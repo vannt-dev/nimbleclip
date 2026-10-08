@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nimble_clip/core/utils/http_helper.dart';
+import 'package:nimble_clip/services/extractors/base_extractor.dart';
+import 'package:nimble_clip/services/extractors/extraction_failure.dart';
 import 'package:nimble_clip/services/extractors/registry.dart';
 
 const _runLive = bool.fromEnvironment('RUN_LIVE_EXTRACTOR_TESTS');
@@ -112,6 +114,31 @@ void main() {
       minimumMedia: 1,
       minimumVideos: 1,
     ),
+    'Pinterest video pin': (
+      url: 'https://www.pinterest.com/pin/703335666829201694/',
+      minimumMedia: 1,
+      minimumVideos: 1,
+    ),
+    'Pinterest picture pin': (
+      url: 'https://www.pinterest.com/pin/99360735500167749/',
+      minimumMedia: 1,
+      minimumVideos: 0,
+    ),
+    'SoundCloud track': (
+      url: 'https://soundcloud.com/forss/flickermood',
+      minimumMedia: 1,
+      minimumVideos: 0,
+    ),
+    'Flickr photo': (
+      url: 'https://www.flickr.com/photos/signalcorpsarchive/54313219625/',
+      minimumMedia: 1,
+      minimumVideos: 0,
+    ),
+    'Flickr video': (
+      url: 'https://www.flickr.com/photos/sergeysmirnov/55470861998/',
+      minimumMedia: 1,
+      minimumVideos: 1,
+    ),
   };
 
   for (final entry in cases.entries) {
@@ -176,6 +203,28 @@ void main() {
         );
         expect(response.statusCode, isNot(400), reason: path);
       }
+    },
+    skip: !_runLive
+        ? 'Run tool/check_live_extractors.ps1 to test live services.'
+        : false,
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
+
+  // A photo whose owner switched downloading off must be refused, not saved
+  // at the size the page happens to show.
+  test(
+    'Flickr photo with downloads off is refused',
+    () async {
+      await expectLater(
+        registry.extract('https://www.flickr.com/photos/bees/2341623661/'),
+        throwsA(
+          isA<ExtractionException>().having(
+            (error) => error.failure.kind,
+            'failure kind',
+            ExtractionFailureKind.flickrDownloadDisabled,
+          ),
+        ),
+      );
     },
     skip: !_runLive
         ? 'Run tool/check_live_extractors.ps1 to test live services.'

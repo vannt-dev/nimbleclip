@@ -6,6 +6,12 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- Three more sources: **Pinterest** (a pin's video or picture, `pin.it` short
+  links included), **SoundCloud** (a track, as the MP3 SoundCloud serves) and
+  **Flickr** (a photo at its largest size, or a video's files, `flic.kr` short
+  links included). A SoundCloud track that only offers a preview and a Flickr
+  photo whose owner turned downloads off are refused with a message that says
+  so.
 - A **Save audio as MP3** switch in Settings, on Android. With it on, an audio
   download that arrives in another format (YouTube's M4A, for one) is
   converted to MP3 on the device when it finishes: 128, 192 or 256 kbps,

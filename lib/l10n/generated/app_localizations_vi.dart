@@ -592,6 +592,30 @@ class AppLocalizationsVi extends AppLocalizations {
       'Không tìm thấy ảnh hay video trong bài Threads này. Bài có thể chỉ có chữ, ở chế độ riêng tư, hoặc đã bị xoá.';
 
   @override
+  String get soundcloudNotATrack =>
+      'Link SoundCloud này không phải một bài nhạc. Hãy mở bài nhạc rồi sao chép link của nó.';
+
+  @override
+  String get soundcloudUnavailable =>
+      'SoundCloud không cung cấp bản đầy đủ của bài này. Bài có thể chỉ cho nghe thử nếu không trả phí, hoặc không khả dụng ở nước bạn.';
+
+  @override
+  String get pinterestNoMedia =>
+      'Không tìm thấy ảnh hay video trong ghim này. Ghim có thể ở chế độ riêng tư hoặc đã bị xoá.';
+
+  @override
+  String get flickrInvalidLink =>
+      'Không nhận diện được link Flickr. Hãy dùng link của một ảnh hoặc một video.';
+
+  @override
+  String get flickrUnavailable =>
+      'Flickr không cung cấp ảnh này. Ảnh có thể ở chế độ riêng tư hoặc đã bị xoá.';
+
+  @override
+  String get flickrDownloadDisabled =>
+      'Chủ ảnh đã tắt tính năng tải xuống cho ảnh này trên Flickr.';
+
+  @override
   String get originalMp4 => 'MP4 (Chất lượng gốc)';
 
   @override

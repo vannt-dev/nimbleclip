@@ -110,6 +110,9 @@ management, local playback, and gallery export.
 | X / Twitter | Public posts containing images, videos, or mixed media |
 | Instagram | Public image/carousel posts, video posts, Reels, mixed-media posts, and story/highlight links (these need external services) |
 | Threads | Public posts containing images, videos, or carousels mixing the two |
+| Pinterest | A public pin's video or picture, from `pinterest.com`, its country domains and `pin.it` short links. On Android the video is also offered in the other sizes of its stream |
+| SoundCloud | A public track, as the MP3 file SoundCloud serves. Not playlists, and not tracks that only offer a preview without a subscription |
+| Flickr | A public photo at its largest size, or a video's MP4 files, from `flickr.com` and `flic.kr` short links. A photo whose owner turned downloads off is refused |
 | Other links | A direct link to an image, video, or audio file, and pages that declare their media in a standard way: Open Graph or Twitter card tags, `<video>` / `<audio>` elements, or JSON-LD (`VideoObject`, `AudioObject`, `ImageObject`) |
 
 On Android, a video served as an HLS stream (`.m3u8`) or a DASH stream
@@ -126,6 +129,11 @@ and a page that builds its player in JavaScript declares nothing to find.
 Threads includes a post's media in the page only for search-engine crawlers, so
 NimbleClip requests Threads posts with a crawler's user agent. If Threads stops
 doing that, Threads links stop working until another route is found.
+
+SoundCloud and Flickr are read with the key their own web pages use, which
+NimbleClip finds in the page each time the app starts. When either site
+rebuilds its pages in a way that hides the key, its links stop working until
+the app is updated.
 
 Extraction depends on public endpoints and page formats controlled by third
 parties. A platform change, regional restriction, authentication requirement,

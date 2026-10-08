@@ -1058,6 +1058,42 @@ abstract class AppLocalizations {
   /// **'No picture or video was found in this Threads post. It may be text only, private, or deleted.'**
   String get threadsNoMedia;
 
+  /// No description provided for @soundcloudNotATrack.
+  ///
+  /// In en, this message translates to:
+  /// **'This SoundCloud link is not a single track. Open the track and copy its link.'**
+  String get soundcloudNotATrack;
+
+  /// No description provided for @soundcloudUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'SoundCloud does not offer this track as a complete file. It may be a preview for subscribers only, or unavailable in your country.'**
+  String get soundcloudUnavailable;
+
+  /// No description provided for @pinterestNoMedia.
+  ///
+  /// In en, this message translates to:
+  /// **'No picture or video was found in this pin. It may be private or deleted.'**
+  String get pinterestNoMedia;
+
+  /// No description provided for @flickrInvalidLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not recognize this Flickr link. Use the link of a single photo or video.'**
+  String get flickrInvalidLink;
+
+  /// No description provided for @flickrUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Flickr did not provide this photo. It may be private or deleted.'**
+  String get flickrUnavailable;
+
+  /// No description provided for @flickrDownloadDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'The owner has turned off downloads for this photo on Flickr.'**
+  String get flickrDownloadDisabled;
+
   /// No description provided for @originalMp4.
   ///
   /// In en, this message translates to:

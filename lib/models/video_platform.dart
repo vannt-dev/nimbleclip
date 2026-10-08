@@ -5,6 +5,9 @@ enum VideoPlatform {
   twitter,
   instagram,
   threads,
+  pinterest,
+  soundcloud,
+  flickr,
   generic;
 
   String get displayName {
@@ -21,6 +24,12 @@ enum VideoPlatform {
         return 'Instagram';
       case VideoPlatform.threads:
         return 'Threads';
+      case VideoPlatform.pinterest:
+        return 'Pinterest';
+      case VideoPlatform.soundcloud:
+        return 'SoundCloud';
+      case VideoPlatform.flickr:
+        return 'Flickr';
       case VideoPlatform.generic:
         return 'Direct Link';
     }

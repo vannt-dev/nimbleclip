@@ -15,6 +15,32 @@ class UrlHelper {
     VideoPlatform.twitter: ['twitter.com', 'x.com', 't.co'],
     VideoPlatform.instagram: ['instagram.com', 'instagr.am', 'ig.me'],
     VideoPlatform.threads: ['threads.net', 'threads.com'],
+    // Pinterest answers on a domain per country as well as on pinterest.com.
+    VideoPlatform.pinterest: [
+      'pinterest.com',
+      'pin.it',
+      'pinterest.co.uk',
+      'pinterest.ca',
+      'pinterest.com.au',
+      'pinterest.de',
+      'pinterest.fr',
+      'pinterest.es',
+      'pinterest.it',
+      'pinterest.jp',
+      'pinterest.co.kr',
+      'pinterest.com.mx',
+      'pinterest.pt',
+      'pinterest.nz',
+      'pinterest.ph',
+      'pinterest.se',
+      'pinterest.ch',
+      'pinterest.at',
+      'pinterest.cl',
+      'pinterest.dk',
+      'pinterest.ie',
+    ],
+    VideoPlatform.soundcloud: ['soundcloud.com'],
+    VideoPlatform.flickr: ['flickr.com', 'flic.kr'],
   };
 
   static final RegExp _singleUrl = RegExp(r'https?://[^\s<>"]+');
@@ -105,6 +131,8 @@ class UrlHelper {
       'youtu.be',
       'instagr.am',
       'ig.me',
+      'pin.it',
+      'on.soundcloud.com',
     ];
     if (shortHosts.any((candidate) => hostMatches(host, candidate))) {
       return true;

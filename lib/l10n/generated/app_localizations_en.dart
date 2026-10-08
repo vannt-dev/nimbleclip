@@ -595,6 +595,30 @@ class AppLocalizationsEn extends AppLocalizations {
       'No picture or video was found in this Threads post. It may be text only, private, or deleted.';
 
   @override
+  String get soundcloudNotATrack =>
+      'This SoundCloud link is not a single track. Open the track and copy its link.';
+
+  @override
+  String get soundcloudUnavailable =>
+      'SoundCloud does not offer this track as a complete file. It may be a preview for subscribers only, or unavailable in your country.';
+
+  @override
+  String get pinterestNoMedia =>
+      'No picture or video was found in this pin. It may be private or deleted.';
+
+  @override
+  String get flickrInvalidLink =>
+      'Could not recognize this Flickr link. Use the link of a single photo or video.';
+
+  @override
+  String get flickrUnavailable =>
+      'Flickr did not provide this photo. It may be private or deleted.';
+
+  @override
+  String get flickrDownloadDisabled =>
+      'The owner has turned off downloads for this photo on Flickr.';
+
+  @override
   String get originalMp4 => 'MP4 (Original quality)';
 
   @override
