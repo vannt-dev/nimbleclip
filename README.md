@@ -166,9 +166,11 @@ The exact Dart SDK constraint is defined in `pubspec.yaml`.
 
 ### Install
 
-The per-site extractors (`lib/services/extractors`) are a git submodule of a
-private repository. The rest of the app is in this repository, but it does not
-build without them, so a clone needs read access to
+The core of the app (`lib/services/extractors`) is a git submodule of a
+private repository: the per-site extractors, the HLS and DASH stream code, the
+Android encoders (slideshow, stream join, segment cipher, MP3) and the tests
+and fixtures that go with them. The rest of the app is in this repository, but
+it does not build without the core, so a clone needs read access to
 `vannt-dev/nimbleclip-core`:
 
 ```bash
@@ -368,7 +370,9 @@ lib/
 |-- models/              Video metadata and download task models
 |-- providers/           Application state and workflow coordination
 |-- services/
-|   |-- extractors/      Extractors, page parsers, fallback clients, registry
+|   |-- extractors/      Private core (submodule): extractors, page parsers,
+|   |                    fallback clients, registry; `streams/` (HLS, DASH),
+|   |                    `android/` (Kotlin encoders), `test/` (its tests)
 |   |-- async_work_queue.dart
 |   |-- background_download_service.dart
 |   |-- download_history_repository.dart

@@ -16,6 +16,10 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
+    # The private core carries its own tests next to its code. A test under lib/
+    # would be read as app code and flagged for importing flutter_test; it is
+    # compiled, and so checked, whenever the tests run.
+    - lib/services/extractors/test/**
 include: package:flutter_lints/flutter.yaml
 
 linter:

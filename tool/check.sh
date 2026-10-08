@@ -32,7 +32,7 @@ fi
 
 if [ "$mode" = "push" ] || [ "$mode" = "all" ]; then
   echo "Running Flutter tests..."
-  flutter test
+  flutter test test lib/services/extractors/test
 
   echo "Running Node.js tests..."
   node --test test/server_test.js test/live_extractor_summary_test.js

@@ -6,7 +6,7 @@ import 'package:background_downloader/background_downloader.dart' as bg;
 
 import '../models/merge_source.dart';
 import 'slideshow/slideshow_failure.dart';
-import 'slideshow/stream_fetcher.dart';
+import 'extractors/streams/stream_fetcher.dart';
 import 'stream_pair_gateway.dart';
 
 /// The largest range fetched in one request. YouTube serves a range of this

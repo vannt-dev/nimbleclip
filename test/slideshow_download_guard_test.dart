@@ -424,5 +424,5 @@ void main() {
 }
 
 final _tiktokPhotoPost = File(
-  'test/fixtures/extractors/tiktok_images.json',
+  'lib/services/extractors/test/fixtures/tiktok_images.json',
 ).readAsStringSync();

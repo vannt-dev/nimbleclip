@@ -10,6 +10,9 @@ Map<String, List<File>> _sourcesByLayer() {
     final path = entity.path.replaceAll(r'\', '/');
     // Generated localizations are not hand-written and are exempt.
     if (path.startsWith('lib/l10n/generated/')) continue;
+    // The private core keeps its tests beside its code. They are tests, not a
+    // layer of the app, and may reach for anything they need to drive it.
+    if (path.startsWith('lib/services/extractors/test/')) continue;
     final relative = path.substring('lib/'.length);
     final layer = relative.contains('/')
         ? relative.substring(0, relative.indexOf('/'))
