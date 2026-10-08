@@ -9,6 +9,7 @@ import 'providers/settings_provider.dart';
 import 'providers/video_extractor_provider.dart';
 import 'providers/analysis_history_provider.dart';
 import 'providers/shared_intent_provider.dart';
+import 'core/utils/bundled_licenses.dart';
 import 'core/utils/external_service_policy.dart';
 import 'core/utils/image_cache_size.dart';
 import 'services/extractors/registry.dart';
@@ -18,6 +19,7 @@ import 'views/main_navigation_screen.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   configureImageCacheBudget();
+  registerBundledLicenses();
   runApp(const NimbleClipApp());
 }
 

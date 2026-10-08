@@ -15,6 +15,9 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   while the app is closed are not converted. The encoder is LAME 3.100
   (LGPL), built from source into its own library; see
   `android/app/src/main/cpp/README.md`.
+- Settings → About has an **Open-source licences** entry. It opens the licence page, which
+  lists the packages the app is built from and the licence of LAME, the MP3 encoder (LGPL):
+  that text has to travel with the app, not only with its source.
 - More of the app now lives in the private core (the submodule under
   `lib/services/extractors`): the HLS and DASH stream code, the Android
   encoders (slideshow, stream join, segment cipher, MP3) and the extractor

@@ -505,6 +505,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get version => 'Version';
 
   @override
+  String get openSourceLicences => 'Open-source licences';
+
+  @override
   String get supportedPlatforms => 'Supported platforms';
 
   @override
