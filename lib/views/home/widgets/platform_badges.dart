@@ -19,6 +19,9 @@ class PlatformBadges extends StatelessWidget {
       VideoPlatform.twitter,
       VideoPlatform.instagram,
       VideoPlatform.threads,
+      VideoPlatform.pinterest,
+      VideoPlatform.soundcloud,
+      VideoPlatform.flickr,
     ];
 
     // Wrapped rather than scrolled sideways: a row cut off at the screen edge

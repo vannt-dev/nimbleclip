@@ -17,6 +17,9 @@ extension PlatformStyle on VideoPlatform {
     VideoPlatform.twitter => AppColors.twitter,
     VideoPlatform.instagram => AppColors.instagram,
     VideoPlatform.threads => AppColors.threads,
+    VideoPlatform.pinterest => AppColors.pinterest,
+    VideoPlatform.soundcloud => AppColors.soundcloud,
+    VideoPlatform.flickr => AppColors.flickr,
     VideoPlatform.generic => AppColors.primary,
   };
 
@@ -27,6 +30,9 @@ extension PlatformStyle on VideoPlatform {
     VideoPlatform.twitter => Icons.flutter_dash_rounded,
     VideoPlatform.instagram => Icons.camera_alt_rounded,
     VideoPlatform.threads => Icons.alternate_email_rounded,
+    VideoPlatform.pinterest => Icons.push_pin_rounded,
+    VideoPlatform.soundcloud => Icons.cloud_rounded,
+    VideoPlatform.flickr => Icons.photo_library_rounded,
     VideoPlatform.generic => Icons.link_rounded,
   };
 }

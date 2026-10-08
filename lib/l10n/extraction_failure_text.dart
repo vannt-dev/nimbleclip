@@ -41,6 +41,12 @@ String describeExtractionFailure(
     ),
     ExtractionFailureKind.threadsInvalidPost => l10n.threadsInvalidPost,
     ExtractionFailureKind.threadsNoMedia => l10n.threadsNoMedia,
+    ExtractionFailureKind.soundcloudNotATrack => l10n.soundcloudNotATrack,
+    ExtractionFailureKind.soundcloudUnavailable => l10n.soundcloudUnavailable,
+    ExtractionFailureKind.pinterestNoMedia => l10n.pinterestNoMedia,
+    ExtractionFailureKind.flickrInvalidLink => l10n.flickrInvalidLink,
+    ExtractionFailureKind.flickrUnavailable => l10n.flickrUnavailable,
+    ExtractionFailureKind.flickrDownloadDisabled => l10n.flickrDownloadDisabled,
     ExtractionFailureKind.xInvalidPost => l10n.xInvalidPost,
     ExtractionFailureKind.xNoVideo => l10n.xNoVideo,
     ExtractionFailureKind.youtubeCipherUnsupported =>
