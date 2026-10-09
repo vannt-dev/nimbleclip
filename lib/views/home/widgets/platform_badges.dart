@@ -8,6 +8,10 @@ class PlatformBadges extends StatelessWidget {
 
   const PlatformBadges({super.key, this.onPlatformTap});
 
+  static const double _spacing = 8;
+  static const double _minSize = 28;
+  static const double _maxSize = 40;
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -24,54 +28,59 @@ class PlatformBadges extends StatelessWidget {
       VideoPlatform.flickr,
     ];
 
-    // Wrapped rather than scrolled sideways: a row cut off at the screen edge
-    // hid the platforms after the third, with nothing to say there were more.
-    return SizedBox(
-      width: double.infinity,
-      child: Wrap(
-        spacing: 10,
-        runSpacing: 8,
-        children: platforms.map((p) {
-          return Material(
-            type: MaterialType.transparency,
-            child: InkWell(
-              onTap: () => onPlatformTap?.call(p),
-              borderRadius: BorderRadius.circular(24),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? p.brandColor.withAlpha(35)
-                      : p.brandColor.withAlpha(20),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: p.brandColor.withAlpha(isDark ? 80 : 60),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(p.icon, size: 18, color: p.brandColor),
-                    const SizedBox(width: 6),
-                    Text(
-                      p.displayName,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : Colors.black87,
+    // Icons only, sized to share one row: with their names beside them the
+    // badges wrapped onto several rows and took a third of the screen. The
+    // name is still the tooltip, the screen reader label and what a tap says.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final gaps = _spacing * (platforms.length - 1);
+        final size = ((constraints.maxWidth - gaps) / platforms.length)
+            .floorToDouble()
+            .clamp(_minSize, _maxSize);
+
+        // Wrapped rather than scrolled sideways: a row cut off at the screen
+        // edge hides the platforms after it, with nothing to say there are
+        // more. It only wraps on a screen too narrow for the smallest size.
+        return SizedBox(
+          width: double.infinity,
+          child: Wrap(
+            spacing: _spacing,
+            runSpacing: _spacing,
+            children: platforms.map((p) {
+              return Tooltip(
+                message: p.displayName,
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: InkWell(
+                    onTap: () => onPlatformTap?.call(p),
+                    customBorder: const CircleBorder(),
+                    child: Container(
+                      width: size,
+                      height: size,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDark
+                            ? p.brandColor.withAlpha(35)
+                            : p.brandColor.withAlpha(20),
+                        border: Border.all(
+                          color: p.brandColor.withAlpha(isDark ? 80 : 60),
+                          width: 1,
+                        ),
+                      ),
+                      child: Icon(
+                        p.icon,
+                        size: size * 0.5,
+                        color: p.brandColor,
+                        semanticLabel: p.displayName,
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
+              );
+            }).toList(),
+          ),
+        );
+      },
     );
   }
 }
