@@ -447,6 +447,15 @@ void main() {
         await Future<void>.delayed(Duration.zero);
         expect(settled, isFalse);
 
+        // What a paused download shows is what it keeps: a stopped part
+        // still reporting how far it got adds nothing.
+        final shown = <int>[];
+        transfer.onProgress = (received, _) => shown.add(received);
+        gateway.handleUpdate(bg.TaskProgressUpdate(first[1], 0.6));
+        expect(shown, [10]);
+        expect(transfer.receivedBytes, 10);
+        transfer.onProgress = null;
+
         parts.queued.clear();
         expect(await gateway.resume('task-1'), isTrue);
         // Under new ids: the system has been seen stopping a part queued

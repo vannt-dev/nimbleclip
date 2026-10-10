@@ -296,6 +296,9 @@ class BackgroundStreamPairs implements StreamPairGateway {
     final transfer = part.transfer;
     if (update is bg.TaskProgressUpdate) {
       if (update.progress < 0) return;
+      // A part the pause stopped is on its way out, and what it reports until
+      // the stop goes through is not kept.
+      if (part.stoppedByPause || transfer.paused) return;
       part
         ..fraction = update.progress.clamp(0.0, 1.0)
         ..bytesPerSecond = update.hasNetworkSpeed
