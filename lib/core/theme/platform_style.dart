@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../models/video_platform.dart';
 import '../constants/app_colors.dart';
 
-/// Brand colour and icon for a platform.
+/// Brand colour and icon for a platform. The icons are the platforms' own
+/// marks, from Font Awesome's brand set, so a row of them is recognised
+/// without their names.
 ///
 /// These live in the theme layer rather than on the enum: a domain type should
 /// not have to import Flutter's material library to describe itself. Written as
@@ -23,16 +26,49 @@ extension PlatformStyle on VideoPlatform {
     VideoPlatform.generic => AppColors.primary,
   };
 
-  IconData get icon => switch (this) {
-    VideoPlatform.youtube => Icons.play_circle_fill_rounded,
-    VideoPlatform.tiktok => Icons.music_note_rounded,
-    VideoPlatform.facebook => Icons.facebook_rounded,
-    VideoPlatform.twitter => Icons.flutter_dash_rounded,
-    VideoPlatform.instagram => Icons.camera_alt_rounded,
-    VideoPlatform.threads => Icons.alternate_email_rounded,
-    VideoPlatform.pinterest => Icons.push_pin_rounded,
-    VideoPlatform.soundcloud => Icons.cloud_rounded,
-    VideoPlatform.flickr => Icons.photo_library_rounded,
-    VideoPlatform.generic => Icons.link_rounded,
+  /// The platform's own mark; null for a link that belongs to no platform.
+  FaIconData? get brandMark => switch (this) {
+    VideoPlatform.youtube => FontAwesomeIcons.youtube,
+    VideoPlatform.tiktok => FontAwesomeIcons.tiktok,
+    VideoPlatform.facebook => FontAwesomeIcons.facebook,
+    VideoPlatform.twitter => FontAwesomeIcons.xTwitter,
+    VideoPlatform.instagram => FontAwesomeIcons.instagram,
+    VideoPlatform.threads => FontAwesomeIcons.threads,
+    VideoPlatform.pinterest => FontAwesomeIcons.pinterest,
+    VideoPlatform.soundcloud => FontAwesomeIcons.soundcloud,
+    VideoPlatform.flickr => FontAwesomeIcons.flickr,
+    VideoPlatform.generic => null,
   };
+}
+
+/// A platform's icon. A mark is drawn at its own width, since some (YouTube,
+/// SoundCloud) are wider than they are tall and would spill out of the square
+/// a plain [Icon] gives them, into the text beside it.
+class PlatformIcon extends StatelessWidget {
+  const PlatformIcon(
+    this.platform, {
+    super.key,
+    this.size,
+    this.color,
+    this.semanticLabel,
+  });
+
+  final VideoPlatform platform;
+  final double? size;
+  final Color? color;
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final mark = platform.brandMark;
+    if (mark == null) {
+      return Icon(
+        Icons.link_rounded,
+        size: size,
+        color: color,
+        semanticLabel: semanticLabel,
+      );
+    }
+    return FaIcon(mark, size: size, color: color, semanticLabel: semanticLabel);
+  }
 }

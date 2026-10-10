@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/views/home/widgets/platform_badges.dart';
@@ -42,12 +43,34 @@ void main() {
     await useScreen(tester, const Size(360, 800));
     await tester.pumpWidget(host());
 
-    expect(find.byType(Icon), findsNWidgets(shown.length));
+    // each platform's own mark, not a stand-in picture
+    expect(find.byType(FaIcon), findsNWidgets(shown.length));
     expect(find.byType(Text), findsNothing);
     for (final platform in shown) {
       // the name is still there for a long press and for a screen reader
       expect(find.byTooltip(platform.displayName), findsOneWidget);
       expect(find.bySemanticsLabel(platform.displayName), findsOneWidget);
+    }
+  });
+
+  // A mark is only as wide as it is drawn, so nothing centres it by default:
+  // it once sat in the top left corner of every circle.
+  testWidgets('each mark sits in the middle of its circle', (tester) async {
+    await useScreen(tester, const Size(360, 800));
+    await tester.pumpWidget(host());
+
+    for (final platform in shown) {
+      final badge = find.byTooltip(platform.displayName);
+      final mark = find.descendant(of: badge, matching: find.byType(FaIcon));
+      // Stretched to the circle's own size, it would be painted from the
+      // corner; it has to keep its size and be placed.
+      expect(
+        tester.getSize(mark).height,
+        lessThan(tester.getSize(badge).height * 0.75),
+        reason: platform.displayName,
+      );
+      final offset = tester.getCenter(mark) - tester.getCenter(badge);
+      expect(offset.distance, lessThan(0.5), reason: platform.displayName);
     }
   });
 

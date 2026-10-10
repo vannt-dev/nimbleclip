@@ -4,6 +4,14 @@ All notable changes to NimbleClip are documented in this file. This project
 uses [Semantic Versioning](https://semver.org/) and release tags in the form
 `vX.Y.Z`.
 
+## [Unreleased]
+
+- The platforms are shown by their own marks (YouTube, TikTok, Facebook, X,
+  Instagram, Threads, Pinterest, SoundCloud, Flickr) on the home screen, on
+  the labels of a result and on the cards of the Downloads screen, where
+  stand-in pictures were used before. The marks come from Font Awesome's free
+  brand set; its licence is on the Open-source licences page.
+
 ## [1.12.0] - 2026-10-10
 
 - YouTube videos longer than about a minute download again above 360p, and

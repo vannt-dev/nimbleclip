@@ -83,7 +83,7 @@ class _RecentLinkTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Icon(entry.platform.icon),
+      leading: PlatformIcon(entry.platform),
       title: Text(entry.title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
         entry.originalUrl,

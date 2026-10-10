@@ -144,8 +144,8 @@ class _UrlInputCardState extends State<UrlInputCard> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        detectedPlatform.icon,
+                      PlatformIcon(
+                        detectedPlatform,
                         size: 14,
                         color: detectedPlatform.brandColor,
                       ),

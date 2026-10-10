@@ -38,7 +38,9 @@ class ActiveDownloadCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final placeholder = Container(
       color: task.platform.brandColor.withAlpha(30),
-      child: Icon(task.platform.icon, color: task.platform.brandColor),
+      child: Center(
+        child: PlatformIcon(task.platform, color: task.platform.brandColor),
+      ),
     );
 
     return Expanded(
@@ -79,8 +81,8 @@ class ActiveDownloadCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(
-                      task.platform.icon,
+                    PlatformIcon(
+                      task.platform,
                       size: 13,
                       color: task.platform.brandColor,
                     ),

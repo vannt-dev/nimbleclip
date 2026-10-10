@@ -52,6 +52,7 @@ dependencies:
   package_info_plus: ^10.2.1
   background_downloader: ^9.5.8
   connectivity_plus: ^7.3.2
+  font_awesome_flutter: ^11.0.0
 
 dev_dependencies:
   flutter_test:

@@ -55,10 +55,12 @@ class ResultThumbnailHeader extends StatelessWidget {
               ),
               errorWidget: (context, url, error) => Container(
                 color: isDark ? AppColors.darkCardElevated : Colors.grey[200],
-                child: Icon(
-                  metadata.platform.icon,
-                  size: 48,
-                  color: metadata.platform.brandColor,
+                child: Center(
+                  child: PlatformIcon(
+                    metadata.platform,
+                    size: 48,
+                    color: metadata.platform.brandColor,
+                  ),
                 ),
               ),
             ),
@@ -113,7 +115,7 @@ class ResultThumbnailHeader extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(metadata.platform.icon, size: 14, color: Colors.white),
+                PlatformIcon(metadata.platform, size: 14, color: Colors.white),
                 const SizedBox(width: 4),
                 Text(
                   metadata.platform.displayName,
