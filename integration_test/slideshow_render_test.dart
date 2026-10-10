@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:nimble_clip/services/slideshow/slideshow_renderer.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// On-device checks for the native slideshow encoder.
@@ -466,6 +467,23 @@ void main() {
       if (file.existsSync()) await file.delete();
     }
   }
+
+  // Whether a video's separate picture and sound can be joined is the
+  // device's to say: a system too old to write such a file has the encoder
+  // all the same. Android 7.1 is the first that can.
+  test('the device says whether it can join separate streams', () async {
+    final answer = await channel.invokeMethod<bool>('canMergeStreams');
+    expect(answer, isNotNull);
+
+    final sdk = int.tryParse(
+      (Process.runSync('getprop', ['ro.build.version.sdk']).stdout as String)
+          .trim(),
+    );
+    expect(sdk, isNotNull, reason: 'the system did not give its version');
+    expect(answer, sdk! >= 25);
+    // The app asks through the renderer, which hands the answer on.
+    expect(await createSlideshowRenderer().canMergeStreams(), answer);
+  });
 
   test('a video stream and an audio stream mux into one mp4', () async {
     final inputs = await muxInputs();

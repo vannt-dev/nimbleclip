@@ -13,6 +13,9 @@ class UnsupportedSlideshowRenderer implements SlideshowRenderer {
   bool get isSupported => false;
 
   @override
+  Future<bool> canMergeStreams() async => false;
+
+  @override
   Future<SlideshowResult> render({
     required List<String> imagePaths,
     String? audioPath,

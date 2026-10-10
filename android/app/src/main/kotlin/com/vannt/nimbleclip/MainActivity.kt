@@ -156,6 +156,9 @@ class MainActivity : FlutterActivity() {
                     SlideshowEncoder.cancel(call.argument<String>("renderId").orEmpty())
                     result.success(null)
                 }
+                // Whether this device can join a video's separate picture and
+                // sound; the core knows which systems cannot.
+                "canMergeStreams" -> result.success(StreamMuxer.canMergeStreams)
                 "render", "mux", "probe", "frameColorAt", "decryptSegment" -> {
                     // A slideshow encode runs for seconds; on the platform
                     // thread that freezes the UI and trips the ANR watchdog.

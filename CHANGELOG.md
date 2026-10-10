@@ -9,6 +9,10 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 - A paused YouTube audio download stays paused when the app is closed and
   opened again, and keeps what had arrived. It used to carry on by itself at
   the next launch. Its card also shows how much is kept, where it read 0 B.
+- On Android 7.0, YouTube qualities above 360p are no longer offered. That
+  system cannot join their picture and sound, so such a download fetched
+  everything and then failed. 360p and audio download as before; Android 7.1
+  and later are unchanged.
 
 ## [1.13.0] - 2026-10-10
 

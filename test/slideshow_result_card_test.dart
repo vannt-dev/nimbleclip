@@ -17,6 +17,9 @@ class _Renderer implements SlideshowRenderer {
   final bool isSupported;
 
   @override
+  Future<bool> canMergeStreams() async => isSupported;
+
+  @override
   Future<SlideshowResult> render({
     required List<String> imagePaths,
     String? audioPath,

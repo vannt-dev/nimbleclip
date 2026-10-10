@@ -28,6 +28,11 @@ abstract interface class SlideshowRenderer {
   /// Whether this platform can actually render a slideshow.
   bool get isSupported;
 
+  /// Whether this device can join a video's separate picture and sound with
+  /// [mux]. Narrower than [isSupported]: a device can have the encoder and a
+  /// system that is too old to write such a file.
+  Future<bool> canMergeStreams();
+
   /// Renders [imagePaths] (in order) into an MP4 at [outputPath], showing
   /// each image for [perImage] and encoding at [width]x[height]. When
   /// [audioPath] is provided the renderer attempts to mux it in as the

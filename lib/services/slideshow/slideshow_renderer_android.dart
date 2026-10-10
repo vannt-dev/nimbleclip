@@ -49,6 +49,27 @@ class MethodChannelSlideshowRenderer implements SlideshowRenderer {
   @override
   bool get isSupported => !kIsWeb && Platform.isAndroid;
 
+  /// The device's answer, asked once: it does not change while the app runs.
+  static Future<bool>? _canMergeStreams;
+
+  @override
+  Future<bool> canMergeStreams() {
+    if (!isSupported) return Future.value(false);
+    return _canMergeStreams ??= _askCanMergeStreams();
+  }
+
+  static Future<bool> _askCanMergeStreams() async {
+    try {
+      return await _channel.invokeMethod<bool>('canMergeStreams') ?? true;
+    } on PlatformException {
+      // No answer is not a no: the join is offered as it was before the
+      // device could be asked.
+      return true;
+    } on MissingPluginException {
+      return true;
+    }
+  }
+
   @override
   Future<SlideshowResult> render({
     required List<String> imagePaths,

@@ -36,6 +36,9 @@ class _FakeMuxer implements SlideshowRenderer {
   bool get isSupported => true;
 
   @override
+  Future<bool> canMergeStreams() async => isSupported;
+
+  @override
   Future<String> mux({
     required String videoPath,
     required String audioPath,

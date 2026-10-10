@@ -62,6 +62,11 @@ class StreamMuxer {
     @Suppress("UNUSED_PARAMETER")
     fun mux(request: Request, onProgress: (Double) -> Unit = {}): String =
         throw SlideshowEncodeException(NOT_HERE)
+
+    companion object {
+        /** Nothing is joined in the public core. */
+        const val canMergeStreams = false
+    }
 }
 
 object SegmentCipher {
