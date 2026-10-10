@@ -141,7 +141,7 @@ class CompletedDownloadCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          task.qualityLabel,
+                          task.shownQualityLabel,
                           style: TextStyle(
                             fontSize: 12,
                             color: isDark

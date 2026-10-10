@@ -75,6 +75,29 @@ class DownloadTask extends ChangeNotifier {
   }) : createdAt = createdAt ?? DateTime.now();
 
   bool get isAudioOnly => kind == MediaKind.audio;
+
+  static final RegExp _otherAudioFormat = RegExp(
+    r'\b(M4A|WebM|Opus|AAC)\b',
+    caseSensitive: false,
+  );
+  static final RegExp _sourceBitrate = RegExp(r'\s*\(\d+\s*kbps\)');
+
+  /// The quality as a finished download shows it. [qualityLabel] names what
+  /// was fetched and stays as it is, because a repeated download is recognised
+  /// by it; an audio file converted to MP3 afterwards is named as the MP3 it
+  /// now is, without the bitrate of the file it came from.
+  String get shownQualityLabel {
+    final converted =
+        isAudioOnly &&
+        format.toLowerCase() == 'mp3' &&
+        _otherAudioFormat.hasMatch(qualityLabel);
+    if (!converted) return qualityLabel;
+    return qualityLabel
+        .replaceFirst(_otherAudioFormat, 'MP3')
+        .replaceFirst(_sourceBitrate, '')
+        .trim();
+  }
+
   bool get isImage => kind == MediaKind.image;
 
   /// Notifies only widgets rendering this task. Collection-level changes

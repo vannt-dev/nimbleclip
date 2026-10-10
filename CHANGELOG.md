@@ -18,7 +18,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   following the source's own bitrate. The Downloads screen shows the
   conversion as progress and it can be cancelled; if it cannot be done, the
   file is kept as it was fetched and its card says so. Downloads that finish
-  while the app is closed are not converted. The encoder is LAME 3.100
+  while the app is closed are not converted. A converted download is listed
+  as MP3 audio. The encoder is LAME 3.100
   (LGPL), built from source into its own library; see
   `android/app/src/main/cpp/README.md`.
 - Settings → About has an **Open-source licences** entry. It opens the licence page, which
