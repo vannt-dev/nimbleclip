@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-10-10
+
 - YouTube audio downloads are much faster: a five-minute song arrives in a
   few seconds where it took two and a half minutes, a four-hour recording in
   under a minute. Pause keeps what has arrived, and a download cut off by the
