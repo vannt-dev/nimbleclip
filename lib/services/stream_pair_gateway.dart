@@ -29,6 +29,27 @@ abstract interface class StreamPairGateway {
   void cancelStreamPair(String taskId);
 }
 
+/// One file fetched in parts as operating-system transfers and joined where it
+/// is wanted: a file its server only hands out quickly a range at a time.
+abstract interface class SingleStreamTransfer {
+  String get taskId;
+  int get totalBytes;
+
+  /// Where the whole file is written.
+  String get outputPath;
+
+  /// Completes with [outputPath] once every part has arrived and the file is
+  /// whole. Fails with a `SlideshowException`.
+  Future<String> get file;
+
+  /// Called with the running total and the combined transfer speed.
+  set onProgress(void Function(int receivedBytes, double bytesPerSecond)? cb);
+
+  /// Deletes the parts and the transfer's own records. The finished file, if
+  /// there is one, stays.
+  Future<void> discard();
+}
+
 abstract interface class StreamPairTransfer {
   String get taskId;
   bool get autoSaveToGallery;

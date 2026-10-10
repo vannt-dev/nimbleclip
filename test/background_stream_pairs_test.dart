@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -369,6 +370,209 @@ void main() {
       expect(manifest['video'], {'url': _videoUrl, 'total': 25});
       expect(manifest['audio'], {'url': _audioUrl, 'total': 12});
       expect(manifest['autoSaveToGallery'], isTrue);
+    });
+  });
+
+  // A single file can go through the same parts as a pair: it is joined
+  // straight into the file the download is.
+  group('fetching one file in parts', () {
+    late Directory downloads;
+
+    setUp(() => downloads = Directory.systemTemp.createTempSync('downloads'));
+    tearDown(() {
+      if (downloads.existsSync()) downloads.deleteSync(recursive: true);
+    });
+
+    String output() => '${downloads.path}/youtube_abc.m4a';
+
+    Future<SingleStreamTransfer> startOne(BackgroundStreamPairs gateway) =>
+        gateway.startSingleStream(
+          taskId: 'task-1',
+          title: 'A song',
+          url: _videoUrl,
+          outputPath: output(),
+        );
+
+    test('queues the file in ranges and joins it where it is wanted', () async {
+      final gateway = pairs();
+      final transfer = await startOne(gateway);
+      final reports = <int>[];
+      transfer.onProgress = (received, _) => reports.add(received);
+
+      expect(transfer.totalBytes, 25);
+      expect(transfer.outputPath, output());
+      expect(parts.queued.map((t) => t.headers['Range']), [
+        'bytes=0-9',
+        'bytes=10-19',
+        'bytes=20-24',
+      ]);
+      expect(parts.queued.map((t) => t.url).toSet(), {_videoUrl});
+
+      await finishAll(gateway, parts.queued);
+      expect(await transfer.file, output());
+      expect(File(output()).readAsBytesSync(), _video);
+      expect(reports.last, 25);
+
+      // The transfer's records go; the download stays.
+      await transfer.discard();
+      expect(Directory('${root.path}/task-1').existsSync(), isFalse);
+      expect(File(output()).readAsBytesSync(), _video);
+    });
+
+    test(
+      'a pause keeps the parts that arrived and a resume fetches the rest',
+      () async {
+        final gateway = pairs();
+        final transfer = await startOne(gateway);
+        final first = List.of(parts.queued);
+        gateway.handleUpdate(await parts.finish(first[0]));
+        // the part is counted once its file has been measured
+        await pumpEventQueue();
+
+        expect(await gateway.pause('task-1'), isTrue);
+        expect(parts.cancelled, [first[1].taskId, first[2].taskId]);
+        // background_downloader reports the parts it was told to stop; that is
+        // the pause, not a failed download.
+        for (final task in [first[1], first[2]]) {
+          gateway.handleUpdate(
+            bg.TaskStatusUpdate(task, bg.TaskStatus.canceled),
+          );
+        }
+        var settled = false;
+        unawaited(transfer.file.then((_) => settled = true, onError: (_) {}));
+        await Future<void>.delayed(Duration.zero);
+        expect(settled, isFalse);
+
+        parts.queued.clear();
+        expect(await gateway.resume('task-1'), isTrue);
+        // Under new ids: the system has been seen stopping a part queued
+        // again under the id it had just been told to stop.
+        expect(parts.queued.map((t) => t.taskId), [
+          '${first[1].taskId}~r1',
+          '${first[2].taskId}~r1',
+        ]);
+        expect(parts.queued.map((t) => t.headers['Range']), [
+          'bytes=10-19',
+          'bytes=20-24',
+        ]);
+        // A report still on its way for an id no longer in use changes nothing.
+        gateway.handleUpdate(
+          bg.TaskStatusUpdate(first[1], bg.TaskStatus.canceled),
+        );
+        final resumedRun = List.of(parts.queued);
+
+        // A launch after this one asks the system about the ids now in use.
+        await parts.finish(resumedRun[0]);
+        parts.queued.clear();
+        final later = pairs();
+        await later.recover();
+        await later.requeueLostParts();
+        expect(parts.queued, isEmpty, reason: 'the last part is still known');
+        final recovered = later.takeRecoveredSingleStreams().single;
+        later.handleUpdate(await parts.finish(resumedRun[1]));
+        expect(File(await recovered.file).readAsBytesSync(), _video);
+        await transfer.discard();
+      },
+    );
+
+    // The system stops a part by its id. Queued again under that id before
+    // the stop has gone through, the part would be stopped with it.
+    test(
+      'a resume waits until the paused parts are reported stopped',
+      () async {
+        final gateway = pairs();
+        await startOne(gateway);
+        final first = List.of(parts.queued);
+        await gateway.pause('task-1');
+        parts.queued.clear();
+
+        var resumed = false;
+        final resume = gateway.resume('task-1').then((ok) => resumed = ok);
+        await pumpEventQueue();
+        expect(parts.queued, isEmpty, reason: 'nothing is queued before then');
+
+        for (final task in first) {
+          gateway.handleUpdate(
+            bg.TaskStatusUpdate(task, bg.TaskStatus.canceled),
+          );
+        }
+        await resume;
+        expect(resumed, isTrue);
+        expect(
+          parts.queued.map((t) => t.taskId),
+          first.map((t) => '${t.taskId}~r1'),
+        );
+      },
+    );
+
+    test('a cancel fails it as cancelled, paused or not', () async {
+      final gateway = pairs();
+      final transfer = await startOne(gateway);
+      await gateway.pause('task-1');
+
+      gateway.cancelStreamPair('task-1');
+      await expectLater(
+        transfer.file,
+        throwsA(
+          isA<SlideshowException>().having(
+            (e) => e.kind,
+            'kind',
+            SlideshowFailureKind.cancelled,
+          ),
+        ),
+      );
+      expect(await gateway.pause('task-1'), isFalse);
+      expect(await gateway.resume('task-1'), isFalse);
+    });
+
+    test('a later launch finishes it, apart from the merged videos', () async {
+      await startOne(pairs());
+      final firstRun = List.of(parts.queued);
+      await parts.finish(firstRun[0]);
+      parts.known.clear();
+      parts.queued.clear();
+
+      final gateway = pairs();
+      await gateway.recover();
+      await gateway.requeueLostParts();
+      // A merged video is joined by the provider, and this is not one.
+      expect(gateway.takeRecoveredStreamPairs(), isEmpty);
+      final transfer = gateway.takeRecoveredSingleStreams().single;
+      expect(gateway.takeRecoveredSingleStreams(), isEmpty);
+
+      expect(transfer.taskId, 'task-1');
+      expect(transfer.outputPath, output());
+      expect(parts.queued.map((t) => t.taskId), [
+        firstRun[1].taskId,
+        firstRun[2].taskId,
+      ]);
+      await finishAll(gateway, parts.queued);
+      expect(File(await transfer.file).readAsBytesSync(), _video);
+    });
+
+    test('a merged video left by the version before still recovers', () async {
+      // That version wrote both streams and no output path.
+      final directory = Directory('${root.path}/task-1')..createSync();
+      File('${directory.path}/manifest.json').writeAsStringSync(
+        jsonEncode({
+          'taskId': 'task-1',
+          'title': 'A video',
+          'autoSaveToGallery': true,
+          'partBytes': 10,
+          'video': {'url': _videoUrl, 'total': 25},
+          'audio': {'url': _audioUrl, 'total': 12},
+        }),
+      );
+
+      final gateway = pairs();
+      await gateway.recover();
+      await gateway.requeueLostParts();
+      expect(gateway.takeRecoveredSingleStreams(), isEmpty);
+      final transfer = gateway.takeRecoveredStreamPairs().single;
+      await finishAll(gateway, parts.queued);
+      final files = await transfer.files;
+      expect(File(files.videoPath).readAsBytesSync(), _video);
+      expect(File(files.audioPath).readAsBytesSync(), _audio);
     });
   });
 }

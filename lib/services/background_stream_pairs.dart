@@ -9,9 +9,7 @@ import 'slideshow/slideshow_failure.dart';
 import 'extractors/streams/stream_fetcher.dart';
 import 'stream_pair_gateway.dart';
 
-/// The largest range fetched in one request. YouTube serves a range of this
-/// size at full speed but throttles anything larger, or open-ended, to roughly
-/// playback speed.
+/// The largest range fetched in one request.
 const int streamPartBytes = 10 << 20;
 
 /// The background_downloader group every stream part belongs to, so they share
@@ -86,6 +84,28 @@ class BackgroundStreamPairs implements StreamPairGateway {
   /// Whether [taskId] is one of the parts this class queued.
   bool owns(String taskId) => _parts.containsKey(taskId);
 
+  /// Queues [url] in parts, to be joined at [outputPath].
+  ///
+  /// For a file that is no pair but is fetched like one, a [partBytes] range
+  /// at a time.
+  Future<SingleStreamTransfer> startSingleStream({
+    required String taskId,
+    required String title,
+    required String url,
+    required String outputPath,
+  }) async {
+    final manifest = _Manifest(
+      taskId: taskId,
+      title: title,
+      autoSaveToGallery: false,
+      partBytes: partBytes,
+      video: (url: url, total: await _probeLength(url)),
+      audio: null,
+      outputPath: outputPath,
+    );
+    return _start(manifest);
+  }
+
   @override
   Future<StreamPairTransfer> startStreamPair({
     required String taskId,
@@ -105,7 +125,12 @@ class BackgroundStreamPairs implements StreamPairGateway {
       video: (url: source.videoUrl, total: lengths[0]),
       audio: (url: source.audioUrl, total: lengths[1]),
     );
-    final directory = Directory('${(await _root()).path}/$taskId');
+    return _start(manifest);
+  }
+
+  /// Writes [manifest] beside where its parts will land and queues them all.
+  Future<_PairTransfer> _start(_Manifest manifest) async {
+    final directory = Directory('${(await _root()).path}/${manifest.taskId}');
     try {
       await directory.create(recursive: true);
       await File(
@@ -196,9 +221,66 @@ class BackgroundStreamPairs implements StreamPairGateway {
 
   @override
   List<StreamPairTransfer> takeRecoveredStreamPairs() {
-    final taken = List<StreamPairTransfer>.of(_recovered);
-    _recovered.clear();
+    final taken = _recovered.where((transfer) => !transfer.isSingle).toList();
+    _recovered.removeWhere((transfer) => !transfer.isSingle);
     return taken;
+  }
+
+  /// The single files an earlier process left fetching. Each is handed out
+  /// once.
+  List<SingleStreamTransfer> takeRecoveredSingleStreams() {
+    final taken = _recovered.where((transfer) => transfer.isSingle).toList();
+    _recovered.removeWhere((transfer) => transfer.isSingle);
+    return taken;
+  }
+
+  /// Stops [taskId]'s running parts and keeps the ones that arrived, until
+  /// [resume]. False when there is no such transfer.
+  Future<bool> pause(String taskId) async {
+    final transfer = _transfers[taskId];
+    if (transfer == null || transfer.isSettled) return false;
+    await transfer.pause();
+    return true;
+  }
+
+  /// Queues again the parts of [taskId] that had not arrived when it was
+  /// paused. False when there is no such transfer, or a part cannot be queued.
+  Future<bool> resume(String taskId) async {
+    final transfer = _transfers[taskId];
+    if (transfer == null || transfer.isSettled) return false;
+    // The system stops a part by its id, and a part queued again under that
+    // id before the stop has gone through is stopped with it.
+    await transfer.pauseReported;
+    if (transfer.isSettled) return false;
+    transfer.paused = false;
+    // And under a new id even then: the system has been seen stopping a part
+    // queued again under the id it had just been told to stop.
+    for (final part in transfer.parts) {
+      _parts.remove(part.task.taskId);
+    }
+    try {
+      await transfer.renumberPending();
+    } on FileSystemException catch (error) {
+      transfer.fail(_fileFailure(error));
+      return false;
+    }
+    for (final part in transfer.parts) {
+      _parts[part.task.taskId] = part;
+    }
+    for (final part in transfer.parts) {
+      if (part.done) continue;
+      if (!await _downloader.enqueue(part.task)) {
+        transfer.fail(
+          const SlideshowException(
+            SlideshowFailureKind.fetchFailed,
+            detail: 'a stream part could not be queued again',
+          ),
+        );
+        return false;
+      }
+    }
+    await transfer.finishIfWhole();
+    return true;
   }
 
   @override
@@ -238,6 +320,16 @@ class BackgroundStreamPairs implements StreamPairGateway {
           ),
         );
       case bg.TaskStatus.canceled:
+        // A pause cancels the transfer's own parts, and the word of it can
+        // arrive after the resume: it is the pause, not a failed download.
+        if (part.stoppedByPause || transfer.paused) {
+          part
+            ..stoppedByPause = false
+            ..fraction = 0
+            ..bytesPerSecond = 0;
+          transfer.notePauseReport();
+          return;
+        }
         transfer.fail(const SlideshowException(SlideshowFailureKind.cancelled));
       case bg.TaskStatus.enqueued:
       case bg.TaskStatus.running:
@@ -291,6 +383,8 @@ class _Manifest {
     required this.partBytes,
     required this.video,
     required this.audio,
+    this.outputPath,
+    this.round = 0,
   });
 
   factory _Manifest.fromJson(Map<String, dynamic> json) {
@@ -305,7 +399,9 @@ class _Manifest {
       autoSaveToGallery: json['autoSaveToGallery'] as bool? ?? false,
       partBytes: json['partBytes']! as int,
       video: plan(json['video']),
-      audio: plan(json['audio']),
+      audio: json['audio'] == null ? null : plan(json['audio']),
+      outputPath: json['outputPath'] as String?,
+      round: json['round'] as int? ?? 0,
     );
   }
 
@@ -314,11 +410,42 @@ class _Manifest {
   final bool autoSaveToGallery;
   final int partBytes;
   final _StreamPlan video;
-  final _StreamPlan audio;
+
+  /// Null for a single file, which then sits in the [video] slot whatever it
+  /// holds: the two names are a merged video's.
+  final _StreamPlan? audio;
+
+  /// Where a single file is joined; a pair is joined beside its parts.
+  final String? outputPath;
+
+  /// How many times the parts were queued again after a pause. It is part of
+  /// their ids, so a later launch asks the system about the ids in use.
+  final int round;
+
+  _Manifest withRound(int round) => _Manifest(
+    taskId: taskId,
+    title: title,
+    autoSaveToGallery: autoSaveToGallery,
+    partBytes: partBytes,
+    video: video,
+    audio: audio,
+    outputPath: outputPath,
+    round: round,
+  );
+
+  /// The id of the system transfer that fetches part [index] of [stream].
+  String partId(_Stream stream, int index) => round == 0
+      ? '$taskId~${stream.tag}~$index'
+      : '$taskId~${stream.tag}~$index~r$round';
+
+  List<_Stream> get streams => [
+    _Stream.video,
+    if (audio != null) _Stream.audio,
+  ];
 
   _StreamPlan plan(_Stream stream) => switch (stream) {
     _Stream.video => video,
-    _Stream.audio => audio,
+    _Stream.audio => audio!,
   };
 
   Map<String, dynamic> toJson() => {
@@ -327,7 +454,10 @@ class _Manifest {
     'autoSaveToGallery': autoSaveToGallery,
     'partBytes': partBytes,
     'video': {'url': video.url, 'total': video.total},
-    'audio': {'url': audio.url, 'total': audio.total},
+    if (audio case final audio?)
+      'audio': {'url': audio.url, 'total': audio.total},
+    'outputPath': ?outputPath,
+    if (round != 0) 'round': round,
   };
 }
 
@@ -335,6 +465,7 @@ class _Part {
   _Part({
     required this.transfer,
     required this.stream,
+    required this.index,
     required this.task,
     required this.path,
     required this.bytes,
@@ -342,15 +473,21 @@ class _Part {
 
   final _PairTransfer transfer;
   final _Stream stream;
-  final bg.DownloadTask task;
+
+  /// Which part of [stream] this is, from 0.
+  final int index;
+  bg.DownloadTask task;
   final String path;
   final int bytes;
   bool done = false;
   double fraction = 0;
   double bytesPerSecond = 0;
+
+  /// Set when a pause cancelled this part, until that cancel is reported.
+  bool stoppedByPause = false;
 }
 
-class _PairTransfer implements StreamPairTransfer {
+class _PairTransfer implements StreamPairTransfer, SingleStreamTransfer {
   _PairTransfer({
     required this.manifest,
     required this.directory,
@@ -361,7 +498,7 @@ class _PairTransfer implements StreamPairTransfer {
     // the provider — and an unheard failure would surface as an uncaught
     // error. Whoever does await [files] still receives it.
     _files.future.ignore();
-    for (final stream in _Stream.values) {
+    for (final stream in manifest.streams) {
       final plan = manifest.plan(stream);
       final ranges = planStreamParts(plan.total, partBytes: manifest.partBytes);
       for (var i = 0; i < ranges.length; i++) {
@@ -371,10 +508,11 @@ class _PairTransfer implements StreamPairTransfer {
           _Part(
             transfer: this,
             stream: stream,
+            index: i,
             path: '${directory.path}/$fileName',
             bytes: range.to - range.from + 1,
             task: bg.DownloadTask(
-              taskId: '${manifest.taskId}~${stream.tag}~$i',
+              taskId: manifest.partId(stream, i),
               url: plan.url,
               filename: fileName,
               directory: directory.path,
@@ -392,13 +530,55 @@ class _PairTransfer implements StreamPairTransfer {
     }
   }
 
-  final _Manifest manifest;
+  _Manifest manifest;
   final Directory directory;
   final void Function(_PairTransfer) _onSettled;
   final Future<void> Function(Iterable<String>) _cancelParts;
   final List<_Part> parts = [];
-  final Completer<StreamPairFiles> _files = Completer<StreamPairFiles>();
+  final Completer<({String videoPath, String? audioPath})> _files = Completer();
   bool _joining = false;
+
+  /// Set while the transfer's own parts are stopped on purpose.
+  bool paused = false;
+  Completer<void>? _pauseReported;
+
+  /// Completes once every part a pause stopped has been reported stopped, or
+  /// after a few seconds when a report never comes.
+  Future<void> get pauseReported =>
+      _pauseReported?.future.timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {},
+      ) ??
+      Future<void>.value();
+
+  /// Gives every part that has not arrived a new id, and records the round
+  /// so that a later launch knows them by it.
+  Future<void> renumberPending() async {
+    manifest = manifest.withRound(manifest.round + 1);
+    await File(
+      '${directory.path}/$_manifestName',
+    ).writeAsString(jsonEncode(manifest.toJson()), flush: true);
+    for (final part in parts) {
+      if (part.done) continue;
+      part.task = part.task.copyWith(
+        taskId: manifest.partId(part.stream, part.index),
+      );
+    }
+  }
+
+  void notePauseReport() {
+    final reported = _pauseReported;
+    if (reported == null || reported.isCompleted) return;
+    if (parts.every((part) => !part.stoppedByPause)) reported.complete();
+  }
+
+  bool get isSingle => manifest.audio == null;
+
+  @override
+  String get outputPath => manifest.outputPath ?? _joinedPath(_Stream.video);
+
+  @override
+  Future<String> get file => _files.future.then((files) => files.videoPath);
 
   void Function(int receivedBytes, double bytesPerSecond)? _onProgress;
 
@@ -409,10 +589,12 @@ class _PairTransfer implements StreamPairTransfer {
   bool get autoSaveToGallery => manifest.autoSaveToGallery;
 
   @override
-  int get totalBytes => manifest.video.total + manifest.audio.total;
+  int get totalBytes => manifest.video.total + (manifest.audio?.total ?? 0);
 
   @override
-  Future<StreamPairFiles> get files => _files.future;
+  Future<StreamPairFiles> get files => _files.future.then(
+    (files) => (videoPath: files.videoPath, audioPath: files.audioPath!),
+  );
 
   @override
   set onProgress(void Function(int receivedBytes, double bytesPerSecond)? cb) {
@@ -422,7 +604,31 @@ class _PairTransfer implements StreamPairTransfer {
 
   bool get isSettled => _files.isCompleted;
 
-  String _joinedPath(_Stream stream) => '${directory.path}/${stream.fileName}';
+  String _joinedPath(_Stream stream) => isSingle && manifest.outputPath != null
+      ? manifest.outputPath!
+      : '${directory.path}/${stream.fileName}';
+
+  /// Stops the parts still running; the ones on disk stay.
+  Future<void> pause() async {
+    paused = true;
+    final running = <String>[];
+    // Marked before the cancel is sent: its report can be back before the
+    // call that sent it returns.
+    for (final part in parts) {
+      if (part.done) continue;
+      part
+        ..stoppedByPause = true
+        ..fraction = 0
+        ..bytesPerSecond = 0;
+      running.add(part.task.taskId);
+    }
+    // What is kept is what counts: the bar would otherwise stay where the
+    // stopped parts had got to and fall back on the resume.
+    reportProgress();
+    _pauseReported = Completer<void>();
+    notePauseReport();
+    await _cancelParts(running).catchError((_) {});
+  }
 
   Future<bool> isStreamJoined(_Stream stream) =>
       File(_joinedPath(stream)).exists();
@@ -471,13 +677,13 @@ class _PairTransfer implements StreamPairTransfer {
     if (isSettled || _joining || parts.any((part) => !part.done)) return;
     _joining = true;
     try {
-      for (final stream in _Stream.values) {
+      for (final stream in manifest.streams) {
         await _join(stream);
       }
       if (isSettled) return;
       _files.complete((
         videoPath: _joinedPath(_Stream.video),
-        audioPath: _joinedPath(_Stream.audio),
+        audioPath: isSingle ? null : _joinedPath(_Stream.audio),
       ));
       _onSettled(this);
     } on FileSystemException catch (error) {

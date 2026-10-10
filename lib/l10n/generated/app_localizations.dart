@@ -344,6 +344,18 @@ abstract class AppLocalizations {
   /// **'Could not convert to MP3 — kept in the original format'**
   String get mp3ConversionFailed;
 
+  /// No description provided for @keepAliveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'NimbleClip is downloading'**
+  String get keepAliveTitle;
+
+  /// No description provided for @keepAliveText.
+  ///
+  /// In en, this message translates to:
+  /// **'Your downloads are finished while the app is in the background'**
+  String get keepAliveText;
+
   /// No description provided for @wifiOnlyDownloads.
   ///
   /// In en, this message translates to:

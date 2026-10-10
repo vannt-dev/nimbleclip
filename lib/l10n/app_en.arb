@@ -57,6 +57,8 @@
   "convertAudioToMp3": "Save audio as MP3",
   "convertAudioToMp3Description": "Audio that arrives in another format (M4A, WebM) is converted to MP3 on this device",
   "mp3ConversionFailed": "Could not convert to MP3 — kept in the original format",
+  "keepAliveTitle": "NimbleClip is downloading",
+  "keepAliveText": "Your downloads are finished while the app is in the background",
   "wifiOnlyDownloads": "Download on Wi-Fi only",
   "wifiOnlyDownloadsDescription": "On mobile data, downloads wait and start when Wi-Fi is back",
   "downloadsAwaitingWifi": "{count, plural, =1{1 download is waiting for Wi-Fi} other{{count} downloads are waiting for Wi-Fi}}",
