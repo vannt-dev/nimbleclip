@@ -4,7 +4,7 @@ All notable changes to NimbleClip are documented in this file. This project
 uses [Semantic Versioning](https://semver.org/) and release tags in the form
 `vX.Y.Z`.
 
-## [Unreleased]
+## [1.12.0] - 2026-10-10
 
 - Three more sources: **Pinterest** (a pin's video or picture, `pin.it` short
   links included), **SoundCloud** (a track, as the MP3 SoundCloud serves) and
@@ -30,6 +30,9 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   tests with their fixtures. Nothing changes in the app itself.
 - A finished download that carries a note, such as a slideshow rendered
   without its music, now shows it on its card.
+- The supported platforms on the home screen are shown as a single row of
+  icons. A platform's name is still there as its tooltip, for screen readers
+  and in the message a tap shows.
 
 ## [1.11.0] - 2026-10-07
 
