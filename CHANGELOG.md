@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.13.1] - 2026-10-10
+
 - A paused YouTube audio download stays paused when the app is closed and
   opened again, and keeps what had arrived. It used to carry on by itself at
   the next launch. Its card also shows how much is kept, where it read 0 B.
