@@ -28,6 +28,49 @@ DownloadTask task({
 }
 
 void main() {
+  group('shownQualityLabel', () {
+    DownloadTask audio(String label, String format) => DownloadTask(
+      id: 'task',
+      videoId: 'v1',
+      title: 'A track',
+      author: '',
+      thumbnailUrl: '',
+      downloadUrl: 'https://cdn.example.com/a',
+      originalUrl: 'https://example.com/watch?v=1',
+      platform: VideoPlatform.youtube,
+      qualityLabel: label,
+      format: format,
+      kind: MediaKind.audio,
+    );
+
+    test('an audio file converted to MP3 is named as an MP3', () {
+      final converted = audio('M4A audio (127 kbps)', 'm4a')..format = 'mp3';
+      expect(converted.shownQualityLabel, 'MP3 audio');
+      // what was fetched still identifies the download
+      expect(converted.qualityLabel, 'M4A audio (127 kbps)');
+      expect(
+        (audio(
+          'Âm thanh M4A (127 kbps)',
+          'm4a',
+        )..format = 'mp3').shownQualityLabel,
+        'Âm thanh MP3',
+      );
+    });
+
+    test('everything else keeps the label it was downloaded under', () {
+      expect(
+        audio('M4A audio (127 kbps)', 'm4a').shownQualityLabel,
+        'M4A audio (127 kbps)',
+      );
+      // an MP3 from the start, such as a SoundCloud track
+      expect(
+        audio('Audio (Original)', 'mp3').shownQualityLabel,
+        'Audio (Original)',
+      );
+      expect(task().shownQualityLabel, '720p');
+    });
+  });
+
   group('DownloadTask JSON round trip', () {
     test('preserves a completed task', () {
       final original = task()

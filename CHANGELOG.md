@@ -4,7 +4,13 @@ All notable changes to NimbleClip are documented in this file. This project
 uses [Semantic Versioning](https://semver.org/) and release tags in the form
 `vX.Y.Z`.
 
-## [Unreleased]
+## [1.12.0] - 2026-10-10
+
+- YouTube videos longer than about a minute download again above 360p, and
+  so does their audio. YouTube had begun refusing (HTTP 403) the later parts of the streams it
+  gives the client NimbleClip asked as, so such a download stopped after its
+  first parts and ended in "Download failed". The streams are now requested
+  the way YouTube's visionOS app does, and they are served whole.
 
 - Three more sources: **Pinterest** (a pin's video or picture, `pin.it` short
   links included), **SoundCloud** (a track, as the MP3 SoundCloud serves) and
@@ -18,7 +24,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   following the source's own bitrate. The Downloads screen shows the
   conversion as progress and it can be cancelled; if it cannot be done, the
   file is kept as it was fetched and its card says so. Downloads that finish
-  while the app is closed are not converted. The encoder is LAME 3.100
+  while the app is closed are not converted. A converted download is listed
+  as MP3 audio. The encoder is LAME 3.100
   (LGPL), built from source into its own library; see
   `android/app/src/main/cpp/README.md`.
 - Settings → About has an **Open-source licences** entry. It opens the licence page, which
@@ -30,6 +37,9 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   tests with their fixtures. Nothing changes in the app itself.
 - A finished download that carries a note, such as a slideshow rendered
   without its music, now shows it on its card.
+- The supported platforms on the home screen are shown as a single row of
+  icons. A platform's name is still there as its tooltip, for screen readers
+  and in the message a tap shows.
 
 ## [1.11.0] - 2026-10-07
 

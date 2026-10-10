@@ -157,6 +157,16 @@ VideoMetadata _post({String format = 'm4a', bool audio = true}) =>
 Future<void> _settle() =>
     Future<void>.delayed(const Duration(milliseconds: 30));
 
+/// Waits for [done] to hold. The downloads here write real files, and on a
+/// busy machine that takes longer than any short fixed pause, so a test waits
+/// for the state it is about to check instead of for a length of time.
+Future<void> _until(bool Function() done) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 15));
+  while (!done() && DateTime.now().isBefore(deadline)) {
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+}
+
 void main() {
   final l10n = lookupAppLocalizations(const Locale('en'));
   late Directory directory;
@@ -199,7 +209,7 @@ void main() {
   test('an audio download is converted and replaced by the MP3', () async {
     final converter = _FakeConverter()..gate = Completer<void>();
     final (provider, task, seen) = await download(converter);
-    await _settle();
+    await _until(() => converter.sources.isNotEmpty);
 
     // Still converting: the fetched file is whole, but the task is not done.
     expect(task.status, DownloadStatus.downloading);
@@ -209,7 +219,7 @@ void main() {
     expect(fetched, endsWith('.m4a'));
 
     converter.gate!.complete();
-    await _settle();
+    await _until(() => task.status == DownloadStatus.completed);
 
     expect(task.status, DownloadStatus.completed);
     expect(task.progress, 1);
@@ -234,6 +244,8 @@ void main() {
         metadata: metadata,
         setting: setting,
       );
+      await _until(() => task.status == DownloadStatus.completed);
+      // time for a conversion that should not happen to show itself
       await _settle();
 
       expect(converter.sources, isEmpty);
@@ -248,7 +260,7 @@ void main() {
       failure: AudioConversionFailureKind.failed,
     );
     final (_, task, _) = await download(converter);
-    await _settle();
+    await _until(() => task.errorMessage != null);
 
     expect(task.status, DownloadStatus.completed);
     expect(task.format, 'm4a');
@@ -260,11 +272,11 @@ void main() {
   test('a cancel during the conversion removes the download', () async {
     final converter = _FakeConverter()..gate = Completer<void>();
     final (provider, task, _) = await download(converter);
-    await _settle();
+    await _until(() => converter.sources.isNotEmpty);
     final fetched = converter.sources.single;
 
     provider.cancelTask(task.id);
-    await _settle();
+    await _until(() => task.filePath == null);
 
     expect(converter.cancelled, [task.id]);
     expect(task.status, DownloadStatus.cancelled);
