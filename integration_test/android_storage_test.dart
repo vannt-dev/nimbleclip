@@ -33,6 +33,7 @@ DownloadTask fixtureTask({
   required String id,
   required String title,
   String query = '',
+  int? partBytes,
 }) {
   return DownloadTask(
     id: id,
@@ -44,6 +45,7 @@ DownloadTask fixtureTask({
     originalUrl: '$fixtureHost/sample.mp4',
     platform: VideoPlatform.generic,
     qualityLabel: 'Original',
+    partBytes: partBytes,
   );
 }
 
@@ -138,12 +140,7 @@ void main() {
       );
       backgroundService = BackgroundDownloadService(
         requestNotificationPermission: false,
-        streamPairs: BackgroundStreamPairs(
-          root: () async => scratch,
-          // small enough to cut the sample into several parts
-          partBytes: fixtureSize ~/ 4 + 1,
-        ),
-        inParts: (task) => task.title.startsWith('In parts'),
+        streamPairs: BackgroundStreamPairs(root: () async => scratch),
       );
     });
     tearDownAll(() => backgroundService.dispose());
@@ -172,7 +169,12 @@ void main() {
     // A download in parts: the file is fetched as several system transfers,
     // a byte range each, and joined where the download is.
     test('a download fetched in parts arrives whole', () async {
-      final task = fixtureTask(id: 'aaaaaa00-part', title: 'In parts');
+      final task = fixtureTask(
+        id: 'aaaaaa00-part',
+        title: 'In parts',
+        // small enough to cut the sample into several parts
+        partBytes: fixtureSize ~/ 4 + 1,
+      );
       String? failure;
       final progress = <double>[];
 
@@ -206,6 +208,7 @@ void main() {
         id: 'aaaaaa00-pcan',
         title: 'In parts, cancelled',
         query: '?slow=1',
+        partBytes: fixtureSize ~/ 4 + 1,
       );
 
       final done = backgroundService.startDownload(
@@ -237,6 +240,7 @@ void main() {
           id: 'aaaaaa00-ppau',
           title: 'In parts, paused',
           query: '?slow=1',
+          partBytes: fixtureSize ~/ 4 + 1,
         );
         String? failure;
         Future<void> run() => backgroundService.startDownload(

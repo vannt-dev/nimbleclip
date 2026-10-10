@@ -8,12 +8,16 @@ class MergeSource {
   const MergeSource({
     required this.videoUrl,
     required this.audioUrl,
+    required this.partBytes,
     this.videoBytes,
     this.audioBytes,
   });
 
   final String videoUrl;
   final String audioUrl;
+
+  /// The size of the ranges each stream is fetched in, as its extractor asks.
+  final int partBytes;
 
   /// Sizes as the source reported them; used to weight the fetch progress.
   final int? videoBytes;

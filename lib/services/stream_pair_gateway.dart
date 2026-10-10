@@ -30,13 +30,21 @@ abstract interface class StreamPairGateway {
 }
 
 /// One file fetched in parts as operating-system transfers and joined where it
-/// is wanted: a file its server only hands out quickly a range at a time.
+/// is wanted.
 abstract interface class SingleStreamTransfer {
   String get taskId;
   int get totalBytes;
 
   /// Where the whole file is written.
   String get outputPath;
+
+  /// Whether the transfer was paused and waits to be resumed. A pause is
+  /// remembered with the transfer, so one found after the process ended is
+  /// still paused.
+  bool get isPaused;
+
+  /// The bytes of the parts that have arrived.
+  int get receivedBytes;
 
   /// Completes with [outputPath] once every part has arrived and the file is
   /// whole. Fails with a `SlideshowException`.

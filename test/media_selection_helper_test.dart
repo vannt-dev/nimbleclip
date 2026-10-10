@@ -120,6 +120,7 @@ void main() {
           source: const MergeSource(
             videoUrl: 'https://example.com/picture.mp4',
             audioUrl: 'https://example.com/sound.m4a',
+            partBytes: 1 << 20,
           ),
         );
 

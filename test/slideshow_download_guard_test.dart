@@ -30,6 +30,9 @@ class _FakeRenderer implements SlideshowRenderer {
   @override
   bool get isSupported => true;
 
+  @override
+  Future<bool> canMergeStreams() async => isSupported;
+
   final bool audioSkipped;
   final SlideshowFailureKind? failWith;
 

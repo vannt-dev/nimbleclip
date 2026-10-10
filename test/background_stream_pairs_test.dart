@@ -86,14 +86,17 @@ void main() {
     root: () async => root,
     downloader: parts,
     probeLength: (url) async => parts.streams[url]!.length,
-    partBytes: 10,
   );
 
   Future<StreamPairTransfer> start(BackgroundStreamPairs gateway) =>
       gateway.startStreamPair(
         taskId: 'task-1',
         title: 'A video',
-        source: const MergeSource(videoUrl: _videoUrl, audioUrl: _audioUrl),
+        source: const MergeSource(
+          videoUrl: _videoUrl,
+          audioUrl: _audioUrl,
+          partBytes: 10,
+        ),
         autoSaveToGallery: true,
       );
 
@@ -391,6 +394,7 @@ void main() {
           title: 'A song',
           url: _videoUrl,
           outputPath: output(),
+          partBytes: 10,
         );
 
     test('queues the file in ranges and joins it where it is wanted', () async {
@@ -443,6 +447,15 @@ void main() {
         await Future<void>.delayed(Duration.zero);
         expect(settled, isFalse);
 
+        // What a paused download shows is what it keeps: a stopped part
+        // still reporting how far it got adds nothing.
+        final shown = <int>[];
+        transfer.onProgress = (received, _) => shown.add(received);
+        gateway.handleUpdate(bg.TaskProgressUpdate(first[1], 0.6));
+        expect(shown, [10]);
+        expect(transfer.receivedBytes, 10);
+        transfer.onProgress = null;
+
         parts.queued.clear();
         expect(await gateway.resume('task-1'), isTrue);
         // Under new ids: the system has been seen stopping a part queued
@@ -474,6 +487,70 @@ void main() {
         await transfer.discard();
       },
     );
+
+    // What the app shows as paused stays so until it is resumed: a launch
+    // after the pause must not take the missing parts for lost ones.
+    test('a paused download is still paused after the process ended', () async {
+      final gateway = pairs();
+      await startOne(gateway);
+      final first = List.of(parts.queued);
+      gateway.handleUpdate(await parts.finish(first[0]));
+      await pumpEventQueue();
+      await gateway.pause('task-1');
+      parts.queued.clear();
+
+      final later = pairs();
+      await later.recover();
+      await later.requeueLostParts();
+      expect(parts.queued, isEmpty, reason: 'nothing is fetched while paused');
+      final recovered = later.takeRecoveredSingleStreams().single;
+      expect(recovered.isPaused, isTrue);
+      expect(recovered.receivedBytes, 10);
+      expect(recovered.totalBytes, 25);
+
+      expect(await later.resume('task-1'), isTrue);
+      expect(recovered.isPaused, isFalse);
+      expect(parts.queued.map((t) => t.headers['Range']), [
+        'bytes=10-19',
+        'bytes=20-24',
+      ]);
+      // The resume is remembered too: a launch after it carries on.
+      final resumedRun = List.of(parts.queued);
+      parts.known.clear();
+      parts.queued.clear();
+      final afterResume = pairs();
+      await afterResume.recover();
+      await afterResume.requeueLostParts();
+      expect(afterResume.takeRecoveredSingleStreams().single.isPaused, isFalse);
+      expect(
+        parts.queued.map((t) => t.taskId),
+        resumedRun.map((t) => t.taskId),
+      );
+
+      await finishAll(later, resumedRun);
+      expect(File(await recovered.file).readAsBytesSync(), _video);
+    });
+
+    test('a download whose last part arrived is not paused', () async {
+      final gateway = pairs();
+      await startOne(gateway);
+      final first = List.of(parts.queued);
+      gateway.handleUpdate(await parts.finish(first[0]));
+      await pumpEventQueue();
+      await gateway.pause('task-1');
+      // The parts that were all but there when the pause came still land.
+      await parts.finish(first[1]);
+      await parts.finish(first[2]);
+      parts.queued.clear();
+
+      final later = pairs();
+      await later.recover();
+      await later.requeueLostParts();
+      final recovered = later.takeRecoveredSingleStreams().single;
+      expect(recovered.isPaused, isFalse);
+      expect(parts.queued, isEmpty);
+      expect(File(await recovered.file).readAsBytesSync(), _video);
+    });
 
     // The system stops a part by its id. Queued again under that id before
     // the stop has gone through, the part would be stopped with it.
