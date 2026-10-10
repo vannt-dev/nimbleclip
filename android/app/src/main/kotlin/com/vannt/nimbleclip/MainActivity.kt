@@ -73,6 +73,25 @@ class MainActivity : FlutterActivity() {
         })
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
+            "com.vannt.nimbleclip/keep_alive",
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "start" -> result.success(
+                    KeepAliveService.start(
+                        applicationContext,
+                        call.argument<String>("title") ?: "NimbleClip",
+                        call.argument<String>("text") ?: "",
+                    ),
+                )
+                "stop" -> {
+                    KeepAliveService.stop(applicationContext)
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
             "com.vannt.nimbleclip/media_store",
         ).setMethodCallHandler { call, result ->
             try {

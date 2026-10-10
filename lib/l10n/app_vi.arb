@@ -41,6 +41,8 @@
   "convertAudioToMp3": "Lưu âm thanh dạng MP3",
   "convertAudioToMp3Description": "Âm thanh tải về ở định dạng khác (M4A, WebM) được chuyển sang MP3 ngay trên máy",
   "mp3ConversionFailed": "Không chuyển được sang MP3 — giữ nguyên định dạng gốc",
+  "keepAliveTitle": "NimbleClip đang tải",
+  "keepAliveText": "Việc tải vẫn được hoàn tất khi ứng dụng chạy nền",
   "wifiOnlyDownloads": "Chỉ tải qua Wi-Fi",
   "wifiOnlyDownloadsDescription": "Khi dùng dữ liệu di động, lượt tải sẽ chờ và tự bắt đầu khi có Wi-Fi",
   "downloadsAwaitingWifi": "{count, plural, other{{count} lượt tải đang chờ Wi-Fi}}",

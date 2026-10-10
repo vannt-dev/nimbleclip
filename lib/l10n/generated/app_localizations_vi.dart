@@ -165,6 +165,13 @@ class AppLocalizationsVi extends AppLocalizations {
       'Không chuyển được sang MP3 — giữ nguyên định dạng gốc';
 
   @override
+  String get keepAliveTitle => 'NimbleClip đang tải';
+
+  @override
+  String get keepAliveText =>
+      'Việc tải vẫn được hoàn tất khi ứng dụng chạy nền';
+
+  @override
   String get wifiOnlyDownloads => 'Chỉ tải qua Wi-Fi';
 
   @override

@@ -167,6 +167,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not convert to MP3 — kept in the original format';
 
   @override
+  String get keepAliveTitle => 'NimbleClip is downloading';
+
+  @override
+  String get keepAliveText =>
+      'Your downloads are finished while the app is in the background';
+
+  @override
   String get wifiOnlyDownloads => 'Download on Wi-Fi only';
 
   @override

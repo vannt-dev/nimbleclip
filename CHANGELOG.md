@@ -9,11 +9,20 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 - YouTube audio downloads are fast. YouTube hands an audio stream out at
   about twice playback speed when the whole of it is asked for at once (a
   five-minute song took two and a half minutes), and at full speed a 10 MB
-  range at a time. On Android and iOS the audio is now fetched in such ranges,
-  as the parts of an HD video already were: the same song arrives in a few
-  seconds, a four-hour recording in under a minute. Pause keeps the parts
-  that have arrived, and a download cut off by the app closing is finished
-  the next time it opens.
+  range at a time. The audio is now fetched in such ranges, as the parts of
+  an HD video already were: the same song arrives in a few seconds, a
+  four-hour recording in under a minute. Pause keeps the parts that have
+  arrived, and a download cut off by the app closing is finished the next
+  time it opens. Tried on Android; iOS runs the same code and has not been
+  tried on a device.
+- Downloads are finished while the app is in the background, on Android.
+  The transfers themselves always carried on; what followed them did not
+  when Android froze or ended the app: joining the parts of an HD video,
+  converting audio to MP3, a stream fetched segment by segment, a slideshow.
+  While any download is running NimbleClip now shows a notification
+  ("NimbleClip is downloading") and the system leaves it working. The
+  notification goes a few seconds after the last
+  download ends. Swiping the app away still stops it.
 
 - The platforms are shown by their own marks (YouTube, TikTok, Facebook, X,
   Instagram, Threads, Pinterest, SoundCloud, Flickr) on the home screen, on

@@ -27,6 +27,7 @@ import '../services/background_download_service.dart';
 import '../services/download_history_repository.dart';
 import '../services/async_work_queue.dart';
 import '../services/audio/audio_converter.dart';
+import '../services/keep_alive.dart';
 import '../services/connection_monitor.dart';
 import '../services/extractors/registry.dart';
 import '../services/media_file_actions.dart';
@@ -47,7 +48,12 @@ class DownloadProvider extends ChangeNotifier {
     DashFetcher? dashFetcher,
     ConnectionMonitor? connectionMonitor,
     AudioConverter? audioConverter,
+    ProcessKeepAlive? keepAlive,
+    Duration keepAliveLinger = const Duration(seconds: 3),
   }) : _downloadService = downloadService ?? createDefaultDownloadService(),
+       _keepAlive = keepAlive ?? createProcessKeepAlive(),
+       // ignore: prefer_initializing_formals, the parameter is public, the field is not
+       _keepAliveLinger = keepAliveLinger,
        _connectionMonitor = connectionMonitor ?? PlatformConnectionMonitor(),
        _audioConverter = audioConverter ?? createAudioConverter(),
        _streamFetcher = streamFetcher ?? _defaultStreamFetcher,
@@ -241,9 +247,61 @@ class DownloadProvider extends ChangeNotifier {
     return false;
   }
 
+  final ProcessKeepAlive _keepAlive;
+
+  /// How long the process is kept after the last piece of work ends, so that
+  /// one download following another does not take the notification down and
+  /// put it up again.
+  final Duration _keepAliveLinger;
+  int _activeWork = 0;
+  bool _keptAlive = false;
+  Timer? _keepAliveRelease;
+
+  /// Runs [work] with the process kept working, also off screen.
+  ///
+  /// The transfers the system makes carry on without the app; this is for
+  /// what follows them and needs it: joining a video's parts, converting to
+  /// MP3, a stream fetched here, a slideshow. Started as the work starts,
+  /// which is when the user asked for it and the app is in front: the system
+  /// refuses to start it from the background.
+  Future<T> _keepingAlive<T>(
+    AppLocalizations l10n,
+    Future<T> Function() work,
+  ) async {
+    _activeWork++;
+    _syncKeepAlive(l10n);
+    try {
+      return await work();
+    } finally {
+      _activeWork--;
+      _syncKeepAlive(l10n);
+    }
+  }
+
+  void _syncKeepAlive(AppLocalizations l10n) {
+    if (!_keepAlive.isSupported || _isDisposed) return;
+    if (_activeWork > 0) {
+      _keepAliveRelease?.cancel();
+      _keepAliveRelease = null;
+      if (_keptAlive) return;
+      _keptAlive = true;
+      unawaited(
+        _keepAlive.start(title: l10n.keepAliveTitle, text: l10n.keepAliveText),
+      );
+    } else if (_keptAlive && _keepAliveRelease == null) {
+      _keepAliveRelease = Timer(_keepAliveLinger, () {
+        _keepAliveRelease = null;
+        _keptAlive = false;
+        unawaited(_keepAlive.stop());
+      });
+    }
+  }
+
   @override
   void dispose() {
     _isDisposed = true;
+    _keepAliveRelease?.cancel();
+    if (_keptAlive) unawaited(_keepAlive.stop());
     unawaited(_connectionChanges?.cancel());
     // Lets a render waiting for Wi-Fi fall out of its wait.
     _networkOpened?.complete();
@@ -688,6 +746,26 @@ class DownloadProvider extends ChangeNotifier {
       String outputPath,
     )
     produce,
+  }) => _keepingAlive(
+    l10n,
+    () => _runRendered(
+      task,
+      l10n,
+      isMerge: isMerge,
+      autoSaveToGallery: autoSaveToGallery,
+      produce: produce,
+    ),
+  );
+
+  Future<void> _runRendered(
+    DownloadTask task,
+    AppLocalizations l10n, {
+    required bool isMerge,
+    required bool autoSaveToGallery,
+    required Future<({String filePath, String? note})> Function(
+      String outputPath,
+    )
+    produce,
   }) async {
     String? outputPath;
     _slideshowRenders.add(task.id);
@@ -1044,6 +1122,15 @@ class DownloadProvider extends ChangeNotifier {
       _executeDownload(queued.task, l10n: queued.l10n, options: queued.options);
 
   Future<void> _executeDownload(
+    DownloadTask task, {
+    required AppLocalizations l10n,
+    DownloadOptions options = const DownloadOptions(),
+  }) => _keepingAlive(
+    l10n,
+    () => _runDownload(task, l10n: l10n, options: options),
+  );
+
+  Future<void> _runDownload(
     DownloadTask task, {
     required AppLocalizations l10n,
     DownloadOptions options = const DownloadOptions(),
