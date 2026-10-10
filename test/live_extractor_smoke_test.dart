@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:nimble_clip/core/utils/http_helper.dart';
 import 'package:nimble_clip/services/extractors/base_extractor.dart';
 import 'package:nimble_clip/services/extractors/extraction_failure.dart';
 import 'package:nimble_clip/services/extractors/registry.dart';
+import 'package:nimble_clip/services/extractors/youtube_extractor.dart';
 
 const _runLive = bool.fromEnvironment('RUN_LIVE_EXTRACTOR_TESTS');
 const _instagramImageUrl = String.fromEnvironment('INSTAGRAM_IMAGE_URL');
@@ -179,6 +181,51 @@ void main() {
       timeout: const Timeout(Duration(minutes: 2)),
     );
   }
+
+  // An address that resolves is not yet a file that arrives. In October 2026
+  // YouTube began answering 403 for the bytes past the first minute or so of
+  // the streams it gives the Android client: every case above stayed green,
+  // while a download of any longer video died on its third part. So this asks
+  // for the last bytes of each stream of a ten-minute video, as a download's
+  // last part does.
+  test(
+    'YouTube serves the end of every stream of a long video',
+    () async {
+      final metadata = await const YouTubeExtractor(
+        canMergeStreams: true,
+      ).extract('https://www.youtube.com/watch?v=aqz-KE-bpKQ');
+      final merged = metadata.qualities.where((option) => option.merge != null);
+      expect(merged, isNotEmpty, reason: 'no quality above 360p was offered');
+
+      final client = http.Client();
+      addTearDown(client.close);
+      Future<int> lastBytes(String url, int total) async {
+        final request = http.Request('GET', Uri.parse(url))
+          ..headers['Range'] = 'bytes=${total - 65536}-${total - 1}';
+        final response = await client.send(request);
+        await response.stream.drain<void>();
+        return response.statusCode;
+      }
+
+      for (final option in metadata.qualities) {
+        final merge = option.merge;
+        final sources = merge != null
+            ? [
+                (merge.videoUrl, merge.videoBytes ?? 0),
+                (merge.audioUrl, merge.audioBytes ?? 0),
+              ]
+            : [(option.downloadUrl, option.sizeBytes ?? 0)];
+        for (final (url, total) in sources) {
+          expect(total, greaterThan(65536), reason: option.id);
+          expect(await lastBytes(url, total), 206, reason: option.id);
+        }
+      }
+    },
+    skip: !_runLive
+        ? 'Run tool/check_live_extractors.ps1 to test live services.'
+        : false,
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
 
   // The outage that prompted this check never reached parsing: Facebook
   // answered 400 to a page GET that claimed a browser User-Agent without the

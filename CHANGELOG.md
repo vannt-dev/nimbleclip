@@ -6,6 +6,12 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [1.12.0] - 2026-10-10
 
+- YouTube videos longer than about a minute download again above 360p, and
+  so does their audio. YouTube had begun refusing (HTTP 403) the later parts of the streams it
+  gives the client NimbleClip asked as, so such a download stopped after its
+  first parts and ended in "Download failed". The streams are now requested
+  the way YouTube's visionOS app does, and they are served whole.
+
 - Three more sources: **Pinterest** (a pin's video or picture, `pin.it` short
   links included), **SoundCloud** (a track, as the MP3 SoundCloud serves) and
   **Flickr** (a photo at its largest size, or a video's files, `flic.kr` short
