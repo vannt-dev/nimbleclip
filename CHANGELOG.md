@@ -19,7 +19,12 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   ("NimbleClip is downloading") and the system leaves it working. The
   notification goes a few seconds after the last
   download ends. Swiping the app away still stops it.
-
+- The repository builds without the private core. `dart run
+  tool/use_public_core.dart` puts a public core in its place
+  (`lib/services/extractors_public`): one extractor for links to media files
+  and for pages with Open Graph metadata, and stand-ins for the rest. Android,
+  iOS and Web build from a plain clone that way; the sites NimbleClip knows by
+  name still need the full core, which the released builds are made with.
 - The platforms are shown by their own marks (YouTube, TikTok, Facebook, X,
   Instagram, Threads, Pinterest, SoundCloud, Flickr) on the home screen, on
   the labels of a result and on the cards of the Downloads screen, where

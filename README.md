@@ -177,9 +177,10 @@ The exact Dart SDK constraint is defined in `pubspec.yaml`.
 The core of the app (`lib/services/extractors`) is a git submodule of a
 private repository: the per-site extractors, the HLS and DASH stream code, the
 Android encoders (slideshow, stream join, segment cipher, MP3) and the tests
-and fixtures that go with them. The rest of the app is in this repository, but
-it does not build without the core, so a clone needs read access to
-`vannt-dev/nimbleclip-core`:
+and fixtures that go with them. The rest of the app is in this repository.
+
+**With read access to `vannt-dev/nimbleclip-core`** the clone brings the core
+with it:
 
 ```bash
 git clone --recurse-submodules https://github.com/vannt-dev/nimbleclip.git
@@ -187,6 +188,37 @@ cd nimbleclip
 flutter pub get
 git config core.hooksPath .githooks
 ```
+
+**Without it**, the repository still builds, with the public core that is
+part of it (`lib/services/extractors_public`):
+
+```bash
+git clone https://github.com/vannt-dev/nimbleclip.git
+cd nimbleclip
+dart run tool/use_public_core.dart
+flutter pub get
+flutter run                      # or: flutter build apk / ios / web
+```
+
+The script copies the public core into the empty `lib/services/extractors`.
+Git does not look inside a submodule's folder that was never checked out, so
+the copy never shows up as a change; run the script again after a pull to pick
+up changes. What such a build does and does not do:
+
+- It reads a link to a media file (video, audio, picture) and a page that names
+  its media in Open Graph or Twitter Card metadata, and downloads them with
+  everything the app has around a download: the queue, pause and resume,
+  history, the gallery.
+- It does not read YouTube, TikTok, Facebook, Instagram, X, Threads, Pinterest,
+  SoundCloud or Flickr: a link to one of them is answered with "no
+  downloadable media". Streams (HLS, DASH), slideshows, joined HD video and
+  MP3 conversion are part of the full core too; Save audio as MP3 keeps the
+  file as it was fetched.
+- Android, iOS and Web build the same way. The tests that belong to it are
+  `flutter test test/public_core_test.dart`; the rest of `test/` exercises the
+  full core and needs it.
+
+The released APK and Web build are made with the full core.
 
 The repository hooks enforce Conventional Commits, run formatting and static
 analysis before commits, and run tests plus a release Web build before pushes.
@@ -381,6 +413,8 @@ lib/
 |   |-- extractors/      Private core (submodule): extractors, page parsers,
 |   |                    fallback clients, registry; `streams/` (HLS, DASH),
 |   |                    `android/` (Kotlin encoders), `test/` (its tests)
+|   |-- extractors_public/  Public core: what a checkout without the private
+|   |                    one is built with (`tool/use_public_core.dart`)
 |   |-- async_work_queue.dart
 |   |-- background_download_service.dart
 |   |-- download_history_repository.dart
@@ -439,6 +473,9 @@ The GitHub Actions workflow runs on every pull request and every push to
 analysis and tests, builds an Android APK and release Web bundle, runs the Node
 server checks, builds iOS with the Share Extension and App Group checks, and
 executes the Android storage/download integration suite on an API 34 emulator.
+Two more jobs build the app the way an outside checkout does, with the public
+core and no access to the private one, for Android and for iOS; a pull request
+from a fork runs those two, while the jobs that need the private core cannot.
 A version-bump commit on `main` automatically starts the signed release
 workflow after every CI job succeeds, as documented in
 [RELEASING.md](RELEASING.md).
