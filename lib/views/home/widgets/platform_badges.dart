@@ -57,6 +57,9 @@ class PlatformBadges extends StatelessWidget {
                     child: Container(
                       width: size,
                       height: size,
+                      // a mark is as wide as it is drawn, not a square that
+                      // fills the circle, so it has to be placed
+                      alignment: Alignment.center,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: isDark
@@ -67,8 +70,8 @@ class PlatformBadges extends StatelessWidget {
                           width: 1,
                         ),
                       ),
-                      child: Icon(
-                        p.icon,
+                      child: PlatformIcon(
+                        p,
                         size: size * 0.5,
                         color: p.brandColor,
                         semanticLabel: p.displayName,

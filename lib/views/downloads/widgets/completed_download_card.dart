@@ -75,17 +75,21 @@ class CompletedDownloadCard extends StatelessWidget {
                                 memCacheWidth: imageCacheWidth(context, 72),
                                 errorWidget: (context, url, error) => Container(
                                   color: task.platform.brandColor.withAlpha(30),
-                                  child: Icon(
-                                    task.platform.icon,
-                                    color: task.platform.brandColor,
+                                  child: Center(
+                                    child: PlatformIcon(
+                                      task.platform,
+                                      color: task.platform.brandColor,
+                                    ),
                                   ),
                                 ),
                               )
                             : Container(
                                 color: task.platform.brandColor.withAlpha(30),
-                                child: Icon(
-                                  task.platform.icon,
-                                  color: task.platform.brandColor,
+                                child: Center(
+                                  child: PlatformIcon(
+                                    task.platform,
+                                    color: task.platform.brandColor,
+                                  ),
                                 ),
                               ),
                       ),
@@ -130,15 +134,18 @@ class CompletedDownloadCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(
-                          task.isImage
-                              ? Icons.image_outlined
-                              : task.platform.icon,
-                          size: 13,
-                          color: task.isImage
-                              ? AppColors.primary
-                              : task.platform.brandColor,
-                        ),
+                        if (task.isImage)
+                          const Icon(
+                            Icons.image_outlined,
+                            size: 13,
+                            color: AppColors.primary,
+                          )
+                        else
+                          PlatformIcon(
+                            task.platform,
+                            size: 13,
+                            color: task.platform.brandColor,
+                          ),
                         const SizedBox(width: 4),
                         Text(
                           task.shownQualityLabel,
