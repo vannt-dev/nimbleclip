@@ -200,6 +200,8 @@ class BackgroundStreamPairs implements StreamPairGateway {
   Future<void> requeueLostParts() async {
     for (final transfer in List.of(_recovered)) {
       await transfer.finishIfWhole();
+      // Paused before the process ended: the rest waits for the resume.
+      if (transfer.isPaused) continue;
       for (final part in transfer.parts) {
         if (transfer.isSettled) break;
         if (part.done || await _downloader.isKnown(part.task.taskId)) continue;
@@ -231,7 +233,8 @@ class BackgroundStreamPairs implements StreamPairGateway {
   }
 
   /// Stops [taskId]'s running parts and keeps the ones that arrived, until
-  /// [resume]. False when there is no such transfer.
+  /// [resume]. The pause is written beside the parts, so it holds across a
+  /// launch. False when there is no such transfer.
   Future<bool> pause(String taskId) async {
     final transfer = _transfers[taskId];
     if (transfer == null || transfer.isSettled) return false;
@@ -381,6 +384,7 @@ class _Manifest {
     required this.audio,
     this.outputPath,
     this.round = 0,
+    this.paused = false,
   });
 
   factory _Manifest.fromJson(Map<String, dynamic> json) {
@@ -398,6 +402,7 @@ class _Manifest {
       audio: json['audio'] == null ? null : plan(json['audio']),
       outputPath: json['outputPath'] as String?,
       round: json['round'] as int? ?? 0,
+      paused: json['paused'] as bool? ?? false,
     );
   }
 
@@ -418,7 +423,11 @@ class _Manifest {
   /// their ids, so a later launch asks the system about the ids in use.
   final int round;
 
-  _Manifest withRound(int round) => _Manifest(
+  /// Whether the transfer was paused when this was written. A launch that
+  /// finds it so leaves the missing parts alone until the resume.
+  final bool paused;
+
+  _Manifest copyWith({int? round, bool? paused}) => _Manifest(
     taskId: taskId,
     title: title,
     autoSaveToGallery: autoSaveToGallery,
@@ -426,7 +435,8 @@ class _Manifest {
     video: video,
     audio: audio,
     outputPath: outputPath,
-    round: round,
+    round: round ?? this.round,
+    paused: paused ?? this.paused,
   );
 
   /// The id of the system transfer that fetches part [index] of [stream].
@@ -454,6 +464,7 @@ class _Manifest {
       'audio': {'url': audio.url, 'total': audio.total},
     'outputPath': ?outputPath,
     if (round != 0) 'round': round,
+    if (paused) 'paused': true,
   };
 }
 
@@ -494,6 +505,7 @@ class _PairTransfer implements StreamPairTransfer, SingleStreamTransfer {
     // the provider — and an unheard failure would surface as an uncaught
     // error. Whoever does await [files] still receives it.
     _files.future.ignore();
+    paused = manifest.paused;
     for (final stream in manifest.streams) {
       final plan = manifest.plan(stream);
       final ranges = planStreamParts(plan.total, partBytes: manifest.partBytes);
@@ -547,13 +559,15 @@ class _PairTransfer implements StreamPairTransfer, SingleStreamTransfer {
       ) ??
       Future<void>.value();
 
+  Future<void> _writeManifest() => File(
+    '${directory.path}/$_manifestName',
+  ).writeAsString(jsonEncode(manifest.toJson()), flush: true);
+
   /// Gives every part that has not arrived a new id, and records the round
-  /// so that a later launch knows them by it.
+  /// so that a later launch knows them by it, and that the pause is over.
   Future<void> renumberPending() async {
-    manifest = manifest.withRound(manifest.round + 1);
-    await File(
-      '${directory.path}/$_manifestName',
-    ).writeAsString(jsonEncode(manifest.toJson()), flush: true);
+    manifest = manifest.copyWith(round: manifest.round + 1, paused: false);
+    await _writeManifest();
     for (final part in parts) {
       if (part.done) continue;
       part.task = part.task.copyWith(
@@ -569,6 +583,13 @@ class _PairTransfer implements StreamPairTransfer, SingleStreamTransfer {
   }
 
   bool get isSingle => manifest.audio == null;
+
+  @override
+  bool get isPaused => paused && !isSettled;
+
+  @override
+  int get receivedBytes =>
+      parts.where((part) => part.done).fold(0, (sum, part) => sum + part.bytes);
 
   @override
   String get outputPath => manifest.outputPath ?? _joinedPath(_Stream.video);
@@ -624,6 +645,15 @@ class _PairTransfer implements StreamPairTransfer, SingleStreamTransfer {
     _pauseReported = Completer<void>();
     notePauseReport();
     await _cancelParts(running).catchError((_) {});
+    // Remembered, so that a launch after this one does not take the missing
+    // parts for lost ones and fetch them. A pause that cannot be written down
+    // still holds for as long as the process does.
+    manifest = manifest.copyWith(paused: true);
+    try {
+      if (!isSettled) await _writeManifest();
+    } on FileSystemException {
+      // As above.
+    }
   }
 
   Future<bool> isStreamJoined(_Stream stream) =>
