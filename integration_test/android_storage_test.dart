@@ -10,6 +10,8 @@ import 'package:nimble_clip/models/download_task.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/services/download_service.dart';
 import 'package:nimble_clip/services/background_download_service.dart';
+import 'package:nimble_clip/services/background_stream_pairs.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 
 /// On-device checks for the Android storage and download paths.
@@ -43,6 +45,14 @@ DownloadTask fixtureTask({
     platform: VideoPlatform.generic,
     qualityLabel: 'Original',
   );
+}
+
+/// Waits for [done] to hold, for a transfer that takes a moment to start.
+Future<void> _until(bool Function() done) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 15));
+  while (!done() && DateTime.now().isBefore(deadline)) {
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
 }
 
 void main() {
@@ -117,10 +127,28 @@ void main() {
   });
 
   group('download over cleartext to the dev host', () {
-    test('native background worker completes a real media transfer', () async {
-      final backgroundService = BackgroundDownloadService(
-        requestNotificationPermission: false,
+    // One for the group: background_downloader's updates can be listened to
+    // once in a process, so a second service would hear nothing.
+    late BackgroundDownloadService backgroundService;
+    late Directory scratch;
+
+    setUpAll(() async {
+      scratch = Directory(
+        '${(await getApplicationSupportDirectory()).path}/parts_test',
       );
+      backgroundService = BackgroundDownloadService(
+        requestNotificationPermission: false,
+        streamPairs: BackgroundStreamPairs(
+          root: () async => scratch,
+          // small enough to cut the sample into several parts
+          partBytes: fixtureSize ~/ 4 + 1,
+        ),
+        inParts: (task) => task.title.startsWith('In parts'),
+      );
+    });
+    tearDownAll(() => backgroundService.dispose());
+
+    test('native background worker completes a real media transfer', () async {
       final task = fixtureTask(id: 'aaaaaa00-back', title: 'Background worker');
       String? failure;
 
@@ -139,8 +167,104 @@ void main() {
       expect(await file.length(), fixtureSize);
       expect(String.fromCharCodes(await file.openRead(4, 8).first), 'ftyp');
       await file.delete();
-      backgroundService.dispose();
     });
+
+    // What a YouTube audio download does: the file is fetched as several
+    // system transfers, a byte range each, and joined where the download is.
+    test('a download fetched in parts arrives whole', () async {
+      final task = fixtureTask(id: 'aaaaaa00-part', title: 'In parts');
+      String? failure;
+      final progress = <double>[];
+
+      await backgroundService.startDownload(
+        task: task,
+        l10n: l10n,
+        autoSaveToGallery: false,
+        onProgress: (_, fraction, _, _, _) => progress.add(fraction),
+        onComplete: (_, _) {},
+        onError: (_, error) => failure = error,
+      );
+
+      expect(failure, isNull, reason: 'parts transfer reported: $failure');
+      expect(task.status, DownloadStatus.completed);
+      final file = File(task.filePath!);
+      expect(await file.readAsBytes(), fixtureBytes);
+      expect(progress, isNotEmpty);
+      expect(progress.last, 1.0);
+      // Nothing of the transfer is left beside the download or in its scratch.
+      expect(File('${file.path}.part').existsSync(), isFalse);
+      expect(
+        scratch.existsSync() ? scratch.listSync() : const <FileSystemEntity>[],
+        isEmpty,
+      );
+      await file.delete();
+    });
+
+    test('a download in parts stops on cancel and leaves nothing', () async {
+      // The slow fixture gives the cancel something to interrupt.
+      final task = fixtureTask(
+        id: 'aaaaaa00-pcan',
+        title: 'In parts, cancelled',
+        query: '?slow=1',
+      );
+
+      final done = backgroundService.startDownload(
+        task: task,
+        l10n: l10n,
+        autoSaveToGallery: false,
+        onProgress: (_, _, _, _, _) {},
+        onComplete: (_, _) {},
+        onError: (_, _) {},
+      );
+      await _until(() => backgroundService.isRunning(task.id));
+      final path = task.filePath!;
+      backgroundService.cancelDownload(task.id);
+      await done;
+
+      expect(task.status, DownloadStatus.cancelled);
+      expect(File(path).existsSync(), isFalse);
+      expect(File('$path.part').existsSync(), isFalse);
+      expect(
+        scratch.existsSync() ? scratch.listSync() : const <FileSystemEntity>[],
+        isEmpty,
+      );
+    });
+
+    test(
+      'a download in parts pauses and carries on from what arrived',
+      () async {
+        final task = fixtureTask(
+          id: 'aaaaaa00-ppau',
+          title: 'In parts, paused',
+          query: '?slow=1',
+        );
+        String? failure;
+        Future<void> run() => backgroundService.startDownload(
+          task: task,
+          l10n: l10n,
+          autoSaveToGallery: false,
+          onProgress: (_, _, _, _, _) {},
+          onComplete: (_, _) {},
+          onError: (_, error) => failure = error,
+        );
+
+        final first = run();
+        await _until(() => backgroundService.isRunning(task.id));
+        expect(backgroundService.pauseDownload(task.id), isTrue);
+        await first;
+        expect(task.status, DownloadStatus.paused);
+
+        // The provider puts a resumed task back in its queue as queued.
+        task.status = DownloadStatus.queued;
+        await run();
+
+        expect(failure, isNull, reason: 'resumed transfer reported: $failure');
+        expect(task.status, DownloadStatus.completed);
+        final file = File(task.filePath!);
+        expect(await file.readAsBytes(), fixtureBytes);
+        await file.delete();
+      },
+    );
 
     test('completes and writes the whole file', () async {
       // Also proves network_security_config still allows 10.0.2.2 now that the

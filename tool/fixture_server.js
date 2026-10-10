@@ -168,6 +168,23 @@ function serve() {
           'Content-Length': end - start + 1,
           'Accept-Ranges': 'bytes',
         });
+        // `?slow` hands a range out over about three seconds, so a test has a
+        // transfer still running when it pauses or cancels.
+        if (req.url.includes('slow')) {
+          const body = fs.readFileSync(FIXTURE_FILE).subarray(start, end + 1);
+          const step = Math.ceil(body.length / 20);
+          let sent = 0;
+          const timer = setInterval(() => {
+            if (res.destroyed || sent >= body.length) {
+              clearInterval(timer);
+              if (!res.destroyed) res.end();
+              return;
+            }
+            res.write(body.subarray(sent, sent + step));
+            sent += step;
+          }, 150);
+          return undefined;
+        }
         return fs.createReadStream(FIXTURE_FILE, { start, end }).pipe(res);
       }
 

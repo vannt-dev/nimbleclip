@@ -13,8 +13,10 @@ import '../core/utils/platform_file.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../models/download_task.dart';
 import '../models/merge_source.dart';
+import '../models/video_platform.dart';
 import 'background_stream_pairs.dart';
 import 'download_service.dart';
+import 'slideshow/slideshow_failure.dart';
 import 'storage_service.dart';
 import 'stream_pair_gateway.dart';
 
@@ -40,7 +42,10 @@ class BackgroundDownloadService
     this.validator = const MediaFileValidator(),
     this.requestNotificationPermission = true,
     BackgroundStreamPairs? streamPairs,
+    bool Function(DownloadTask task) inParts = fetchesInParts,
   }) : _storage = storageService ?? StorageService(),
+       // ignore: prefer_initializing_formals, the parameter is public, the field is not
+       _inParts = inParts,
        _pairs = streamPairs ?? BackgroundStreamPairs(root: _streamPairRoot) {
     _updates = bg.FileDownloader().updates.listen(_onUpdate);
     // A merged video is dozens of parts; one notification counts them rather
@@ -48,17 +53,14 @@ class BackgroundDownloadService
     bg.FileDownloader().configureNotificationForGroup(
       streamPartGroup,
       running: const bg.TaskNotification(
-        'NimbleClip - HD video',
+        'NimbleClip',
         '{numFinished} of {numTotal} parts',
       ),
       complete: const bg.TaskNotification(
-        'NimbleClip - HD video',
+        'NimbleClip',
         'Downloaded - open NimbleClip if it does not finish',
       ),
-      error: const bg.TaskNotification(
-        'NimbleClip - HD video',
-        'Download failed',
-      ),
+      error: const bg.TaskNotification('NimbleClip', 'Download failed'),
       progressBar: true,
       groupNotificationId: streamPartGroup,
     );
@@ -94,6 +96,25 @@ class BackgroundDownloadService
   final Set<String> _running = {};
   final Set<String> _finishing = {};
   final BackgroundStreamPairs _pairs;
+
+  /// Downloads fetched in parts rather than as one system transfer, running
+  /// or paused. See [fetchesInParts].
+  final bool Function(DownloadTask task) _inParts;
+  final Map<String, SingleStreamTransfer> _partTransfers = {};
+  final Set<String> _pausedParts = {};
+
+  /// Whether [task] is fetched a range at a time.
+  ///
+  /// YouTube hands an audio stream out at about twice playback speed when the
+  /// whole of it is asked for in one request — a five-minute song took two and
+  /// a half minutes — and at full speed in ranges of [streamPartBytes]. Its
+  /// 360p file with picture and sound is not held back, so that one stays a
+  /// single transfer, which can also resume mid-file.
+  static bool fetchesInParts(DownloadTask task) =>
+      task.platform == VideoPlatform.youtube &&
+      task.isAudioOnly &&
+      (Uri.tryParse(task.downloadUrl)?.host.endsWith('.googlevideo.com') ??
+          false);
   Future<void>? _startFuture;
 
   Future<void> _ensureStarted() =>
@@ -195,15 +216,42 @@ class BackgroundDownloadService
     await _ensureStarted();
     await _pairs.requeueLostParts();
 
+    // A download in parts has no record under its own id either; what a
+    // later launch needs is in its manifest, and its task says it was cut off.
+    final interrupted = {for (final task in tasks) task.id: task};
+    for (final transfer in _pairs.takeRecoveredSingleStreams()) {
+      final task = interrupted[transfer.taskId];
+      if (task == null) {
+        await _discardParts(transfer);
+        continue;
+      }
+      _contexts[task.id] = _BackgroundContext(
+        task: task,
+        l10n: lookupAppLocalizations(const Locale('en')),
+        onProgress: (changed, _, _, _, _) {
+          changed.notifyProgressChanged();
+          onChanged(changed);
+        },
+        onComplete: (changed, _) => onTerminal(changed),
+        onError: (changed, _) => onTerminal(changed),
+        autoSaveToGallery: false,
+        completer: Completer<void>(),
+      );
+      task
+        ..status = DownloadStatus.downloading
+        ..filePath = transfer.outputPath
+        ..totalBytes = transfer.totalBytes
+        ..errorMessage = null;
+      _watchParts(task.id, transfer);
+      onChanged(task);
+    }
+
     for (final task in tasks) {
       final record = recordsById[task.id];
       if (record?.status == bg.TaskStatus.complete &&
           _contexts.containsKey(task.id) &&
           _finishing.add(task.id)) {
-        await _complete(
-          task.id,
-          bg.TaskStatusUpdate(record!.task, bg.TaskStatus.complete),
-        );
+        await _complete(task.id, await record!.task.filePath());
       }
     }
   }
@@ -236,9 +284,22 @@ class BackgroundDownloadService
 
     try {
       final existing = _nativeTasks[task.id];
-      // DownloadProvider changes paused -> queued before handing the task back
-      // to the worker, so the retained native task is the reliable resume flag.
-      if (existing != null) {
+      if (_pausedParts.remove(task.id)) {
+        // The parts that arrived before the pause are kept; the rest are
+        // queued again.
+        _running.add(task.id);
+        task
+          ..status = DownloadStatus.downloading
+          ..errorMessage = null;
+        if (!await _pairs.resume(task.id)) {
+          _fail(task.id, l10n.unknownNetworkError);
+        }
+      } else if (_inParts(task)) {
+        await _startInParts(task, l10n);
+      } else if (existing != null) {
+        // DownloadProvider changes paused -> queued before handing the task
+        // back to the worker, so the retained native task is the reliable
+        // resume flag.
         final resumed = await bg.FileDownloader().resume(existing);
         if (!resumed) {
           _nativeTasks.remove(task.id);
@@ -282,6 +343,98 @@ class BackgroundDownloadService
       // The queue still holds new downloads back; only transfers already
       // handed to the system are beyond reach.
     }
+  }
+
+  /// Queues [task]'s file a range at a time. When its length cannot be
+  /// confirmed it is fetched as one transfer after all: slower, but it arrives.
+  Future<void> _startInParts(DownloadTask task, AppLocalizations l10n) async {
+    await _requestNotificationPermission();
+    final directory = await _storage.getDownloadDirectory();
+    if (directory == null) {
+      throw StateError(l10n.unknownNetworkError);
+    }
+    final path = '$directory/${buildFileName(task)}';
+    // The parts are joined into this file, and one already there would be
+    // taken for the finished join.
+    await _deleteOutput(path);
+    final SingleStreamTransfer transfer;
+    try {
+      transfer = await _pairs.startSingleStream(
+        taskId: task.id,
+        title: task.title,
+        url: task.downloadUrl,
+        outputPath: path,
+      );
+    } on SlideshowException {
+      await _enqueue(task, l10n);
+      return;
+    }
+    // Confirming the length and queueing the parts took a moment, and a
+    // cancel in that moment found no transfer to stop.
+    final cancelled = task.status == DownloadStatus.cancelled;
+    if (!cancelled) {
+      task
+        ..status = DownloadStatus.downloading
+        ..filePath = path
+        ..totalBytes = transfer.totalBytes
+        ..errorMessage = null;
+    }
+    _watchParts(task.id, transfer);
+    if (cancelled) _pairs.cancelStreamPair(task.id);
+  }
+
+  /// Follows [transfer] for the download [id] until its file is whole.
+  void _watchParts(String id, SingleStreamTransfer transfer) {
+    _partTransfers[id] = transfer;
+    _running.add(id);
+    transfer.onProgress = (received, bytesPerSecond) {
+      final context = _contexts[id];
+      if (context == null) return;
+      final total = transfer.totalBytes;
+      final task = context.task;
+      task
+        ..status = DownloadStatus.downloading
+        ..progress = total > 0 ? (received / total).clamp(0.0, 1.0) : 0.0
+        ..totalBytes = total
+        ..receivedBytes = received
+        ..downloadSpeed = bytesPerSecond;
+      context.onProgress(task, task.progress, received, total, bytesPerSecond);
+    };
+    unawaited(_finishParts(id, transfer));
+  }
+
+  Future<void> _finishParts(String id, SingleStreamTransfer transfer) async {
+    try {
+      final path = await transfer.file;
+      transfer.onProgress = null;
+      _partTransfers.remove(id);
+      // Before the checks below: they read the file, not the parts.
+      await _discardParts(transfer);
+      if (_finishing.add(id)) await _complete(id, path);
+    } on SlideshowException catch (error) {
+      transfer.onProgress = null;
+      _partTransfers.remove(id);
+      _pausedParts.remove(id);
+      await _discardParts(transfer);
+      await _deleteOutput(transfer.outputPath);
+      if (error.kind == SlideshowFailureKind.cancelled) {
+        _contexts[id]?.task
+          ?..status = DownloadStatus.cancelled
+          ..downloadSpeed = 0;
+        _finishAwait(id);
+      } else {
+        _fail(id, 'Download failed (${error.detail ?? error.kind.name})');
+      }
+    }
+  }
+
+  Future<void> _discardParts(SingleStreamTransfer transfer) =>
+      transfer.discard().catchError((_) {});
+
+  /// Removes a joined file and the unfinished one beside it.
+  Future<void> _deleteOutput(String path) async {
+    await PlatformFileHelper.deleteFile(path);
+    await PlatformFileHelper.deleteFile('$path.part');
   }
 
   Future<void> _enqueue(DownloadTask task, AppLocalizations l10n) async {
@@ -359,7 +512,9 @@ class BackgroundDownloadService
           ..downloadSpeed = 0;
         _finishAwait(id, keepNativeTask: true);
       case bg.TaskStatus.complete:
-        if (_finishing.add(id)) unawaited(_complete(id, update));
+        if (_finishing.add(id)) {
+          unawaited(update.task.filePath().then((path) => _complete(id, path)));
+        }
       case bg.TaskStatus.canceled:
         _running.remove(id);
         task
@@ -376,12 +531,14 @@ class BackgroundDownloadService
     }
   }
 
-  Future<void> _complete(String id, bg.TaskStatusUpdate update) async {
+  /// Checks the file a finished download left at [path] and reports it.
+  Future<void> _complete(String id, String path) async {
     final context = _contexts[id];
-    final nativeTask = _nativeTasks[id];
-    if (context == null || nativeTask == null) return;
+    if (context == null) {
+      _finishing.remove(id);
+      return;
+    }
     final task = context.task;
-    var path = await nativeTask.filePath();
     try {
       final header = await PlatformFileHelper.readFileHeader(path, length: 512);
       final inspection = validator.inspect(header);
@@ -445,11 +602,25 @@ class BackgroundDownloadService
 
   @override
   void cancelDownload(String taskId) {
+    if (_partTransfers.containsKey(taskId)) {
+      _pairs.cancelStreamPair(taskId);
+      return;
+    }
     unawaited(bg.FileDownloader().cancelTaskWithId(taskId));
   }
 
   @override
   bool pauseDownload(String taskId) {
+    if (_partTransfers.containsKey(taskId)) {
+      if (!_running.contains(taskId)) return false;
+      _pausedParts.add(taskId);
+      unawaited(_pairs.pause(taskId));
+      _contexts[taskId]?.task
+        ?..status = DownloadStatus.paused
+        ..downloadSpeed = 0;
+      _finishAwait(taskId);
+      return true;
+    }
     final task = _nativeTasks[taskId];
     if (task == null || !_running.contains(taskId)) return false;
     unawaited(bg.FileDownloader().pause(task));
