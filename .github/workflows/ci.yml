@@ -149,6 +149,59 @@ jobs:
           grep -q 'group.com.vannt.nimbleclip' ios/Runner/Runner.entitlements
           grep -q 'group.com.vannt.nimbleclip' "ios/Share Extension/ShareExtension.entitlements"
 
+  # What someone outside sees: this repository and nothing else. The private
+  # core cannot be fetched, so no deploy key here; the public core that is part
+  # of the repository is put in its place and the app has to analyse, pass the
+  # public core's tests and build. A pull request from a fork runs these two
+  # jobs the same way. They do not gate a release: a released build is made
+  # with the full core.
+  public-core:
+    name: Build from the public repository alone (Android)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          channel: stable
+          cache: true
+      - name: The private core is not here
+        run: test ! -e lib/services/extractors/registry.dart
+      - name: Put the public core in its place
+        run: dart run tool/use_public_core.dart
+      - run: flutter pub get
+      - name: Nothing shows up as a change
+        run: test -z "$(git status --porcelain -- lib/services/extractors)"
+      - name: The app's own code analyses against the public core
+        run: flutter analyze lib
+      - run: flutter test test/public_core_test.dart
+      - run: flutter build apk --debug --target-platform android-arm64
+
+  public-core-ios:
+    name: Build from the public repository alone (iOS)
+    runs-on: macos-15
+    timeout-minutes: 25
+    env:
+      # As for the ios job above.
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          channel: stable
+          cache: true
+      - name: Put the public core in its place
+        run: dart run tool/use_public_core.dart
+      - run: flutter pub get
+      - name: Build iOS without signing
+        run: flutter build ios --debug --no-codesign
+
   release-candidate:
     name: Detect version release
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
