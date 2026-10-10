@@ -169,8 +169,8 @@ void main() {
       await file.delete();
     });
 
-    // What a YouTube audio download does: the file is fetched as several
-    // system transfers, a byte range each, and joined where the download is.
+    // A download in parts: the file is fetched as several system transfers,
+    // a byte range each, and joined where the download is.
     test('a download fetched in parts arrives whole', () async {
       final task = fixtureTask(id: 'aaaaaa00-part', title: 'In parts');
       String? failure;

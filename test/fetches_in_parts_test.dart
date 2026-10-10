@@ -22,9 +22,8 @@ DownloadTask _task({
   kind: kind,
 );
 
-/// Only the file YouTube holds back when it is asked for whole is fetched a
-/// range at a time; everything else stays one transfer, which can resume
-/// mid-file.
+/// Which downloads are fetched a range at a time; everything else stays one
+/// transfer, which can resume mid-file.
 void main() {
   const stream =
       'https://rr3---sn-8qj-nboel.googlevideo.com/videoplayback?itag=140';
@@ -43,7 +42,7 @@ void main() {
   });
 
   test('everything else is one transfer', () {
-    // YouTube's 360p file with picture and sound is served at full speed whole.
+    // YouTube's 360p file with picture and sound.
     expect(
       BackgroundDownloadService.fetchesInParts(
         _task(

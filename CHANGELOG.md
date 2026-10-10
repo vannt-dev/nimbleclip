@@ -6,15 +6,11 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
-- YouTube audio downloads are fast. YouTube hands an audio stream out at
-  about twice playback speed when the whole of it is asked for at once (a
-  five-minute song took two and a half minutes), and at full speed a 10 MB
-  range at a time. The audio is now fetched in such ranges, as the parts of
-  an HD video already were: the same song arrives in a few seconds, a
-  four-hour recording in under a minute. Pause keeps the parts that have
-  arrived, and a download cut off by the app closing is finished the next
-  time it opens. Tried on Android; iOS runs the same code and has not been
-  tried on a device.
+- YouTube audio downloads are much faster: a five-minute song arrives in a
+  few seconds where it took two and a half minutes, a four-hour recording in
+  under a minute. Pause keeps what has arrived, and a download cut off by the
+  app closing is finished the next time it opens. Tried on Android; iOS runs
+  the same code and has not been tried on a device.
 - Downloads are finished while the app is in the background, on Android.
   The transfers themselves always carried on; what followed them did not
   when Android froze or ended the app: joining the parts of an HD video,
@@ -33,10 +29,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 ## [1.12.0] - 2026-10-10
 
 - YouTube videos longer than about a minute download again above 360p, and
-  so does their audio. YouTube had begun refusing (HTTP 403) the later parts of the streams it
-  gives the client NimbleClip asked as, so such a download stopped after its
-  first parts and ended in "Download failed". The streams are now requested
-  the way YouTube's visionOS app does, and they are served whole.
+  so does their audio. Such a download had started to stop part-way and end
+  in "Download failed".
 
 - Three more sources: **Pinterest** (a pin's video or picture, `pin.it` short
   links included), **SoundCloud** (a track, as the MP3 SoundCloud serves) and
@@ -154,8 +148,7 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 - On Android, a 480p-1080p YouTube download now keeps going after the app is
   closed or Android ends it. Both streams are queued up front as
-  system-managed downloads of at most 10 MB each (YouTube throttles larger
-  ranges to about playback speed), several of which run at once. One
+  system-managed downloads, in parts, several of which run at once. One
   notification counts the parts. Joining the streams still needs the app: if
   the parts finish while it is closed, the video is joined the next time it
   opens.
@@ -181,9 +174,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   seconds to join and the picture is exactly what YouTube sent. H.264 only,
   which is why the ceiling is 1080p: above it YouTube offers only VP9 and AV1.
   Other platforms keep the 360p option and see no higher row.
-- Each stream is fetched in 10 MB byte ranges and written straight to disk.
-  One open-ended request is throttled by YouTube to roughly playback speed; a
-  3-minute 1080p video (84 MB) now arrives in under a minute on an emulator.
+- Each stream is fetched in parts and written straight to disk: a 3-minute
+  1080p video (84 MB) now arrives in under a minute on an emulator.
 - A vertical Short labelled 720p is 720x1280. Qualities are compared on the
   short side, as YouTube names them, so a Short is not mistaken for 1280p and
   dropped by the 1080p ceiling.

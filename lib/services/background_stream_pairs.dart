@@ -9,9 +9,7 @@ import 'slideshow/slideshow_failure.dart';
 import 'extractors/streams/stream_fetcher.dart';
 import 'stream_pair_gateway.dart';
 
-/// The largest range fetched in one request. YouTube serves a range of this
-/// size at full speed but throttles anything larger, or open-ended, to roughly
-/// playback speed.
+/// The largest range fetched in one request.
 const int streamPartBytes = 10 << 20;
 
 /// The background_downloader group every stream part belongs to, so they share
@@ -88,9 +86,8 @@ class BackgroundStreamPairs implements StreamPairGateway {
 
   /// Queues [url] in parts, to be joined at [outputPath].
   ///
-  /// For a file that is no pair but is served like one: YouTube hands an audio
-  /// stream out at about twice playback speed when it is asked for in one
-  /// request, and at full speed a [partBytes] range at a time.
+  /// For a file that is no pair but is fetched like one, a [partBytes] range
+  /// at a time.
   Future<SingleStreamTransfer> startSingleStream({
     required String taskId,
     required String title,

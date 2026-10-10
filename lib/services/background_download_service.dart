@@ -103,13 +103,9 @@ class BackgroundDownloadService
   final Map<String, SingleStreamTransfer> _partTransfers = {};
   final Set<String> _pausedParts = {};
 
-  /// Whether [task] is fetched a range at a time.
-  ///
-  /// YouTube hands an audio stream out at about twice playback speed when the
-  /// whole of it is asked for in one request — a five-minute song took two and
-  /// a half minutes — and at full speed in ranges of [streamPartBytes]. Its
-  /// 360p file with picture and sound is not held back, so that one stays a
-  /// single transfer, which can also resume mid-file.
+  /// Whether [task] is fetched a range at a time rather than as one
+  /// transfer. Everything else stays a single transfer, which can also resume
+  /// mid-file.
   static bool fetchesInParts(DownloadTask task) =>
       task.platform == VideoPlatform.youtube &&
       task.isAudioOnly &&

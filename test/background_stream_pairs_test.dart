@@ -373,9 +373,8 @@ void main() {
     });
   });
 
-  // A YouTube audio stream is no pair, but is served like one: quickly only a
-  // range at a time. It goes through the same parts, and is joined straight
-  // into the file the download is.
+  // A single file can go through the same parts as a pair: it is joined
+  // straight into the file the download is.
   group('fetching one file in parts', () {
     late Directory downloads;
 

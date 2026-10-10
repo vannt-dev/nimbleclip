@@ -182,12 +182,10 @@ void main() {
     );
   }
 
-  // An address that resolves is not yet a file that arrives. In October 2026
-  // YouTube began answering 403 for the bytes past the first minute or so of
-  // the streams it gives the Android client: every case above stayed green,
-  // while a download of any longer video died on its third part. So this asks
-  // for the last bytes of each stream of a ten-minute video, as a download's
-  // last part does.
+  // An address that resolves is not yet a file that arrives: a download can
+  // stop part-way while every case above stays green. So this asks for the
+  // last bytes of each stream of a ten-minute video, as a download's last
+  // part does.
   test(
     'YouTube serves the end of every stream of a long video',
     () async {
