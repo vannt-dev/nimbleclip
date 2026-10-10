@@ -9,9 +9,6 @@ import 'slideshow/slideshow_failure.dart';
 import 'extractors/streams/stream_fetcher.dart';
 import 'stream_pair_gateway.dart';
 
-/// The largest range fetched in one request.
-const int streamPartBytes = 10 << 20;
-
 /// The background_downloader group every stream part belongs to, so they share
 /// one notification rather than posting one each.
 const String streamPartGroup = 'stream_parts';
@@ -20,7 +17,7 @@ const String streamPartGroup = 'stream_parts';
 /// [partBytes].
 List<({int from, int to})> planStreamParts(
   int total, {
-  int partBytes = streamPartBytes,
+  required int partBytes,
 }) => [
   for (var from = 0; from < total; from += partBytes)
     (from: from, to: (from + partBytes < total ? from + partBytes : total) - 1),
@@ -53,7 +50,8 @@ class NativeStreamPartDownloader implements StreamPartDownloader {
 }
 
 /// Fetches merged videos' streams as ranged background_downloader tasks, one
-/// per [streamPartBytes], all queued up front.
+/// per part, all queued up front. How large a part is comes with what is
+/// fetched: the extractor that found the streams names the size.
 ///
 /// background_downloader's own `ParallelDownloadTask` is no substitute: it
 /// relies on the Flutter engine to queue its parts and to relay their progress,
@@ -69,13 +67,11 @@ class BackgroundStreamPairs implements StreamPairGateway {
     required this._root,
     this._downloader = const NativeStreamPartDownloader(),
     Future<int> Function(String url)? probeLength,
-    this.partBytes = streamPartBytes,
   }) : _probeLength = probeLength ?? probeStreamLength;
 
   final Future<Directory> Function() _root;
   final StreamPartDownloader _downloader;
   final Future<int> Function(String url) _probeLength;
-  final int partBytes;
 
   final Map<String, _PairTransfer> _transfers = {};
   final Map<String, _Part> _parts = {};
@@ -84,15 +80,15 @@ class BackgroundStreamPairs implements StreamPairGateway {
   /// Whether [taskId] is one of the parts this class queued.
   bool owns(String taskId) => _parts.containsKey(taskId);
 
-  /// Queues [url] in parts, to be joined at [outputPath].
+  /// Queues [url] in parts of [partBytes], to be joined at [outputPath].
   ///
-  /// For a file that is no pair but is fetched like one, a [partBytes] range
-  /// at a time.
+  /// For a file that is no pair but is fetched like one.
   Future<SingleStreamTransfer> startSingleStream({
     required String taskId,
     required String title,
     required String url,
     required String outputPath,
+    required int partBytes,
   }) async {
     final manifest = _Manifest(
       taskId: taskId,
@@ -121,7 +117,7 @@ class BackgroundStreamPairs implements StreamPairGateway {
       taskId: taskId,
       title: title,
       autoSaveToGallery: autoSaveToGallery,
-      partBytes: partBytes,
+      partBytes: source.partBytes,
       video: (url: source.videoUrl, total: lengths[0]),
       audio: (url: source.audioUrl, total: lengths[1]),
     );

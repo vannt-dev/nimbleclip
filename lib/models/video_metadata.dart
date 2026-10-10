@@ -34,6 +34,11 @@ class VideoQualityOption {
   /// fetched and joined on the device. Null for everything else.
   final StreamSource? stream;
 
+  /// The size of the ranges [downloadUrl] is to be fetched in, when its
+  /// extractor asks for the file to be fetched a range at a time. Null for a
+  /// file fetched in one request.
+  final int? partBytes;
+
   const VideoQualityOption({
     required this.id,
     required this.label,
@@ -48,6 +53,7 @@ class VideoQualityOption {
     this.slideshow,
     this.merge,
     this.stream,
+    this.partBytes,
     bool checked = true,
   }) : assert(
          !checked ||
@@ -71,7 +77,8 @@ class VideoQualityOption {
     this.slideshow,
   }) : kind = MediaKind.image,
        merge = null,
-       stream = null;
+       stream = null,
+       partBytes = null;
 
   const VideoQualityOption.video({
     required this.id,
@@ -84,6 +91,7 @@ class VideoQualityOption {
     this.headers,
     this.mediaId,
     this.slideshow,
+    this.partBytes,
   }) : kind = MediaKind.video,
        merge = null,
        stream = null;
@@ -99,6 +107,7 @@ class VideoQualityOption {
     this.headers,
     this.mediaId,
     this.slideshow,
+    this.partBytes,
   }) : kind = MediaKind.audio,
        merge = null,
        stream = null;
@@ -120,6 +129,7 @@ class VideoQualityOption {
        headers = null,
        merge = null,
        stream = null,
+       partBytes = null,
        slideshow = source;
 
   /// A video the device will join from [source]'s two streams. Like a
@@ -139,6 +149,7 @@ class VideoQualityOption {
        headers = null,
        slideshow = null,
        stream = null,
+       partBytes = null,
        merge = source;
 
   /// A video the device will join from the segments of [source]'s stream.
@@ -156,6 +167,7 @@ class VideoQualityOption {
        headers = null,
        slideshow = null,
        merge = null,
+       partBytes = null,
        stream = source;
 
   bool get isAudioOnly => kind == MediaKind.audio;

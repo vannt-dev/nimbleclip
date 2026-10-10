@@ -13,7 +13,6 @@ import '../core/utils/platform_file.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../models/download_task.dart';
 import '../models/merge_source.dart';
-import '../models/video_platform.dart';
 import 'background_stream_pairs.dart';
 import 'download_service.dart';
 import 'slideshow/slideshow_failure.dart';
@@ -42,10 +41,7 @@ class BackgroundDownloadService
     this.validator = const MediaFileValidator(),
     this.requestNotificationPermission = true,
     BackgroundStreamPairs? streamPairs,
-    bool Function(DownloadTask task) inParts = fetchesInParts,
   }) : _storage = storageService ?? StorageService(),
-       // ignore: prefer_initializing_formals, the parameter is public, the field is not
-       _inParts = inParts,
        _pairs = streamPairs ?? BackgroundStreamPairs(root: _streamPairRoot) {
     _updates = bg.FileDownloader().updates.listen(_onUpdate);
     // A merged video is dozens of parts; one notification counts them rather
@@ -98,19 +94,10 @@ class BackgroundDownloadService
   final BackgroundStreamPairs _pairs;
 
   /// Downloads fetched in parts rather than as one system transfer, running
-  /// or paused. See [fetchesInParts].
-  final bool Function(DownloadTask task) _inParts;
+  /// or paused: the ones whose task carries a part size. Everything else is a
+  /// single transfer, which can also resume mid-file.
   final Map<String, SingleStreamTransfer> _partTransfers = {};
   final Set<String> _pausedParts = {};
-
-  /// Whether [task] is fetched a range at a time rather than as one
-  /// transfer. Everything else stays a single transfer, which can also resume
-  /// mid-file.
-  static bool fetchesInParts(DownloadTask task) =>
-      task.platform == VideoPlatform.youtube &&
-      task.isAudioOnly &&
-      (Uri.tryParse(task.downloadUrl)?.host.endsWith('.googlevideo.com') ??
-          false);
   Future<void>? _startFuture;
 
   Future<void> _ensureStarted() =>
@@ -290,8 +277,8 @@ class BackgroundDownloadService
         if (!await _pairs.resume(task.id)) {
           _fail(task.id, l10n.unknownNetworkError);
         }
-      } else if (_inParts(task)) {
-        await _startInParts(task, l10n);
+      } else if (task.partBytes case final partBytes?) {
+        await _startInParts(task, partBytes, l10n);
       } else if (existing != null) {
         // DownloadProvider changes paused -> queued before handing the task
         // back to the worker, so the retained native task is the reliable
@@ -341,9 +328,13 @@ class BackgroundDownloadService
     }
   }
 
-  /// Queues [task]'s file a range at a time. When its length cannot be
-  /// confirmed it is fetched as one transfer after all: slower, but it arrives.
-  Future<void> _startInParts(DownloadTask task, AppLocalizations l10n) async {
+  /// Queues [task]'s file in ranges of [partBytes]. When its length cannot be
+  /// confirmed it is fetched as one transfer after all.
+  Future<void> _startInParts(
+    DownloadTask task,
+    int partBytes,
+    AppLocalizations l10n,
+  ) async {
     await _requestNotificationPermission();
     final directory = await _storage.getDownloadDirectory();
     if (directory == null) {
@@ -360,6 +351,7 @@ class BackgroundDownloadService
         title: task.title,
         url: task.downloadUrl,
         outputPath: path,
+        partBytes: partBytes,
       );
     } on SlideshowException {
       await _enqueue(task, l10n);

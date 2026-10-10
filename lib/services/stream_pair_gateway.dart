@@ -30,7 +30,7 @@ abstract interface class StreamPairGateway {
 }
 
 /// One file fetched in parts as operating-system transfers and joined where it
-/// is wanted: a file its server only hands out quickly a range at a time.
+/// is wanted.
 abstract interface class SingleStreamTransfer {
   String get taskId;
   int get totalBytes;

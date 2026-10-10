@@ -540,6 +540,7 @@ class DownloadProvider extends ChangeNotifier {
             format: quality.format,
             kind: quality.kind,
             headers: quality.headers,
+            partBytes: quality.partBytes,
             totalBytes: quality.sizeBytes ?? 0,
           ),
         )
@@ -1358,6 +1359,7 @@ class DownloadProvider extends ChangeNotifier {
       final refreshed = task.withRefreshedSource(
         downloadUrl: refreshedUrl.downloadUrl,
         headers: refreshedUrl.headers,
+        partBytes: refreshedUrl.partBytes,
       );
       if (index != -1) {
         _tasks[index] = refreshed;

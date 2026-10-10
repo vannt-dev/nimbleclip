@@ -86,14 +86,17 @@ void main() {
     root: () async => root,
     downloader: parts,
     probeLength: (url) async => parts.streams[url]!.length,
-    partBytes: 10,
   );
 
   Future<StreamPairTransfer> start(BackgroundStreamPairs gateway) =>
       gateway.startStreamPair(
         taskId: 'task-1',
         title: 'A video',
-        source: const MergeSource(videoUrl: _videoUrl, audioUrl: _audioUrl),
+        source: const MergeSource(
+          videoUrl: _videoUrl,
+          audioUrl: _audioUrl,
+          partBytes: 10,
+        ),
         autoSaveToGallery: true,
       );
 
@@ -391,6 +394,7 @@ void main() {
           title: 'A song',
           url: _videoUrl,
           outputPath: output(),
+          partBytes: 10,
         );
 
     test('queues the file in ranges and joins it where it is wanted', () async {

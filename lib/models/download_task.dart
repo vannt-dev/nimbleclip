@@ -32,6 +32,10 @@ class DownloadTask extends ChangeNotifier {
   final MediaKind kind;
   final Map<String, String>? headers;
 
+  /// The size of the ranges [downloadUrl] is fetched in, as the option this
+  /// task was made from asked. Null for a file fetched in one request.
+  final int? partBytes;
+
   DownloadStatus status;
   double progress; // 0.0 to 1.0
   int totalBytes;
@@ -61,6 +65,7 @@ class DownloadTask extends ChangeNotifier {
     this.format = 'mp4',
     this.kind = MediaKind.video,
     this.headers,
+    this.partBytes,
     this.status = DownloadStatus.queued,
     this.progress = 0.0,
     this.totalBytes = 0,
@@ -162,10 +167,13 @@ class DownloadTask extends ChangeNotifier {
   }
 
   /// Copy carrying a fresh download URL and headers, used when a retry has to
-  /// re-extract because the persisted URL's signature has expired.
+  /// re-extract because the persisted URL's signature has expired. How the new
+  /// address is to be fetched comes with it: [partBytes] is the refreshed
+  /// option's, not this task's.
   DownloadTask withRefreshedSource({
     required String downloadUrl,
     Map<String, String>? headers,
+    int? partBytes,
   }) {
     return DownloadTask(
       id: id,
@@ -181,6 +189,7 @@ class DownloadTask extends ChangeNotifier {
       format: format,
       kind: kind,
       headers: headers ?? this.headers,
+      partBytes: partBytes,
       status: DownloadStatus.queued,
       createdAt: createdAt,
       galleryUri: galleryUri,
@@ -202,6 +211,7 @@ class DownloadTask extends ChangeNotifier {
     'format': format,
     'kind': kind.name,
     'headers': headers,
+    'partBytes': ?partBytes,
     'status': status.name,
     'progress': progress,
     'totalBytes': totalBytes,
@@ -240,6 +250,7 @@ class DownloadTask extends ChangeNotifier {
     headers: (json['headers'] as Map<String, dynamic>?)?.map(
       (k, v) => MapEntry(k, v.toString()),
     ),
+    partBytes: json['partBytes'] as int?,
     // A task persisted as queued/downloading/paused belongs to a process
     // that no longer exists — nothing resumes it, so restoring it as-is
     // would leave it pinned to the "active" list forever. Mark it failed so

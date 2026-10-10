@@ -128,6 +128,7 @@ VideoQualityOption _merged({
   source: MergeSource(
     videoUrl: video,
     audioUrl: audio,
+    partBytes: 1 << 20,
     videoBytes: 3,
     audioBytes: 2,
   ),
@@ -868,7 +869,11 @@ class _PairGateway extends InertDownloadService implements StreamPairGateway {
 class _FakeTransfer implements StreamPairTransfer {
   _FakeTransfer(
     this.taskId, {
-    this.source = const MergeSource(videoUrl: '', audioUrl: ''),
+    this.source = const MergeSource(
+      videoUrl: '',
+      audioUrl: '',
+      partBytes: 1 << 20,
+    ),
     required this.autoSaveToGallery,
   }) {
     _files.future.ignore();
