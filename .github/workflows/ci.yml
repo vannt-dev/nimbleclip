@@ -165,6 +165,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      # Without the Gradle cache this build took five minutes; with it, about two.
+      - uses: gradle/actions/setup-gradle@v5
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.0'

@@ -189,9 +189,7 @@ try {
             -ForegroundColor Cyan
         Invoke-CheckedCommand 'flutter' @(
             'test',
-            'integration_test/android_storage_test.dart',
-            'integration_test/slideshow_render_test.dart',
-            'integration_test/mp3_conversion_test.dart',
+            'integration_test/android_suite_test.dart',
             '-d',
             $resolvedDeviceId
         )
