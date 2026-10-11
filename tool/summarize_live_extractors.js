@@ -12,6 +12,20 @@
 
 const fs = require('node:fs');
 
+// Checks that YouTube, TikTok and Pinterest refuse when the request comes from
+// GitHub's network. The same checks pass from a home connection, so a failure
+// here says nothing about the extractor and does not open the health issue; it
+// is reported on its own, so a change in what the site answers is still seen.
+// Kept in step with the names in test/live_extractor_smoke_test.dart.
+const REFUSED_FROM_GITHUB = new Map([
+  ['YouTube Short from a share link', 'YouTube'],
+  ['TikTok video', 'TikTok'],
+  ['TikTok slideshow', 'TikTok'],
+  ['Pinterest video pin', 'Pinterest'],
+  ['Pinterest picture pin', 'Pinterest'],
+]);
+const REFUSED_LAST_VERIFIED = '2026-10-11';
+
 function parseEvents(reportText) {
   const events = [];
   for (const line of reportText.split('\n')) {
@@ -45,12 +59,13 @@ function escapeTableCell(value) {
     .replace(/\|/g, '&#124;');
 }
 
-function summarize(reportText) {
+function summarize(reportText, {refusedFromGithub = REFUSED_FROM_GITHUB} = {}) {
   const events = parseEvents(reportText);
   const names = new Map();
   const errors = new Map();
   const passed = [];
   const failed = [];
+  const refused = [];
   const skipped = [];
 
   for (const event of events) {
@@ -67,20 +82,29 @@ function summarize(reportText) {
         skipped.push(name);
       } else if (event.result === 'success') {
         passed.push(name);
+      } else if (refusedFromGithub.has(name)) {
+        refused.push({name, error: errors.get(event.testID) ?? event.result});
       } else {
         failed.push({name, error: errors.get(event.testID) ?? event.result});
       }
     }
   }
 
+  // A suite run without --dart-define=RUN_LIVE_EXTRACTOR_TESTS skips every
+  // case and still reports success. That run checked nothing, so it must not
+  // be allowed to stand in for a healthy one.
+  const checkedAnything =
+    passed.length > 0 || failed.length > 0 || refused.length > 0;
+
   return {
     passed,
     failed,
+    refused,
     skipped,
-    // A suite run without --dart-define=RUN_LIVE_EXTRACTOR_TESTS skips every
-    // case and still reports success. That run checked nothing, so it must not
-    // be allowed to stand in for a healthy one.
-    checkedAnything: passed.length > 0 || failed.length > 0,
+    checkedAnything,
+    // What the workflow acts on: the issue opens when this is false and closes
+    // when it is true. A check the site refuses from GitHub does not count.
+    healthy: checkedAnything && failed.length === 0,
   };
 }
 
@@ -108,6 +132,16 @@ function formatMarkdown(summary, runUrl) {
   if (summary.passed.length) {
     lines.push('', `Passing: ${summary.passed.join(', ')}.`);
   }
+  if (summary.refused?.length) {
+    lines.push(
+      '',
+      "Refused from GitHub's network, which says nothing about the extractor" +
+        ` (these pass from a home connection, last checked ${REFUSED_LAST_VERIFIED}):`,
+    );
+    for (const {name, error} of summary.refused) {
+      lines.push(`- ${escapeTableCell(name)}: <code>${escapeTableCell(error)}</code>`);
+    }
+  }
   if (summary.skipped.length) {
     lines.push('', `Skipped: ${summary.skipped.join(', ')}.`);
   }
@@ -118,7 +152,7 @@ function formatMarkdown(summary, runUrl) {
   return lines.join('\n');
 }
 
-module.exports = {summarize, formatMarkdown};
+module.exports = {summarize, formatMarkdown, REFUSED_FROM_GITHUB};
 
 if (require.main === module) {
   const args = process.argv.slice(2);
@@ -144,7 +178,8 @@ if (require.main === module) {
     fs.appendFileSync(
       process.env.GITHUB_OUTPUT,
       `markdown<<${delimiter}\n${markdown}\n${delimiter}\n` +
-        `checked=${summary.checkedAnything}\n`,
+        `checked=${summary.checkedAnything}\n` +
+        `healthy=${summary.healthy}\n`,
     );
   }
 }
