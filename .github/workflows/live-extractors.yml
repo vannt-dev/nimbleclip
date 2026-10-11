@@ -55,8 +55,11 @@ jobs:
           test -f live-extractors.json || : > live-extractors.json
           node tool/summarize_live_extractors.js \
             live-extractors.json "$RUN_URL" --github-output
+      # The summary, not the test exit code, says whether the extractors are
+      # healthy: a check that the site refuses from GitHub's network fails the
+      # test run and is reported, but is not a failure of ours.
       - name: Open or update health issue
-        if: steps.smoke.outcome == 'failure'
+        if: steps.summary.outputs.healthy == 'false'
         uses: actions/github-script@v8
         # Through the environment, never interpolated into the script: the
         # failure text can carry a third party's own wording.
@@ -104,7 +107,7 @@ jobs:
       # keep. `checked` guards it — a suite that skipped every case also reports
       # success, and a run that verified nothing must not close anything.
       - name: Close the health issue once the checks pass
-        if: steps.smoke.outcome == 'success' && steps.summary.outputs.checked == 'true'
+        if: steps.summary.outputs.healthy == 'true'
         uses: actions/github-script@v8
         env:
           SUMMARY: ${{ steps.summary.outputs.markdown }}
