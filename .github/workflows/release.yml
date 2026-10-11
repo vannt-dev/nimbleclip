@@ -107,7 +107,10 @@ jobs:
             printf 'storeFile=upload-keystore.jks\n'
           } > android/key.properties
 
+      # When CI calls this workflow, every check below has just passed on this very commit.
+      # The tag and manual paths still run them.
       - name: Run release checks
+        if: ${{ !inputs.ref }}
         run: |
           flutter pub get
           dart format --output=none --set-exit-if-changed lib test integration_test

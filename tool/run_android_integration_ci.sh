@@ -33,8 +33,5 @@ if ! curl --fail --silent http://127.0.0.1:8097/health |
   exit 1
 fi
 
-flutter test \
-  integration_test/android_storage_test.dart \
-  integration_test/slideshow_render_test.dart \
-  integration_test/mp3_conversion_test.dart \
-  -d emulator-5554
+# One file, one build of the app: a file per suite built the app three times.
+flutter test integration_test/android_suite_test.dart -d emulator-5554
