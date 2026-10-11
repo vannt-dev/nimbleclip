@@ -19,6 +19,7 @@ const fs = require('node:fs');
 // Kept in step with the names in test/live_extractor_smoke_test.dart.
 const REFUSED_FROM_GITHUB = new Map([
   ['YouTube Short from a share link', 'YouTube'],
+  ['YouTube serves the end of every stream of a long video', 'YouTube'],
   ['TikTok video', 'TikTok'],
   ['TikTok slideshow', 'TikTok'],
   ['Pinterest video pin', 'Pinterest'],
