@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.13.2] - 2026-10-12
+
 - A TikTok photo post saved as a video has its music again, and the post's
   MP3 audio downloads again. Both had stopped receiving the track: the video
   came out silent and the audio did not arrive.
