@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:nimble_clip/core/utils/http_helper.dart';
+import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/services/extractors/base_extractor.dart';
 import 'package:nimble_clip/services/extractors/extraction_failure.dart';
 import 'package:nimble_clip/services/extractors/registry.dart';
@@ -173,6 +174,29 @@ void main() {
               : [option.downloadUrl];
           expect(urls, isNotEmpty, reason: option.id);
           expect(urls.every(resolves), isTrue, reason: option.id);
+        }
+        // An address that resolves is not yet a file that arrives, and music
+        // fails quietly: a slideshow whose track cannot be fetched is still
+        // rendered, without sound. So the track itself is asked for.
+        final music = {
+          for (final option in metadata.qualities) ...[
+            ?option.slideshow?.audioUrl,
+            if (option.isAudioOnly && metadata.platform == VideoPlatform.tiktok)
+              option.downloadUrl,
+          ],
+        };
+        for (final url in music) {
+          final response = await ExtractorHttp.getWithRetry(
+            url,
+            service: 'music',
+            headers: {'Range': 'bytes=0-65535'},
+          );
+          expect(response.statusCode, anyOf(200, 206), reason: url);
+          expect(
+            response.headers['content-type'] ?? '',
+            isNot(startsWith('text/')),
+            reason: 'the music address answered with a page: $url',
+          );
         }
       },
       skip: !_runLive

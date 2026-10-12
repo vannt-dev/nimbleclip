@@ -6,6 +6,10 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- A TikTok photo post saved as a video has its music again, and the post's
+  MP3 audio downloads again. Both had stopped receiving the track: the video
+  came out silent and the audio did not arrive.
+
 ## [1.13.1] - 2026-10-10
 
 - A paused YouTube audio download stays paused when the app is closed and
