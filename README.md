@@ -499,3 +499,8 @@ cookies, private media, or personal account data.
 NimbleClip is not affiliated with, endorsed by, or sponsored by YouTube,
 TikTok, Meta, Instagram, Facebook, or X. Product names and trademarks belong to
 their respective owners.
+
+## License
+
+The app in this repository is distributed under the MIT License. See [LICENSE](LICENSE).
+The private core (`lib/services/extractors`) is a separate repository and is not covered by it.
