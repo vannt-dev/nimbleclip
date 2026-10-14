@@ -16,6 +16,10 @@ management, local playback, and gallery export.
 > content you are authorized to download. You are responsible for complying
 > with the source platform's terms and applicable copyright laws.
 
+Official builds are listed at [vannt-dev.github.io/official.html](https://vannt-dev.github.io/official.html);
+anything else is not published by vannt-dev.
+The APK signing certificate fingerprints are listed there too.
+
 ## Features
 
 - Detects supported links pasted from the clipboard.
