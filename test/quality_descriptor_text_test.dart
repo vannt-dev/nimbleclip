@@ -12,6 +12,7 @@ const _all = <QualityDescriptor>[
   Sd480(),
   OriginalVideo(),
   OriginalMp4(),
+  AnimatedGif(),
   OriginalAudio(),
   EmbeddedVideo(),
   AudioMp3('Some song'),

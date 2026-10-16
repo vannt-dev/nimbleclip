@@ -114,7 +114,7 @@ The APK signing certificate fingerprints are listed there too.
 | Facebook | Public videos, Watch links, Reels, image posts, carousels, mixed-media posts, and story links (these need external services) |
 | X / Twitter | Public posts containing images, videos, or mixed media |
 | Instagram | Public image/carousel posts, video posts, Reels, mixed-media posts, and story/highlight links (these need external services) |
-| Threads | Public posts containing images, videos, or carousels mixing the two |
+| Threads | Public posts containing images, videos, carousels mixing the two, or a GIF (saved as MP4 or GIF) |
 | Pinterest | A public pin's video or picture, from `pinterest.com`, its country domains and `pin.it` short links. On Android the video is also offered in the other sizes of its stream |
 | SoundCloud | A public track, as the MP3 file SoundCloud serves. Not playlists, and not tracks that only offer a preview without a subscription |
 | Flickr | A public photo at its largest size, or a video's MP4 files, from `flickr.com` and `flic.kr` short links. A photo whose owner turned downloads off is refused |

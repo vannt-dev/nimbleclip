@@ -1112,6 +1112,12 @@ abstract class AppLocalizations {
   /// **'MP4 (Original quality)'**
   String get originalMp4;
 
+  /// No description provided for @animatedGif.
+  ///
+  /// In en, this message translates to:
+  /// **'GIF (animated picture)'**
+  String get animatedGif;
+
   /// No description provided for @xPostBy.
   ///
   /// In en, this message translates to:

@@ -201,6 +201,7 @@
   "flickrUnavailable": "Flickr did not provide this photo. It may be private or deleted.",
   "flickrDownloadDisabled": "The owner has turned off downloads for this photo on Flickr.",
   "originalMp4": "MP4 (Original quality)",
+  "animatedGif": "GIF (animated picture)",
   "xPostBy": "Post by @{handle}",
   "@xPostBy": {"placeholders": {"handle": {"type": "String"}}},
   "tiktokServiceStatus": "TikTok returned status {status}. Try again in a few minutes.",
