@@ -1,0 +1,36 @@
+name: Install the Android NDK
+description: >-
+  Installs the NDK version Flutter builds with, before Gradle would fetch it
+  itself. Gradle's own download has arrived corrupt on the runners ("Error
+  reading Zip content") and failed the build; here a bad download is removed
+  and fetched again. Run it after subosito/flutter-action.
+
+runs:
+  using: composite
+  steps:
+    - name: Install the NDK Flutter asks for
+      shell: bash
+      run: |
+        flutter_root=$(dirname "$(dirname "$(command -v flutter)")")
+        version=$(sed -n 's/.*val ndkVersion: String = "\(.*\)".*/\1/p' \
+          "$flutter_root/packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt")
+        if [ -z "$version" ]; then
+          echo "::error::could not read Flutter's NDK version"
+          exit 1
+        fi
+        ndk="$ANDROID_HOME/ndk/$version"
+        if [ -f "$ndk/source.properties" ]; then
+          echo "NDK $version is already installed"
+          exit 0
+        fi
+        sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+        for attempt in 1 2 3; do
+          if "$sdkmanager" --install "ndk;$version" > /dev/null && [ -f "$ndk/source.properties" ]; then
+            echo "NDK $version installed (attempt $attempt)"
+            exit 0
+          fi
+          echo "::warning::installing NDK $version failed (attempt $attempt)"
+          rm -rf "$ndk"
+          sleep 10
+        done
+        exit 1

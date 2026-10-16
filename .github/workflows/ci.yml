@@ -45,8 +45,53 @@ jobs:
           done < <(git log --format=%s "$range")
           exit "$failed"
 
+  # Decides what a pull request has to prove. Every job below still exists on
+  # a pull request, so the required checks are reported; a job with nothing
+  # to check is skipped, which counts as passed. A push to main runs it all.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+      ios: ${{ steps.diff.outputs.ios }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: diff
+        name: Files the pull request changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT_NAME" != "pull_request" ] || ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+            echo "full run ($EVENT_NAME)"
+            { echo "code=true"; echo "ios=true"; } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "$changed"
+          # Only these leave the app as it was.
+          if echo "$changed" | grep -Evq '^(docs/|[^/]+\.md$|LICENSE$)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+          # The iOS build can only be checked here, and the macOS runners are
+          # few: it runs when the iOS project, the plugins, the core or CI
+          # change, and on every push to main before a release.
+          if echo "$changed" | grep -Eq '^(ios/|pubspec\.(yaml|lock)$|lib/services/extractors$|\.github/)'; then
+            echo "ios=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ios=false" >> "$GITHUB_OUTPUT"
+          fi
+
   flutter-quality:
     name: Flutter quality and Web build
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -68,6 +113,8 @@ jobs:
 
   node:
     name: Node.js server checks
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -83,6 +130,8 @@ jobs:
 
   android:
     name: Android integration tests
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -108,6 +157,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+      - uses: ./.github/actions/install-ndk
       - run: flutter pub get
       - name: Run Android integration tests
         uses: reactivecircus/android-emulator-runner@v2
@@ -122,6 +172,8 @@ jobs:
 
   ios:
     name: iOS build and Share Extension
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
     runs-on: macos-15
     timeout-minutes: 25
     env:
@@ -157,6 +209,8 @@ jobs:
   # with the full core.
   public-core:
     name: Build from the public repository alone (Android)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -182,10 +236,13 @@ jobs:
       - name: The app's own code analyses against the public core
         run: flutter analyze lib
       - run: flutter test test/public_core_test.dart
+      - uses: ./.github/actions/install-ndk
       - run: flutter build apk --debug --target-platform android-arm64
 
   public-core-ios:
     name: Build from the public repository alone (iOS)
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
     runs-on: macos-15
     timeout-minutes: 25
     env:

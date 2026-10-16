@@ -388,6 +388,16 @@ void main() {
 
     String output() => '${downloads.path}/youtube_abc.m4a';
 
+    // A finished part counts once its file has been measured. That is real
+    // file I/O, which on a busy machine takes longer than a turn of the event
+    // queue; a pause sent before then would stop that part as well.
+    Future<void> counted(SingleStreamTransfer transfer, int bytes) async {
+      for (var i = 0; i < 400 && transfer.receivedBytes < bytes; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      expect(transfer.receivedBytes, bytes);
+    }
+
     Future<SingleStreamTransfer> startOne(BackgroundStreamPairs gateway) =>
         gateway.startSingleStream(
           taskId: 'task-1',
@@ -430,8 +440,7 @@ void main() {
         final transfer = await startOne(gateway);
         final first = List.of(parts.queued);
         gateway.handleUpdate(await parts.finish(first[0]));
-        // the part is counted once its file has been measured
-        await pumpEventQueue();
+        await counted(transfer, 10);
 
         expect(await gateway.pause('task-1'), isTrue);
         expect(parts.cancelled, [first[1].taskId, first[2].taskId]);
@@ -492,10 +501,10 @@ void main() {
     // after the pause must not take the missing parts for lost ones.
     test('a paused download is still paused after the process ended', () async {
       final gateway = pairs();
-      await startOne(gateway);
+      final transfer = await startOne(gateway);
       final first = List.of(parts.queued);
       gateway.handleUpdate(await parts.finish(first[0]));
-      await pumpEventQueue();
+      await counted(transfer, 10);
       await gateway.pause('task-1');
       parts.queued.clear();
 
@@ -533,10 +542,10 @@ void main() {
 
     test('a download whose last part arrived is not paused', () async {
       final gateway = pairs();
-      await startOne(gateway);
+      final transfer = await startOne(gateway);
       final first = List.of(parts.queued);
       gateway.handleUpdate(await parts.finish(first[0]));
-      await pumpEventQueue();
+      await counted(transfer, 10);
       await gateway.pause('task-1');
       // The parts that were all but there when the pause came still land.
       await parts.finish(first[1]);
