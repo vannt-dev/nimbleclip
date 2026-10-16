@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-10-16
+
 - A Threads post or reply that is a GIF can be downloaded, as a video (MP4) and
   as the GIF itself. It used to say the post had no picture or video.
 
