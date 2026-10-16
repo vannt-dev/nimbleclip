@@ -13,6 +13,7 @@ String describeQuality(QualityDescriptor descriptor, AppLocalizations l10n) {
     Sd480() => l10n.standardQuality480,
     OriginalVideo() => l10n.originalVideo,
     OriginalMp4() => l10n.originalMp4,
+    AnimatedGif() => l10n.animatedGif,
     OriginalAudio() => l10n.originalAudio,
     EmbeddedVideo() => l10n.embeddedVideo,
     AudioMp3(:final title) => l10n.audioMp3Label(

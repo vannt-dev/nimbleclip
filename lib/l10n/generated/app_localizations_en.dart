@@ -629,6 +629,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get originalMp4 => 'MP4 (Original quality)';
 
   @override
+  String get animatedGif => 'GIF (animated picture)';
+
+  @override
   String xPostBy(String handle) {
     return 'Post by @$handle';
   }

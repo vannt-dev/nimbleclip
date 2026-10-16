@@ -40,6 +40,11 @@ class OriginalMp4 extends QualityDescriptor {
   const OriginalMp4();
 }
 
+/// A moving picture saved as a GIF file, as opposed to the same clip as MP4.
+class AnimatedGif extends QualityDescriptor {
+  const AnimatedGif();
+}
+
 class OriginalAudio extends QualityDescriptor {
   const OriginalAudio();
 }
@@ -117,6 +122,7 @@ String qualityDescriptorToken(QualityDescriptor descriptor) {
     Sd480() => 'sd480',
     OriginalVideo() => 'originalVideo',
     OriginalMp4() => 'originalMp4',
+    AnimatedGif() => 'animatedGif',
     OriginalAudio() => 'originalAudio',
     EmbeddedVideo() => 'embeddedVideo',
     AudioMp3(:final title) => 'audioMp3:${title ?? ""}',

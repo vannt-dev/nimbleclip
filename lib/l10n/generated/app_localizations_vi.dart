@@ -626,6 +626,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get originalMp4 => 'MP4 (Chất lượng gốc)';
 
   @override
+  String get animatedGif => 'GIF (ảnh động)';
+
+  @override
   String xPostBy(String handle) {
     return 'Bài đăng của @$handle';
   }

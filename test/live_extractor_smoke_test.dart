@@ -117,6 +117,12 @@ void main() {
       minimumMedia: 1,
       minimumVideos: 1,
     ),
+    // A reply that is a GIF: offered as a video and as a GIF file.
+    'Threads GIF reply': (
+      url: 'https://www.threads.com/@reneg8d_locs/post/Db2wSzulghD',
+      minimumMedia: 2,
+      minimumVideos: 1,
+    ),
     'Pinterest video pin': (
       url: 'https://www.pinterest.com/pin/703335666829201694/',
       minimumMedia: 1,

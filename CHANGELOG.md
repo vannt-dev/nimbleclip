@@ -6,6 +6,9 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- A Threads post or reply that is a GIF can be downloaded, as a video (MP4) and
+  as the GIF itself. It used to say the post had no picture or video.
+
 ## [1.13.2] - 2026-10-12
 
 - A TikTok photo post saved as a video has its music again, and the post's

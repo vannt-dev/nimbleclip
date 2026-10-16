@@ -169,6 +169,7 @@
   "flickrUnavailable": "Flickr không cung cấp ảnh này. Ảnh có thể ở chế độ riêng tư hoặc đã bị xoá.",
   "flickrDownloadDisabled": "Chủ ảnh đã tắt tính năng tải xuống cho ảnh này trên Flickr.",
   "originalMp4": "MP4 (Chất lượng gốc)",
+  "animatedGif": "GIF (ảnh động)",
   "xPostBy": "Bài đăng của @{handle}",
   "tiktokServiceStatus": "Dịch vụ TikTok trả về mã {status}. Hãy thử lại sau ít phút.",
   "tiktokConnectionFailed": "Không kết nối được dịch vụ TikTok: {error}",
