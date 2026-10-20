@@ -135,10 +135,9 @@ Threads includes a post's media in the page only for search-engine crawlers, so
 NimbleClip requests Threads posts with a crawler's user agent. If Threads stops
 doing that, Threads links stop working until another route is found.
 
-SoundCloud and Flickr are read with the key their own web pages use, which
-NimbleClip finds in the page each time the app starts. When either site
-rebuilds its pages in a way that hides the key, its links stop working until
-the app is updated.
+SoundCloud and Flickr links depend on how those sites build their own pages.
+When either site changes them, its links can stop working until the app is
+updated.
 
 Extraction depends on public endpoints and page formats controlled by third
 parties. A platform change, regional restriction, authentication requirement,
