@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.14.1] - 2026-10-20
+
 - SoundCloud tracks download again on Android. SoundCloud stopped offering
   its MP3 files, so every track was reported as unavailable. A track is now
   saved as M4A audio (AAC), or as MP3 when Save audio as MP3 is turned on.
