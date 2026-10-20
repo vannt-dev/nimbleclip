@@ -45,6 +45,7 @@ class _FakeMuxer implements SlideshowRenderer {
     required String outputPath,
     String? renderId,
     bool audioOptional = false,
+    bool audioOnly = false,
     void Function(double progress)? onProgress,
   }) async {
     calls.add((video: videoPath, audio: audioPath, output: outputPath));

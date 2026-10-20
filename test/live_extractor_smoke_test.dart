@@ -12,7 +12,9 @@ const _instagramImageUrl = String.fromEnvironment('INSTAGRAM_IMAGE_URL');
 const _instagramVideoUrl = String.fromEnvironment('INSTAGRAM_VIDEO_URL');
 
 void main() {
-  final registry = ExtractorRegistry();
+  // As on Android, which joins streams: what the app offers there is what
+  // these checks are about, and the host running them cannot join anything.
+  final registry = ExtractorRegistry(canJoinStreams: true);
 
   // [minimumVideos] is what keeps a case honest about its own name. Counting
   // media alone let a case called "video" pass on photographs: when Facebook
@@ -166,17 +168,20 @@ void main() {
           greaterThanOrEqualTo(entry.value.minimumVideos),
           reason: 'a case named for video must not pass on photographs alone',
         );
-        // A slideshow or a merged video is produced on the device and so has
-        // no download URL of its own; the sources it is built from must
-        // resolve instead.
+        // A slideshow, a merged video or a stream is produced on the device
+        // and so has no download URL of its own; the sources it is built from
+        // must resolve instead.
         bool resolves(String url) => Uri.tryParse(url)?.hasScheme == true;
         for (final option in metadata.qualities) {
           final slideshow = option.slideshow;
           final merge = option.merge;
+          final stream = option.stream;
           final urls = slideshow != null
               ? [...slideshow.imageUrls, ?slideshow.audioUrl]
               : merge != null
               ? [merge.videoUrl, merge.audioUrl]
+              : stream != null
+              ? [stream.playlistUrl]
               : [option.downloadUrl];
           expect(urls, isNotEmpty, reason: option.id);
           expect(urls.every(resolves), isTrue, reason: option.id);

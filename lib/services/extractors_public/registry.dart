@@ -13,10 +13,15 @@ import 'generic_extractor.dart';
 /// others) are read by the full core, which is not part of this repository.
 /// A link to one of them is answered with "no downloadable media" here.
 class ExtractorRegistry {
-  // The full core hands this to the extractors that may call other services.
+  // The full core hands these to its extractors: the first to those that may
+  // call other services, the second to those that offer streams. The one
+  // extractor here does neither.
   // ignore: avoid_unused_constructor_parameters
-  ExtractorRegistry({ExternalServiceAccess? externalServiceAccess})
-    : extractors = const [GenericExtractor()];
+  ExtractorRegistry({
+    ExternalServiceAccess? externalServiceAccess,
+    // ignore: avoid_unused_constructor_parameters
+    bool? canJoinStreams,
+  }) : extractors = const [GenericExtractor()];
 
   /// GenericExtractor must stay last: its `canHandle` accepts everything.
   final List<BaseVideoExtractor> extractors;

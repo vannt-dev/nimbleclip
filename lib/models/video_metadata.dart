@@ -152,7 +152,8 @@ class VideoQualityOption {
        partBytes = null,
        merge = source;
 
-  /// A video the device will join from the segments of [source]'s stream.
+  /// A video, or with [kind] audio, the device will join from the segments
+  /// of [source]'s stream.
   const VideoQualityOption.stream({
     required this.id,
     required this.label,
@@ -161,8 +162,8 @@ class VideoQualityOption {
     this.format = 'mp4',
     this.thumbnailUrl,
     this.mediaId,
-  }) : kind = MediaKind.video,
-       downloadUrl = '',
+    this.kind = MediaKind.video,
+  }) : downloadUrl = '',
        sizeBytes = null,
        headers = null,
        slideshow = null,

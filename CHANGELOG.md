@@ -6,6 +6,10 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- SoundCloud tracks download again on Android. SoundCloud stopped offering
+  its MP3 files, so every track was reported as unavailable. A track is now
+  saved as M4A audio (AAC), or as MP3 when Save audio as MP3 is turned on.
+
 ## [1.14.0] - 2026-10-16
 
 - A Threads post or reply that is a GIF can be downloaded, as a video (MP4) and

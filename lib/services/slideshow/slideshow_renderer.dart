@@ -61,6 +61,9 @@ abstract interface class SlideshowRenderer {
   /// failure: the picture is written alone. That is for a stream joined from
   /// its segments, which may be silent; a merged download always has both.
   ///
+  /// With [audioOnly], only the sound of [audioPath] is written, as an M4A:
+  /// for a stream of sound alone. [videoPath] is then not read.
+  ///
   /// Shares [onProgress], [renderId] and [cancel] with [render]. Returns the
   /// path of the written file; throws a [SlideshowException] on failure.
   Future<String> mux({
@@ -69,6 +72,7 @@ abstract interface class SlideshowRenderer {
     required String outputPath,
     String? renderId,
     bool audioOptional = false,
+    bool audioOnly = false,
     void Function(double progress)? onProgress,
   });
 

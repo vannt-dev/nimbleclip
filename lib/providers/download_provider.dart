@@ -804,6 +804,9 @@ class DownloadProvider extends ChangeNotifier {
           await saveToGalleryManually(task).catchError((_) => false);
         }
       }
+      // Sound joined from a stream is converted like a fetched download, so
+      // the setting means the same whichever way a track arrived.
+      if (_wantsMp3(task)) await _convertToMp3(task, l10n);
     } catch (error) {
       // A cancel is the user's own decision, already recorded on the task by
       // cancelTask. Overwriting it with `failed` would report their choice back
@@ -1068,11 +1071,13 @@ class DownloadProvider extends ChangeNotifier {
     task.downloadSpeed = 0;
     try {
       // Segments that hold both picture and sound are one file read twice,
-      // once for each track - and may hold no sound at all.
+      // once for each track - and may hold no sound at all. A stream of sound
+      // alone has no picture, and is nothing without its sound.
       return await _slideshowRenderer.mux(
         videoPath: videoFile.path,
         audioPath: (audioFile ?? videoFile).path,
-        audioOptional: audioFile == null,
+        audioOptional: audioFile == null && !task.isAudioOnly,
+        audioOnly: task.isAudioOnly,
         outputPath: outputPath,
         renderId: task.id,
         onProgress: (fraction) => _reportRenderProgress(
@@ -1101,9 +1106,10 @@ class DownloadProvider extends ChangeNotifier {
   }
 
   /// Mirrors the download services' naming so a rendered file sits alongside
-  /// fetched ones rather than standing out in the folder.
+  /// fetched ones rather than standing out in the folder. Sound joined from a
+  /// stream keeps its own format; everything else rendered is an MP4.
   String _slideshowFileName(DownloadTask task) =>
-      downloadFileName(task, extension: 'mp4');
+      downloadFileName(task, extension: task.isAudioOnly ? null : 'mp4');
 
   String _slideshowFailureText(Object error, AppLocalizations l10n) {
     if (error is SlideshowException) {

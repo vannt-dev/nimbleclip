@@ -10,6 +10,7 @@ import 'package:nimble_clip/models/quality_descriptor.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/providers/download_provider.dart';
+import 'package:nimble_clip/services/audio/audio_converter.dart';
 import 'package:nimble_clip/services/slideshow/slideshow_renderer.dart';
 
 import 'support/inert_download_service.dart';
@@ -21,7 +22,8 @@ class _FakeMuxer implements SlideshowRenderer {
   _FakeMuxer({this.failWith});
 
   final SlideshowFailureKind? failWith;
-  final List<({String video, String audio, bool audioOptional})> calls = [];
+  final List<({String video, String audio, bool audioOptional, bool audioOnly})>
+  calls = [];
   final Map<String, String> contents = {};
 
   @override
@@ -37,12 +39,14 @@ class _FakeMuxer implements SlideshowRenderer {
     required String outputPath,
     String? renderId,
     bool audioOptional = false,
+    bool audioOnly = false,
     void Function(double progress)? onProgress,
   }) async {
     calls.add((
       video: videoPath,
       audio: audioPath,
       audioOptional: audioOptional,
+      audioOnly: audioOnly,
     ));
     for (final path in {videoPath, audioPath}) {
       contents[path] = File(path).readAsStringSync();
@@ -70,6 +74,29 @@ class _FakeMuxer implements SlideshowRenderer {
   Future<void> cancel(String renderId) async {}
 }
 
+/// Stands in for the platform's MP3 encoder: records what it converted.
+class _FakeConverter implements AudioConverter {
+  final List<String> sources = [];
+
+  @override
+  bool get isSupported => true;
+
+  @override
+  Future<String> toMp3({
+    required String sourcePath,
+    required String outputPath,
+    required String jobId,
+    void Function(double progress)? onProgress,
+  }) async {
+    sources.add(sourcePath);
+    await File(outputPath).writeAsString('mp3');
+    return outputPath;
+  }
+
+  @override
+  Future<void> cancel(String jobId) async {}
+}
+
 /// Writes each playlist's table entry where its segments would be joined.
 class _FakeStreams {
   _FakeStreams(this.bodies, {this.failWith});
@@ -93,22 +120,32 @@ class _FakeStreams {
   }
 }
 
-VideoMetadata _metadata(StreamSource source) => VideoMetadata(
-  id: 'clip',
-  originalUrl: 'https://video.example/watch/42',
-  title: 'A clip',
-  author: 'video.example',
-  coverUrl: '',
-  platform: VideoPlatform.generic,
-  qualities: [
-    VideoQualityOption.stream(
-      id: 'gen_hls_720',
-      label: const VideoWithAudio('720p'),
-      quality: '720p',
-      source: source,
-    ),
-  ],
-);
+VideoMetadata _metadata(StreamSource source, {bool audioOnly = false}) =>
+    VideoMetadata(
+      id: 'clip',
+      originalUrl: 'https://video.example/watch/42',
+      title: 'A clip',
+      author: 'video.example',
+      coverUrl: '',
+      platform: VideoPlatform.generic,
+      qualities: [
+        audioOnly
+            ? VideoQualityOption.stream(
+                id: 'gen_hls_audio',
+                label: const OriginalAudio(),
+                quality: 'Audio AAC',
+                format: 'm4a',
+                kind: MediaKind.audio,
+                source: source,
+              )
+            : VideoQualityOption.stream(
+                id: 'gen_hls_720',
+                label: const VideoWithAudio('720p'),
+                quality: '720p',
+                source: source,
+              ),
+      ],
+    );
 
 Future<void> _waitUntil(bool Function() condition) async {
   for (var attempt = 0; attempt < 400 && !condition(); attempt++) {
@@ -138,6 +175,7 @@ void main() {
     SlideshowRenderer renderer,
     _FakeStreams streams, {
     DashFetcher? dashFetcher,
+    AudioConverter? audioConverter,
   }) => DownloadProvider(
     downloadService: InertDownloadService(),
     storageService: storage,
@@ -146,15 +184,17 @@ void main() {
     slideshowRenderer: renderer,
     hlsFetcher: streams.call,
     dashFetcher: dashFetcher,
+    audioConverter: audioConverter,
     slideshowWorkspace: () async =>
         Directory('${root.path}/work')..createSync(recursive: true),
   );
 
   Future<DownloadTask> download(
     DownloadProvider downloads,
-    StreamSource source,
-  ) async {
-    final metadata = _metadata(source);
+    StreamSource source, {
+    bool audioOnly = false,
+  }) async {
+    final metadata = _metadata(source, audioOnly: audioOnly);
     await downloads.startNewDownloads(
       metadata: metadata,
       qualities: metadata.qualities,
@@ -268,6 +308,52 @@ void main() {
     expect(muxer.calls.single.video, muxer.calls.single.audio);
     expect(muxer.calls.single.audioOptional, isTrue);
   });
+
+  test('a stream of sound alone is kept as sound, not as a video', () async {
+    final muxer = _FakeMuxer();
+    final streams = _FakeStreams({audio: 'sound'});
+
+    final task = await download(
+      provider(muxer, streams),
+      const HlsSource(videoPlaylistUrl: audio),
+      audioOnly: true,
+    );
+
+    expect(task.status, DownloadStatus.completed);
+    expect(task.isAudioOnly, isTrue);
+    expect(streams.fetched, [audio]);
+    final call = muxer.calls.single;
+    expect(call.audioOnly, isTrue);
+    // There is nothing else to keep, so the sound must be there.
+    expect(call.audioOptional, isFalse);
+    expect(muxer.contents[call.audio], 'sound');
+    expect(task.filePath, endsWith('.m4a'));
+  });
+
+  test(
+    'sound joined from a stream is converted when MP3 is asked for',
+    () async {
+      final converter = _FakeConverter();
+      final downloads = provider(
+        _FakeMuxer(),
+        _FakeStreams({audio: 'sound'}),
+        audioConverter: converter,
+      )..convertAudioToMp3 = true;
+
+      final task = await download(
+        downloads,
+        const HlsSource(videoPlaylistUrl: audio),
+        audioOnly: true,
+      );
+
+      expect(task.status, DownloadStatus.completed);
+      expect(converter.sources.single, endsWith('.m4a'));
+      expect(task.format, 'mp3');
+      expect(task.filePath, endsWith('.mp3'));
+      expect(File(task.filePath!).readAsStringSync(), 'mp3');
+      expect(File(converter.sources.single).existsSync(), isFalse);
+    },
+  );
 
   test('a stream that turns out live says so on the task', () async {
     final task = await download(

@@ -143,6 +143,7 @@ class MethodChannelSlideshowRenderer implements SlideshowRenderer {
     required String outputPath,
     String? renderId,
     bool audioOptional = false,
+    bool audioOnly = false,
     void Function(double progress)? onProgress,
   }) async {
     if (!isSupported) {
@@ -162,6 +163,7 @@ class MethodChannelSlideshowRenderer implements SlideshowRenderer {
         'outputPath': outputPath,
         'renderId': id,
         'audioOptional': audioOptional,
+        'audioOnly': audioOnly,
       });
     } on PlatformException catch (error) {
       throw SlideshowException(_kindFor(error.code), detail: error.message);

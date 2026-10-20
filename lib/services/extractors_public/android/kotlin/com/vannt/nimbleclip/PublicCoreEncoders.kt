@@ -57,6 +57,7 @@ class StreamMuxer {
         val outputPath: String,
         val renderId: String,
         val audioOptional: Boolean = false,
+        val audioOnly: Boolean = false,
     )
 
     @Suppress("UNUSED_PARAMETER")
