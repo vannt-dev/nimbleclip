@@ -31,7 +31,7 @@ concurrency:
 jobs:
   release:
     name: Build and publish
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v5
