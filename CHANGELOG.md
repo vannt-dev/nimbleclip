@@ -6,6 +6,12 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.14.2] - 2026-10-26
+
+- Videos served as a stream (HLS or DASH) download faster. When the sound is
+  a separate stream, it now downloads at the same time as the picture instead
+  of after it, and one slow piece of the stream no longer holds up the rest.
+
 ## [1.14.1] - 2026-10-20
 
 - SoundCloud tracks download again on Android. SoundCloud stopped offering
