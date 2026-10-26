@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -380,5 +381,85 @@ void main() {
 
     expect(task.status, DownloadStatus.failed);
     expect(task.errorMessage, l10n.streamUnreadable);
+  });
+
+  test('picture and sound served apart are fetched at the same time', () async {
+    final muxer = _FakeMuxer();
+    final audioStarted = Completer<void>();
+    // The picture only finishes once the sound has started: one after the
+    // other, the download would never end.
+    final task = await download(
+      provider(
+        muxer,
+        _FakeStreams({}),
+        dashFetcher:
+            (
+              manifestUrl,
+              representationId,
+              into, {
+              onProgress,
+              isCancelled,
+            }) async {
+              if (representationId == 'aac') {
+                audioStarted.complete();
+              } else {
+                await audioStarted.future.timeout(const Duration(seconds: 1));
+              }
+              await into.writeAsString(representationId);
+              onProgress?.call(1, representationId.length);
+            },
+      ),
+      const DashSource(
+        manifestUrl: 'https://cdn.example/film.mpd',
+        videoId: 'v720',
+        audioId: 'aac',
+      ),
+    );
+
+    expect(task.status, DownloadStatus.completed);
+    final call = muxer.calls.single;
+    expect(muxer.contents[call.video], 'v720');
+    expect(muxer.contents[call.audio], 'aac');
+  });
+
+  test('when one track fails, the other stops and the task fails', () async {
+    final muxer = _FakeMuxer();
+    var pictureStopped = false;
+    final task = await download(
+      provider(
+        muxer,
+        _FakeStreams({}),
+        dashFetcher:
+            (
+              manifestUrl,
+              representationId,
+              into, {
+              onProgress,
+              isCancelled,
+            }) async {
+              if (representationId == 'aac') {
+                throw const SlideshowException(
+                  SlideshowFailureKind.fetchFailed,
+                );
+              }
+              // Keeps fetching until it is told the download is over.
+              while (!(isCancelled?.call() ?? false)) {
+                await Future<void>.delayed(const Duration(milliseconds: 5));
+              }
+              pictureStopped = true;
+            },
+      ),
+      const DashSource(
+        manifestUrl: 'https://cdn.example/film.mpd',
+        videoId: 'v720',
+        audioId: 'aac',
+      ),
+    );
+
+    expect(task.status, DownloadStatus.failed);
+    expect(task.errorMessage, l10n.downloadFailed);
+    expect(pictureStopped, isTrue);
+    expect(muxer.calls, isEmpty);
+    expect(Directory('${root.path}/work').existsSync(), isFalse);
   });
 }

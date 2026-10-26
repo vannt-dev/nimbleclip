@@ -540,7 +540,8 @@ void main() {
         l10n: l10n,
         options: noGallery,
       );
-      await _waitUntil(() => fetcher.fetched.isNotEmpty);
+      // Picture and sound start side by side.
+      await _waitUntil(() => fetcher.fetched.length == 2);
       await downloader.startNewDownloads(
         metadata: metadata,
         qualities: [option],
@@ -550,7 +551,13 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
       expect(downloader.allTasks, hasLength(1));
-      expect(fetcher.fetched, hasLength(1));
+      expect(
+        fetcher.fetched,
+        unorderedEquals([
+          'https://yt.example/video-1080',
+          'https://yt.example/audio',
+        ]),
+      );
       downloader.cancelTask(downloader.allTasks.single.id);
     });
 
