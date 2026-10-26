@@ -940,19 +940,23 @@ class DownloadProvider extends ChangeNotifier {
       task.notifyProgressChanged();
     }
 
-    await _streamFetcher(
-      source.videoUrl,
-      videoFile,
-      onBytes: reportBytes,
-      isCancelled: stopped,
-    );
-    final videoReceived = await videoFile.length();
-    await _streamFetcher(
-      source.audioUrl,
-      audioFile,
-      onBytes: (received) => reportBytes(videoReceived + received),
-      isCancelled: stopped,
-    );
+    var videoReceived = 0, audioReceived = 0;
+    await _fetchSideBySide(stopped, [
+      (isCancelled) => _streamFetcher(
+        source.videoUrl,
+        videoFile,
+        onBytes: (received) =>
+            reportBytes((videoReceived = received) + audioReceived),
+        isCancelled: isCancelled,
+      ),
+      (isCancelled) => _streamFetcher(
+        source.audioUrl,
+        audioFile,
+        onBytes: (received) =>
+            reportBytes(videoReceived + (audioReceived = received)),
+        isCancelled: isCancelled,
+      ),
+    ]);
     if (stopped()) {
       throw const SlideshowException(SlideshowFailureKind.cancelled);
     }
@@ -1040,8 +1044,9 @@ class DownloadProvider extends ChangeNotifier {
     final clock = Stopwatch()..start();
     void report(double fraction, int received) {
       if (stopped()) return;
-      // Averaged over the whole fetch: segments land a batch at a time, so
-      // the rate between two reports swings between nothing and a burst.
+      // Averaged over the whole fetch: segments are reported whole, as each
+      // one lands, so the rate between two reports swings between nothing
+      // and a burst.
       final seconds = clock.elapsedMilliseconds / 1000;
       task
         ..receivedBytes = received
@@ -1050,21 +1055,27 @@ class DownloadProvider extends ChangeNotifier {
       task.notifyProgressChanged();
     }
 
-    var videoBytes = 0;
-    await fetchVideo(videoFile, (fraction, received) {
-      videoBytes = received;
-      report(fraction * videoShare, received);
-    }, stopped);
-    if (audioFile != null) {
-      await fetchAudio!(
-        audioFile,
-        (fraction, received) => report(
-          videoShare + fraction * (1 - videoShare),
-          videoBytes + received,
-        ),
-        stopped,
-      );
-    }
+    // Picture and sound come down side by side: the sound no longer waits
+    // for the last picture segment. A failure in either stops the other.
+    var videoFraction = 0.0, videoBytes = 0;
+    var audioFraction = 0.0, audioBytes = 0;
+    void reportBoth() => report(
+      videoFraction * videoShare + audioFraction * (1 - videoShare),
+      videoBytes + audioBytes,
+    );
+    await _fetchSideBySide(stopped, [
+      (isCancelled) => fetchVideo(videoFile, (fraction, received) {
+        videoFraction = fraction;
+        videoBytes = received;
+        reportBoth();
+      }, isCancelled),
+      if (audioFile != null)
+        (isCancelled) => fetchAudio!(audioFile, (fraction, received) {
+          audioFraction = fraction;
+          audioBytes = received;
+          reportBoth();
+        }, isCancelled),
+    ]);
     if (stopped()) {
       throw const SlideshowException(SlideshowFailureKind.cancelled);
     }
@@ -1096,6 +1107,27 @@ class DownloadProvider extends ChangeNotifier {
 
   // Only names the shape, so the two kinds of stream above read alike.
   static _TrackFetch _trackFetch(_TrackFetch fetch) => fetch;
+
+  /// Runs [fetches] at the same time. When one fails, the others are told to
+  /// stop through their cancel check; all of them have ended before the first
+  /// failure is rethrown, so none still writes into the workspace.
+  static Future<void> _fetchSideBySide(
+    bool Function() stopped,
+    List<Future<void> Function(bool Function() isCancelled)> fetches,
+  ) async {
+    Object? failure;
+    StackTrace? failureTrace;
+    bool cancelled() => failure != null || stopped();
+    await Future.wait([
+      for (final fetch in fetches)
+        fetch(cancelled).catchError((Object error, StackTrace trace) {
+          failure ??= error;
+          failureTrace ??= trace;
+        }),
+    ]);
+    final error = failure;
+    if (error != null) Error.throwWithStackTrace(error, failureTrace!);
+  }
 
   void _reportRenderProgress(DownloadTask task, double fraction) {
     // Only while it is still running: a cancel already moved the task on, and
