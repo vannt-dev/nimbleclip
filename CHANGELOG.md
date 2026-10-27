@@ -6,6 +6,11 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.14.3] - 2026-10-27
+
+- Videos served as a stream (HLS or DASH) keep downloading when one piece of
+  the stream comes in slowly, so a patchy connection finishes sooner.
+
 ## [1.14.2] - 2026-10-26
 
 - Videos served as a stream (HLS or DASH) download faster. When the sound is
