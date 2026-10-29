@@ -1333,6 +1333,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'There is not enough free space to render this slideshow.'**
   String get slideshowOutOfSpace;
+
+  /// No description provided for @searchDownloadsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by title'**
+  String get searchDownloadsHint;
+
+  /// No description provided for @clearSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get clearSearch;
+
+  /// No description provided for @filterAllTypes.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get filterAllTypes;
+
+  /// No description provided for @filterVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get filterVideo;
+
+  /// No description provided for @filterAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio'**
+  String get filterAudio;
+
+  /// No description provided for @filterImages.
+  ///
+  /// In en, this message translates to:
+  /// **'Images'**
+  String get filterImages;
+
+  /// No description provided for @noMatchingDownloads.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching downloads'**
+  String get noMatchingDownloads;
+
+  /// No description provided for @noMatchingDownloadsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Try other words or another type.'**
+  String get noMatchingDownloadsDescription;
+
+  /// No description provided for @clearFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear filters'**
+  String get clearFilters;
 }
 
 class _AppLocalizationsDelegate

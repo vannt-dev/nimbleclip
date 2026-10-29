@@ -764,4 +764,32 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get slideshowOutOfSpace =>
       'Không đủ dung lượng trống để dựng video từ ảnh này.';
+
+  @override
+  String get searchDownloadsHint => 'Tìm theo tiêu đề';
+
+  @override
+  String get clearSearch => 'Xóa tìm kiếm';
+
+  @override
+  String get filterAllTypes => 'Tất cả';
+
+  @override
+  String get filterVideo => 'Video';
+
+  @override
+  String get filterAudio => 'Âm thanh';
+
+  @override
+  String get filterImages => 'Ảnh';
+
+  @override
+  String get noMatchingDownloads => 'Không có mục nào khớp';
+
+  @override
+  String get noMatchingDownloadsDescription =>
+      'Thử từ khóa khác hoặc loại khác.';
+
+  @override
+  String get clearFilters => 'Xóa bộ lọc';
 }

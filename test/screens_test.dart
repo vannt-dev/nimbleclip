@@ -197,6 +197,160 @@ void main() {
       expect(find.byKey(const ValueKey('download-finished')), findsWidgets);
     });
 
+    group('search and type filter', () {
+      DownloadTask seeded(
+        String id,
+        String title, {
+        MediaKind kind = MediaKind.video,
+        DownloadStatus status = DownloadStatus.completed,
+      }) => DownloadTask(
+        id: id,
+        videoId: id,
+        title: title,
+        author: 'Creator',
+        thumbnailUrl: '',
+        downloadUrl: 'https://cdn.example.com/$id',
+        originalUrl: 'https://example.com/$id',
+        platform: VideoPlatform.facebook,
+        qualityLabel: 'HD 720p',
+        kind: kind,
+        format: kind == MediaKind.audio ? 'mp3' : 'mp4',
+        status: status,
+      );
+
+      Future<void> pumpSeeded(WidgetTester tester) async {
+        final tasks = [
+          seeded('lesson', 'Học Tiếng Việt cơ bản'),
+          seeded('song', 'Bài hát mùa thu', kind: MediaKind.audio),
+          seeded('photo', 'Sunset at Đà Lạt', kind: MediaKind.image),
+        ];
+        await tester.pumpWidget(
+          _host(
+            DownloadsScreen(onNavigateHome: () {}),
+            providers: [
+              ChangeNotifierProvider(create: (_) => SettingsProvider()),
+              ChangeNotifierProvider(
+                create: (_) => DownloadProvider(
+                  downloadService: InertDownloadService(),
+                  historyRepository: _SeededHistoryRepository(tasks),
+                ),
+              ),
+            ],
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+      }
+
+      Finder entry(String id) => find.byKey(ValueKey('download-$id'));
+
+      testWidgets('no search field while the list is empty', (tester) async {
+        await tester.pumpWidget(
+          _host(
+            DownloadsScreen(onNavigateHome: () {}),
+            providers: [
+              ChangeNotifierProvider(create: (_) => SettingsProvider()),
+              ChangeNotifierProvider(
+                create: (_) =>
+                    DownloadProvider(downloadService: InertDownloadService()),
+              ),
+            ],
+          ),
+        );
+        await tester.pump();
+
+        expect(find.byKey(const Key('downloads_search_field')), findsNothing);
+      });
+
+      testWidgets('typing without accents finds a Vietnamese title', (
+        tester,
+      ) async {
+        await pumpSeeded(tester);
+        expect(entry('lesson'), findsOneWidget);
+        expect(entry('song'), findsOneWidget);
+
+        await tester.enterText(
+          find.byKey(const Key('downloads_search_field')),
+          'tieng viet',
+        );
+        // The list waits for typing to pause before it filters.
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(entry('song'), findsOneWidget);
+
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(entry('lesson'), findsOneWidget);
+        expect(entry('song'), findsNothing);
+        expect(entry('photo'), findsNothing);
+        expect(find.text('All (1)'), findsOneWidget);
+      });
+
+      testWidgets('a type chip keeps only that kind', (tester) async {
+        await pumpSeeded(tester);
+
+        await tester.tap(find.byKey(const Key('downloads_type_audio')));
+        await tester.pump();
+        expect(entry('song'), findsOneWidget);
+        expect(entry('lesson'), findsNothing);
+        expect(entry('photo'), findsNothing);
+
+        await tester.tap(find.byKey(const Key('downloads_type_image')));
+        await tester.pump();
+        expect(entry('photo'), findsOneWidget);
+        expect(entry('song'), findsNothing);
+
+        await tester.tap(find.byKey(const Key('downloads_type_all')));
+        await tester.pump();
+        expect(entry('lesson'), findsOneWidget);
+        expect(entry('song'), findsOneWidget);
+        expect(entry('photo'), findsOneWidget);
+      });
+
+      testWidgets('nothing matching shows its own empty state', (tester) async {
+        await pumpSeeded(tester);
+
+        await tester.enterText(
+          find.byKey(const Key('downloads_search_field')),
+          'tieng viet',
+        );
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.tap(find.byKey(const Key('downloads_type_audio')));
+        await tester.pump();
+
+        expect(find.text('No matching downloads'), findsOneWidget);
+        expect(find.text('Your download list is empty'), findsNothing);
+        expect(entry('lesson'), findsNothing);
+
+        await tester.tap(find.text('Clear filters'));
+        await tester.pump();
+
+        expect(find.text('No matching downloads'), findsNothing);
+        expect(entry('lesson'), findsOneWidget);
+        expect(entry('song'), findsOneWidget);
+        final field = tester.widget<TextField>(
+          find.byKey(const Key('downloads_search_field')),
+        );
+        expect(field.controller!.text, isEmpty);
+      });
+
+      testWidgets('the clear button empties the search at once', (
+        tester,
+      ) async {
+        await pumpSeeded(tester);
+
+        await tester.enterText(
+          find.byKey(const Key('downloads_search_field')),
+          'sunset',
+        );
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(entry('lesson'), findsNothing);
+
+        await tester.tap(find.byTooltip('Clear search'));
+        await tester.pump();
+        expect(entry('lesson'), findsOneWidget);
+        expect(entry('photo'), findsOneWidget);
+      });
+    });
+
     testWidgets('disposing the provider releases the gateway', (tester) async {
       final gateway = InertDownloadService();
       await tester.pumpWidget(

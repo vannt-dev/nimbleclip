@@ -767,4 +767,32 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get slideshowOutOfSpace =>
       'There is not enough free space to render this slideshow.';
+
+  @override
+  String get searchDownloadsHint => 'Search by title';
+
+  @override
+  String get clearSearch => 'Clear search';
+
+  @override
+  String get filterAllTypes => 'All';
+
+  @override
+  String get filterVideo => 'Video';
+
+  @override
+  String get filterAudio => 'Audio';
+
+  @override
+  String get filterImages => 'Images';
+
+  @override
+  String get noMatchingDownloads => 'No matching downloads';
+
+  @override
+  String get noMatchingDownloadsDescription =>
+      'Try other words or another type.';
+
+  @override
+  String get clearFilters => 'Clear filters';
 }

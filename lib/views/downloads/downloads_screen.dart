@@ -10,6 +10,7 @@ import '../../models/download_task.dart';
 import '../../providers/download_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../player/video_player_screen.dart';
+import 'download_filter.dart';
 import 'widgets/active_download_card.dart';
 import 'widgets/completed_download_card.dart';
 
@@ -24,7 +25,13 @@ class DownloadsScreen extends StatefulWidget {
 
 class _DownloadsScreenState extends State<DownloadsScreen>
     with SingleTickerProviderStateMixin {
+  /// How long typing has to pause before the list is filtered again.
+  static const _searchDebounce = Duration(milliseconds: 250);
+
   late TabController _tabController;
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _searchTimer;
+  DownloadFilter _filter = const DownloadFilter();
 
   @override
   void initState() {
@@ -34,8 +41,30 @@ class _DownloadsScreenState extends State<DownloadsScreen>
 
   @override
   void dispose() {
+    _searchTimer?.cancel();
+    _searchController.dispose();
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String text) {
+    _searchTimer?.cancel();
+    _searchTimer = Timer(_searchDebounce, () {
+      if (!mounted) return;
+      setState(() => _filter = _filter.copyWith(query: text));
+    });
+  }
+
+  void _clearSearch() {
+    _searchTimer?.cancel();
+    _searchController.clear();
+    setState(() => _filter = _filter.copyWith(query: ''));
+  }
+
+  void _clearFilters() {
+    _searchTimer?.cancel();
+    _searchController.clear();
+    setState(() => _filter = const DownloadFilter());
   }
 
   Future<void> _openMedia(BuildContext context, DownloadTask task) async {
@@ -188,10 +217,19 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final downloadProv = context.watch<DownloadProvider>();
 
-    final all = downloadProv.allTasks;
-    final active = [...downloadProv.activeTasks, ...downloadProv.pausedTasks];
-    final completed = downloadProv.completedTasks;
+    final allUnfiltered = downloadProv.allTasks;
+    final activeUnfiltered = [
+      ...downloadProv.activeTasks,
+      ...downloadProv.pausedTasks,
+    ];
+    final completedUnfiltered = downloadProv.completedTasks;
+    final all = _filter.apply(allUnfiltered);
+    final active = _filter.apply(activeUnfiltered);
+    final completed = _filter.apply(completedUnfiltered);
     final hasFinished = downloadProv.hasFinishedTasks;
+    // A filter left on after the list was cleared still shows, so it can be
+    // switched off again.
+    final showSearch = allUnfiltered.isNotEmpty || _filter.isActive;
 
     return Scaffold(
       appBar: AppBar(
@@ -262,6 +300,7 @@ class _DownloadsScreenState extends State<DownloadsScreen>
       ),
       body: Column(
         children: [
+          if (showSearch) _buildSearchBar(context),
           if (downloadProv.downloadsAwaitingWifi > 0)
             Container(
               key: const Key('awaiting_wifi_banner'),
@@ -291,9 +330,22 @@ class _DownloadsScreenState extends State<DownloadsScreen>
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildTaskList(context, all),
-                _buildActiveList(context, active),
-                _buildCompletedList(context, completed),
+                _buildTaskList(
+                  context,
+                  all,
+                  filteredOut: all.isEmpty && allUnfiltered.isNotEmpty,
+                ),
+                _buildActiveList(
+                  context,
+                  active,
+                  filteredOut: active.isEmpty && activeUnfiltered.isNotEmpty,
+                ),
+                _buildCompletedList(
+                  context,
+                  completed,
+                  filteredOut:
+                      completed.isEmpty && completedUnfiltered.isNotEmpty,
+                ),
               ],
             ),
           ),
@@ -302,7 +354,99 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     );
   }
 
-  Widget _buildActiveList(BuildContext context, List<DownloadTask> tasks) {
+  Widget _buildSearchBar(BuildContext context) {
+    final l10n = context.l10n;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final types = <(DownloadTypeFilter, String, IconData?)>[
+      (DownloadTypeFilter.all, l10n.filterAllTypes, null),
+      (DownloadTypeFilter.video, l10n.filterVideo, Icons.movie_outlined),
+      (DownloadTypeFilter.audio, l10n.filterAudio, Icons.music_note_outlined),
+      (DownloadTypeFilter.image, l10n.filterImages, Icons.image_outlined),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: TextField(
+            key: const Key('downloads_search_field'),
+            controller: _searchController,
+            onChanged: _onSearchChanged,
+            textInputAction: TextInputAction.search,
+            maxLines: 1,
+            style: const TextStyle(fontSize: 14),
+            decoration: InputDecoration(
+              hintText: l10n.searchDownloadsHint,
+              hintStyle: TextStyle(
+                color: isDark
+                    ? AppColors.darkTextSecondary.withAlpha(160)
+                    : AppColors.lightTextSecondary.withAlpha(160),
+                fontSize: 13,
+              ),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+              prefixIcon: const Icon(Icons.search_rounded, size: 20),
+              suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _searchController,
+                builder: (context, value, _) => value.text.isEmpty
+                    ? const SizedBox.shrink()
+                    : IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        tooltip: l10n.clearSearch,
+                        onPressed: _clearSearch,
+                      ),
+              ),
+            ),
+          ),
+        ),
+        // Edge to edge, so chips that do not fit a narrow screen scroll in
+        // from the side instead of being cut at the margin.
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              for (final (type, label, icon) in types)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    key: Key('downloads_type_${type.name}'),
+                    label: Text(label),
+                    avatar: icon == null ? null : Icon(icon, size: 16),
+                    showCheckmark: false,
+                    visualDensity: VisualDensity.compact,
+                    selected: _filter.type == type,
+                    onSelected: (_) =>
+                        setState(() => _filter = _filter.copyWith(type: type)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNoMatches(BuildContext context) {
+    return _buildEmptyState(
+      icon: Icons.search_off_rounded,
+      title: context.l10n.noMatchingDownloads,
+      subtitle: context.l10n.noMatchingDownloadsDescription,
+      actionIcon: Icons.filter_alt_off_rounded,
+      actionLabel: context.l10n.clearFilters,
+      onAction: _clearFilters,
+    );
+  }
+
+  Widget _buildActiveList(
+    BuildContext context,
+    List<DownloadTask> tasks, {
+    required bool filteredOut,
+  }) {
+    if (filteredOut) return _buildNoMatches(context);
     if (tasks.isEmpty) {
       return _buildEmptyState(
         icon: Icons.cloud_download_outlined,
@@ -318,7 +462,12 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     );
   }
 
-  Widget _buildCompletedList(BuildContext context, List<DownloadTask> tasks) {
+  Widget _buildCompletedList(
+    BuildContext context,
+    List<DownloadTask> tasks, {
+    required bool filteredOut,
+  }) {
+    if (filteredOut) return _buildNoMatches(context);
     if (tasks.isEmpty) {
       return _buildEmptyState(
         icon: Icons.check_circle_outline_rounded,
@@ -336,7 +485,12 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     );
   }
 
-  Widget _buildTaskList(BuildContext context, List<DownloadTask> tasks) {
+  Widget _buildTaskList(
+    BuildContext context,
+    List<DownloadTask> tasks, {
+    required bool filteredOut,
+  }) {
+    if (filteredOut) return _buildNoMatches(context);
     if (tasks.isEmpty) {
       return _buildEmptyState(
         icon: Icons.video_library_outlined,
@@ -395,6 +549,9 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     required IconData icon,
     required String title,
     required String subtitle,
+    IconData actionIcon = Icons.add_rounded,
+    String? actionLabel,
+    VoidCallback? onAction,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -444,9 +601,9 @@ class _DownloadsScreenState extends State<DownloadsScreen>
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: widget.onNavigateHome,
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: Text(context.l10n.newDownload),
+              onPressed: onAction ?? widget.onNavigateHome,
+              icon: Icon(actionIcon, size: 18),
+              label: Text(actionLabel ?? context.l10n.newDownload),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 20,
