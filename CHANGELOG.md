@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-10-29
+
 - The Downloads screen can be searched by title and narrowed to videos, audio,
   or images. The search ignores case and accents, so "tieng viet" finds
   "Tiếng Việt".
