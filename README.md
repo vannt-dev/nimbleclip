@@ -70,6 +70,9 @@ The APK signing certificate fingerprints are listed there too.
   completed file again.
 - Tracks progress, transfer speed, and downloaded file size per task without
   rebuilding the entire download list.
+- Searches the download list by title and narrows it to videos, audio, or
+  images. The search ignores case and accents, so `tieng viet` finds
+  "Tiếng Việt", and it applies to every tab of the Downloads screen.
 - Runs mobile downloads through Android DownloadWorker and iOS URLSession with
   progress notifications, retry, pause, and resume while the app is in the
   background.

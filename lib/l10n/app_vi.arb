@@ -206,4 +206,13 @@
   ,"slideshowMusicUnavailable": "Không thêm được nhạc, nên video từ ảnh này không có tiếng."
   ,"slideshowRenderFailed": "Không dựng được video từ ảnh trên thiết bị này."
   ,"slideshowOutOfSpace": "Không đủ dung lượng trống để dựng video từ ảnh này."
+  ,"searchDownloadsHint": "Tìm theo tiêu đề"
+  ,"clearSearch": "Xóa tìm kiếm"
+  ,"filterAllTypes": "Tất cả"
+  ,"filterVideo": "Video"
+  ,"filterAudio": "Âm thanh"
+  ,"filterImages": "Ảnh"
+  ,"noMatchingDownloads": "Không có mục nào khớp"
+  ,"noMatchingDownloadsDescription": "Thử từ khóa khác hoặc loại khác."
+  ,"clearFilters": "Xóa bộ lọc"
 }

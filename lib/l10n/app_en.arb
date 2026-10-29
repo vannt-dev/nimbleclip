@@ -247,4 +247,13 @@
   ,"slideshowMusicUnavailable": "The music could not be added, so this slideshow is silent."
   ,"slideshowRenderFailed": "This slideshow could not be rendered on this device."
   ,"slideshowOutOfSpace": "There is not enough free space to render this slideshow."
+  ,"searchDownloadsHint": "Search by title"
+  ,"clearSearch": "Clear search"
+  ,"filterAllTypes": "All"
+  ,"filterVideo": "Video"
+  ,"filterAudio": "Audio"
+  ,"filterImages": "Images"
+  ,"noMatchingDownloads": "No matching downloads"
+  ,"noMatchingDownloadsDescription": "Try other words or another type."
+  ,"clearFilters": "Clear filters"
 }
