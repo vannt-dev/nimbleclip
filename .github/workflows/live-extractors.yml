@@ -62,7 +62,7 @@ jobs:
       # test run and is reported, but is not a failure of ours.
       - name: Open or update health issue
         if: steps.summary.outputs.healthy == 'false'
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         # Through the environment, never interpolated into the script: the
         # failure text can carry a third party's own wording.
         env:
@@ -110,7 +110,7 @@ jobs:
       # success, and a run that verified nothing must not close anything.
       - name: Close the health issue once the checks pass
         if: steps.summary.outputs.healthy == 'true'
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           SUMMARY: ${{ steps.summary.outputs.markdown }}
         with:
