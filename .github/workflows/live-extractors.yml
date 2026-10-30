@@ -18,16 +18,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/fetch-core
         with:
           deploy-key: ${{ secrets.CORE_DEPLOY_KEY }}
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: '3.47.0'
           channel: stable
           cache: true
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
       - run: flutter pub get
@@ -60,7 +62,7 @@ jobs:
       # test run and is reported, but is not a failure of ours.
       - name: Open or update health issue
         if: steps.summary.outputs.healthy == 'false'
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         # Through the environment, never interpolated into the script: the
         # failure text can carry a third party's own wording.
         env:
@@ -108,7 +110,7 @@ jobs:
       # success, and a run that verified nothing must not close anything.
       - name: Close the health issue once the checks pass
         if: steps.summary.outputs.healthy == 'true'
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           SUMMARY: ${{ steps.summary.outputs.markdown }}
         with:
