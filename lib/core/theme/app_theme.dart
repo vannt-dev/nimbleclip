@@ -18,11 +18,10 @@ class AppTheme {
       onSecondary: Colors.white,
       onSurface: AppColors.lightTextPrimary,
     ),
-    textTheme: GoogleFonts.plusJakartaSansTextTheme(ThemeData.light().textTheme)
-        .apply(
-          bodyColor: AppColors.lightTextPrimary,
-          displayColor: AppColors.lightTextPrimary,
-        ),
+    textTheme: _plusJakartaSansTextTheme(ThemeData.light().textTheme).apply(
+      bodyColor: AppColors.lightTextPrimary,
+      displayColor: AppColors.lightTextPrimary,
+    ),
     appBarTheme: AppBarTheme(
       backgroundColor: AppColors.lightBg,
       elevation: 0,
@@ -89,11 +88,10 @@ class AppTheme {
       onSecondary: Colors.white,
       onSurface: AppColors.darkTextPrimary,
     ),
-    textTheme: GoogleFonts.plusJakartaSansTextTheme(ThemeData.dark().textTheme)
-        .apply(
-          bodyColor: AppColors.darkTextPrimary,
-          displayColor: AppColors.darkTextPrimary,
-        ),
+    textTheme: _plusJakartaSansTextTheme(ThemeData.dark().textTheme).apply(
+      bodyColor: AppColors.darkTextPrimary,
+      displayColor: AppColors.darkTextPrimary,
+    ),
     appBarTheme: AppBarTheme(
       backgroundColor: AppColors.darkBg,
       elevation: 0,
@@ -143,5 +141,28 @@ class AppTheme {
         ),
       ),
     ),
+  );
+}
+
+// google_fonts 9 builds its text themes on the material_ui package, whose
+// TextTheme is not the type package:flutter/material.dart uses, so each
+// style gets the font here.
+TextTheme _plusJakartaSansTextTheme(TextTheme base) {
+  return base.copyWith(
+    displayLarge: GoogleFonts.plusJakartaSans(textStyle: base.displayLarge),
+    displayMedium: GoogleFonts.plusJakartaSans(textStyle: base.displayMedium),
+    displaySmall: GoogleFonts.plusJakartaSans(textStyle: base.displaySmall),
+    headlineLarge: GoogleFonts.plusJakartaSans(textStyle: base.headlineLarge),
+    headlineMedium: GoogleFonts.plusJakartaSans(textStyle: base.headlineMedium),
+    headlineSmall: GoogleFonts.plusJakartaSans(textStyle: base.headlineSmall),
+    titleLarge: GoogleFonts.plusJakartaSans(textStyle: base.titleLarge),
+    titleMedium: GoogleFonts.plusJakartaSans(textStyle: base.titleMedium),
+    titleSmall: GoogleFonts.plusJakartaSans(textStyle: base.titleSmall),
+    bodyLarge: GoogleFonts.plusJakartaSans(textStyle: base.bodyLarge),
+    bodyMedium: GoogleFonts.plusJakartaSans(textStyle: base.bodyMedium),
+    bodySmall: GoogleFonts.plusJakartaSans(textStyle: base.bodySmall),
+    labelLarge: GoogleFonts.plusJakartaSans(textStyle: base.labelLarge),
+    labelMedium: GoogleFonts.plusJakartaSans(textStyle: base.labelMedium),
+    labelSmall: GoogleFonts.plusJakartaSans(textStyle: base.labelSmall),
   );
 }
