@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.15.3] - 2026-11-01
+
 - Settings now says plainly that its storage figure is the copies kept inside
   NimbleClip ("Local copies in NimbleClip"), and that files saved to your
   gallery are not counted. Cleaning up deletes only those copies; files in your
