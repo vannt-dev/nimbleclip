@@ -463,6 +463,33 @@ class DownloadProvider extends ChangeNotifier {
     return matches;
   }
 
+  /// Whether every one of [qualities] of [metadata] is already queued,
+  /// running or paused, so starting them again would add nothing.
+  ///
+  /// Asked before [startNewDownloads] rather than read from its result: that
+  /// returns only what entered the URL queue, so an option joined or rendered
+  /// on the device comes back empty even when it has just started.
+  bool isInProgress({
+    required VideoMetadata metadata,
+    required List<VideoQualityOption> qualities,
+    required AppLocalizations l10n,
+  }) =>
+      qualities.isNotEmpty &&
+      qualities.every((quality) => _isInFlight(metadata, quality, l10n));
+
+  /// The queued or running tasks for [qualities] of [metadata], whichever
+  /// path, URL or render, they were started on.
+  List<DownloadTask> activeTasksFor({
+    required VideoMetadata metadata,
+    required List<VideoQualityOption> qualities,
+    required AppLocalizations l10n,
+  }) => _tasks
+      .where(
+        (task) =>
+            task.isActive && _matchesSelection(task, metadata, qualities, l10n),
+      )
+      .toList();
+
   /// Whether [quality] of [metadata] is already queued, running or paused.
   bool _isInFlight(
     VideoMetadata metadata,
