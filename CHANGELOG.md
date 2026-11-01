@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.15.2] - 2026-11-01
+
 - Tapping "Download now" on a video that the app joins or builds on your phone
   (such as a YouTube video in high quality, a streamed video, or a photo
   slideshow) no longer says "This file is already being downloaded" as the
