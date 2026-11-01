@@ -6,6 +6,12 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- Some streamed videos, such as those on news and broadcaster sites, download
+  again, and now with their full sound: some used to keep only the first few
+  seconds of it. When a stream also offers its sound on its own, that is listed
+  as an audio download instead of being picked as the default video, which
+  could not be saved.
+
 ## [1.15.3] - 2026-11-01
 
 - Settings now says plainly that its storage figure is the copies kept inside
