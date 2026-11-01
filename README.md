@@ -21,6 +21,31 @@ Official builds are listed at [vannt-dev.github.io/official.html](https://vannt-
 anything else is not published by vannt-dev.
 The APK signing certificate fingerprints are listed there too.
 
+## How it works
+
+NimbleClip reads the links you give it, you pick what to keep, and the downloads run in one queue.
+
+```mermaid
+flowchart LR
+  subgraph analyze ["Analyze"]
+    direction TB
+    link["Links to<br/>public posts<br/>YouTube, TikTok,<br/>Instagram, …<br/>pasted or shared,<br/>up to 20 at once"]
+    core["Private core<br/>nimbleclip-core"]
+    ext["External<br/>extraction services<br/>(can be<br/>turned off)"]
+    link --> core
+    core <-.->|"some links"| ext
+  end
+  subgraph download ["Download"]
+    direction LR
+    queue["Download queue<br/>1 to 5 at a time,<br/>runs in background<br/>on Android, iOS"]
+    gallery["Device gallery<br/>videos and images"]
+    screen["Downloads screen<br/>play, open, share"]
+    queue --> gallery
+    queue --> screen
+  end
+  analyze -->|"video, audio, image<br/>options: you pick<br/>quality or items"| download
+```
+
 ## Features
 
 - Detects supported links pasted from the clipboard.
