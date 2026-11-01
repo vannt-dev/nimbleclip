@@ -107,6 +107,22 @@ class DownloadProvider extends ChangeNotifier {
   late final AsyncWorkQueue<_QueuedDownload> _queue;
   Future<void> _persistenceTail = Future.value();
 
+  /// Changes whenever a finished download's file in the app's own folder
+  /// appears or goes away: a download completing, its local copy removed
+  /// after a save to the gallery, an MP3 swapped in, an entry deleted.
+  ///
+  /// Read from the task list without touching the disk, and progress ticks do
+  /// not reach this provider, so a listener can compare it on every change
+  /// and only measure the folder when it moves.
+  int get localFilesSignature => Object.hashAll(
+    _tasks
+        .where(
+          (task) =>
+              task.status == DownloadStatus.completed && task.filePath != null,
+        )
+        .map((task) => task.filePath),
+  );
+
   static const int defaultMaxConcurrentDownloads = 3;
   int get maxConcurrentDownloads => _queue.maxConcurrent;
   set maxConcurrentDownloads(int value) {
@@ -462,6 +478,33 @@ class DownloadProvider extends ChangeNotifier {
     if (historyChanged) await _saveHistory();
     return matches;
   }
+
+  /// Whether every one of [qualities] of [metadata] is already queued,
+  /// running or paused, so starting them again would add nothing.
+  ///
+  /// Asked before [startNewDownloads] rather than read from its result: that
+  /// returns only what entered the URL queue, so an option joined or rendered
+  /// on the device comes back empty even when it has just started.
+  bool isInProgress({
+    required VideoMetadata metadata,
+    required List<VideoQualityOption> qualities,
+    required AppLocalizations l10n,
+  }) =>
+      qualities.isNotEmpty &&
+      qualities.every((quality) => _isInFlight(metadata, quality, l10n));
+
+  /// The queued or running tasks for [qualities] of [metadata], whichever
+  /// path, URL or render, they were started on.
+  List<DownloadTask> activeTasksFor({
+    required VideoMetadata metadata,
+    required List<VideoQualityOption> qualities,
+    required AppLocalizations l10n,
+  }) => _tasks
+      .where(
+        (task) =>
+            task.isActive && _matchesSelection(task, metadata, qualities, l10n),
+      )
+      .toList();
 
   /// Whether [quality] of [metadata] is already queued, running or paused.
   bool _isInFlight(

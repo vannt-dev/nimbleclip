@@ -6,6 +6,36 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.15.4] - 2026-11-01
+
+- Streamed videos, such as those on news and broadcaster sites, are now saved
+  with their full sound. Some kept only the first few seconds of it, and many
+  were saved with sound that players could not play, so they seemed silent.
+- When a stream also offers its sound on its own, that is listed as an audio
+  download instead of being picked as the default video, which could not be
+  saved.
+
+## [1.15.3] - 2026-11-01
+
+- Settings now says plainly that its storage figure is the copies kept inside
+  NimbleClip ("Local copies in NimbleClip"), and that files saved to your
+  gallery are not counted. Cleaning up deletes only those copies; files in your
+  gallery stay. The figure also updates while the app is open, when you open
+  Settings and when a download finishes, instead of only after a restart.
+
+## [1.15.2] - 2026-11-01
+
+- Tapping "Download now" on a video that the app joins or builds on your phone
+  (such as a YouTube video in high quality, a streamed video, or a photo
+  slideshow) no longer says "This file is already being downloaded" as the
+  download starts. The notice now appears only when you tap again while it is
+  still downloading.
+
+## [1.15.1] - 2026-11-01
+
+- Updated the libraries the app is built on, including the ones for fonts and
+  for opening a downloaded file. Nothing changes in how you use the app.
+
 ## [1.15.0] - 2026-10-29
 
 - The Downloads screen can be searched by title and narrowed to videos, audio,

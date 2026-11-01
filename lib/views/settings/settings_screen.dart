@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
@@ -7,10 +9,57 @@ import '../../l10n/l10n.dart';
 import '../../providers/download_provider.dart';
 import '../../providers/settings_provider.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
   static final Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+/// Keeps the local copies figure current while the app runs.
+///
+/// It is measured when the screen comes into view, and while it is in view
+/// whenever a download leaves or removes a file. Measuring walks the folder,
+/// so nothing is measured on progress ticks or while another tab is shown.
+class _SettingsScreenState extends State<SettingsScreen> {
+  DownloadProvider? _downloads;
+  int? _localFiles;
+  bool _visible = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final downloads = context.read<DownloadProvider>();
+    if (!identical(downloads, _downloads)) {
+      _downloads?.removeListener(_onDownloadsChanged);
+      _downloads = downloads..addListener(_onDownloadsChanged);
+      _localFiles = downloads.localFilesSignature;
+    }
+    // The tabs sit in an IndexedStack, which keeps this screen built while
+    // hidden and reports through Visibility which one is on screen.
+    final visible = Visibility.of(context);
+    if (visible && !_visible) _measureLocalCopies();
+    _visible = visible;
+  }
+
+  void _onDownloadsChanged() {
+    final localFiles = _downloads!.localFilesSignature;
+    if (localFiles == _localFiles) return;
+    _localFiles = localFiles;
+    if (_visible) _measureLocalCopies();
+  }
+
+  void _measureLocalCopies() {
+    unawaited(context.read<SettingsProvider>().refreshCacheSize());
+  }
+
+  @override
+  void dispose() {
+    _downloads?.removeListener(_onDownloadsChanged);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -315,12 +364,21 @@ class SettingsScreen extends StatelessWidget {
                     color: AppColors.warning,
                   ),
                   title: Text(l10n.downloadedMediaSize),
-                  subtitle: Text(
-                    Formatters.formatBytes(settings.cacheSizeBytes),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        Formatters.formatBytes(settings.cacheSizeBytes),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      Text(
+                        l10n.localCopiesGalleryNotCounted,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
                   ),
                   trailing: TextButton(
                     onPressed: hasActiveDownloads
@@ -393,7 +451,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   title: Text(l10n.version),
                   trailing: FutureBuilder<PackageInfo>(
-                    future: _packageInfo,
+                    future: SettingsScreen._packageInfo,
                     builder: (_, snapshot) => Text(
                       snapshot.data?.version ?? '—',
                       style: const TextStyle(fontWeight: FontWeight.w600),

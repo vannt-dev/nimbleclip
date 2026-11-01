@@ -15,6 +15,7 @@ import '../../providers/settings_provider.dart';
 import '../../providers/video_extractor_provider.dart';
 import '../../providers/analysis_history_provider.dart';
 import '../../providers/shared_intent_provider.dart';
+import '../../services/slideshow/slideshow_renderer.dart';
 import '../player/video_player_screen.dart';
 import 'widgets/batch_results_card.dart';
 import 'widgets/download_feedback.dart';
@@ -28,7 +29,16 @@ import 'widgets/video_result_card.dart';
 class HomeScreen extends StatefulWidget {
   final VoidCallback onNavigateDownloads;
 
-  const HomeScreen({super.key, required this.onNavigateDownloads});
+  /// Passed on to the result card, which uses it to decide whether options
+  /// joined on the device are offered. Null means the real one for this
+  /// platform; a widget test sets it to stand in for Android.
+  final SlideshowRenderer? slideshowRenderer;
+
+  const HomeScreen({
+    super.key,
+    required this.onNavigateDownloads,
+    this.slideshowRenderer,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -244,16 +254,40 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         if (!confirmed || !mounted) return;
       }
 
-      final tasks = await provider.startNewDownloads(
+      // Decided before starting, not from what starting returns: an option
+      // joined on the device never enters the URL queue, so its empty result
+      // read as "already downloading" on the very tap that started it.
+      if (provider.isInProgress(
+        metadata: meta,
+        qualities: selected,
+        l10n: context.l10n,
+      )) {
+        DownloadFeedback.showAlreadyInProgress(
+          context,
+          onViewProgress: widget.onNavigateDownloads,
+        );
+        return;
+      }
+
+      await provider.startNewDownloads(
         metadata: meta,
         qualities: selected,
         l10n: context.l10n,
         options: settings.downloadOptions,
       );
       if (!mounted) return;
+      // Fetched and joined downloads alike. Empty only when a join is held
+      // back for Wi-Fi and has no task yet, so there is nothing to follow and
+      // the plain notice, which closes on its own, stands in.
+      final tasks = provider.activeTasksFor(
+        metadata: meta,
+        qualities: selected,
+        l10n: context.l10n,
+      );
       if (tasks.isEmpty) {
-        DownloadFeedback.showAlreadyInProgress(
+        DownloadFeedback.showBatchStarted(
           context,
+          queued: selected.length,
           onViewProgress: widget.onNavigateDownloads,
         );
         return;
@@ -286,13 +320,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         l10n: l10n,
       );
       if (existing.isNotEmpty) continue;
-      final tasks = await downloads.startNewDownloads(
+      // Counted by what was asked for, not by what entered the URL queue,
+      // which leaves out a video joined on the device.
+      if (downloads.isInProgress(
+        metadata: metadata,
+        qualities: [quality],
+        l10n: l10n,
+      )) {
+        continue;
+      }
+      await downloads.startNewDownloads(
         metadata: metadata,
         qualities: [quality],
         l10n: l10n,
         options: settings.downloadOptions,
       );
-      queued += tasks.length;
+      queued++;
     }
     if (!mounted) return;
     DownloadFeedback.showBatchStarted(
@@ -539,6 +582,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     onQualitySelected: extractor.selectQuality,
                     onDownload: _onStartDownload,
                     onPreview: _onPreviewMedia,
+                    slideshowRenderer: widget.slideshowRenderer,
                   ),
                   const SizedBox(height: 24),
                   OutlinedButton.icon(

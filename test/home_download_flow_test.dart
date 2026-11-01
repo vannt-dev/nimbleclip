@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,6 +9,7 @@ import 'package:nimble_clip/l10n/generated/app_localizations.dart';
 import 'package:nimble_clip/l10n/quality_descriptor_text.dart';
 import 'package:nimble_clip/models/quality_descriptor.dart';
 import 'package:nimble_clip/models/download_task.dart';
+import 'package:nimble_clip/models/stream_source.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/providers/analysis_history_provider.dart';
@@ -18,6 +21,8 @@ import 'package:nimble_clip/services/download_history_repository.dart';
 import 'package:nimble_clip/services/download_service.dart';
 import 'package:nimble_clip/services/extractors/registry.dart';
 import 'package:nimble_clip/services/media_file_actions.dart';
+import 'package:nimble_clip/services/slideshow/slideshow_renderer.dart';
+import 'package:nimble_clip/services/storage_service.dart';
 import 'package:nimble_clip/views/home/home_screen.dart';
 import 'package:nimble_clip/views/home/widgets/download_feedback.dart';
 
@@ -38,6 +43,25 @@ const _metadata = VideoMetadata(
   coverUrl: '',
   platform: VideoPlatform.youtube,
   qualities: [_quality],
+);
+
+/// A video the device joins from a stream rather than fetching one file.
+const _joinedQuality = VideoQualityOption.stream(
+  id: 'v-joined',
+  mediaId: 'v',
+  label: VideoWithAudio('720p'),
+  quality: '720p',
+  source: HlsSource(videoPlaylistUrl: 'https://cdn.example.com/720.m3u8'),
+);
+
+const _joinedMetadata = VideoMetadata(
+  id: 'joined',
+  originalUrl: 'https://video.example/watch/42',
+  title: 'A joined clip',
+  author: 'Creator',
+  coverUrl: '',
+  platform: VideoPlatform.generic,
+  qualities: [_joinedQuality],
 );
 
 VideoMetadata _metadataTitled(String title) => VideoMetadata(
@@ -125,6 +149,34 @@ class _SeededHistory implements DownloadHistoryRepository, MediaFileActions {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+/// Stands in for a device that can join streams, which the test host cannot.
+class _JoiningDevice implements SlideshowRenderer {
+  const _JoiningDevice();
+
+  @override
+  bool get isSupported => true;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// A download folder that never answers, so a joined download, once started,
+/// stays in progress for as long as the test looks at it.
+class _StalledStorage implements StorageService {
+  @override
+  Future<String?> getDownloadDirectory() => Completer<String?>().future;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+DownloadProvider _joiningProvider() => DownloadProvider(
+  downloadService: _RecordingGateway(),
+  historyRepository: _SeededHistory(),
+  storageService: _StalledStorage(),
+  slideshowRenderer: const _JoiningDevice(),
+);
+
 final _en = lookupAppLocalizations(const Locale('en'));
 
 DownloadTask _completedTask() => DownloadTask(
@@ -165,7 +217,10 @@ Future<void> _pumpHome(
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: HomeScreen(onNavigateDownloads: () {}),
+        home: HomeScreen(
+          onNavigateDownloads: () {},
+          slideshowRenderer: const _JoiningDevice(),
+        ),
       ),
     ),
   );
@@ -372,5 +427,65 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(gateway.started, hasLength(1));
+  });
+
+  testWidgets('a joined download started with one tap is not reported as '
+      'already downloading', (tester) async {
+    final downloads = _joiningProvider();
+    await _pumpHome(tester, downloads: downloads, metadata: _joinedMetadata);
+
+    final button = find.text('Download now');
+    await tester.ensureVisible(button);
+    await tester.tap(button);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(downloads.allTasks, hasLength(1));
+    expect(find.text('This file is already being downloaded.'), findsNothing);
+    expect(find.textContaining('Downloading: A joined clip'), findsOneWidget);
+  });
+
+  testWidgets('tapping again while a joined download runs says it is '
+      'already downloading', (tester) async {
+    final downloads = _joiningProvider();
+    await _pumpHome(tester, downloads: downloads, metadata: _joinedMetadata);
+
+    final button = find.text('Download now');
+    await tester.ensureVisible(button);
+    await tester.tap(button);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(button);
+    await tester.pump();
+    // The notice waits for the started bar to slide away first.
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(downloads.allTasks, hasLength(1));
+    expect(find.text('This file is already being downloaded.'), findsOneWidget);
+  });
+
+  testWidgets('tapping again while a download runs says it is already '
+      'downloading', (tester) async {
+    final gateway = _RecordingGateway();
+    final downloads = DownloadProvider(
+      downloadService: gateway,
+      historyRepository: _SeededHistory(),
+    );
+    await _pumpHome(tester, downloads: downloads);
+
+    final button = find.text('Download now');
+    await tester.ensureVisible(button);
+    await tester.tap(button);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('This file is already being downloaded.'), findsNothing);
+
+    await tester.tap(button);
+    await tester.pump();
+    // The notice waits for the started bar to slide away first.
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(gateway.started, hasLength(1));
+    expect(find.text('This file is already being downloaded.'), findsOneWidget);
   });
 }
