@@ -6,6 +6,11 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.15.1] - 2026-11-01
+
+- Updated the libraries the app is built on, including the ones for fonts and
+  for opening a downloaded file. Nothing changes in how you use the app.
+
 ## [1.15.0] - 2026-10-29
 
 - The Downloads screen can be searched by title and narrowed to videos, audio,
