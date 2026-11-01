@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,12 +8,15 @@ import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nimble_clip/l10n/generated/app_localizations.dart';
+import 'package:nimble_clip/models/download_options.dart';
 import 'package:nimble_clip/models/download_task.dart';
 import 'package:nimble_clip/models/quality_descriptor.dart';
 import 'package:nimble_clip/models/video_metadata.dart';
 import 'package:nimble_clip/providers/download_provider.dart';
 import 'package:nimble_clip/providers/settings_provider.dart';
 import 'package:nimble_clip/services/download_history_repository.dart';
+import 'package:nimble_clip/services/download_service.dart';
+import 'package:nimble_clip/services/keep_alive.dart';
 import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/views/downloads/downloads_screen.dart';
 import 'package:nimble_clip/views/downloads/widgets/active_download_card.dart';
@@ -48,6 +53,38 @@ class _SeededHistoryRepository implements DownloadHistoryRepository {
 
   @override
   Future<void> removeDownloadReceipts(Set<String> ids) async {}
+}
+
+/// Finishes a download when the test says so, leaving a file behind.
+class _FinishingDownloadService extends InertDownloadService {
+  final Map<String, Completer<void>> _pending = {};
+
+  @override
+  Future<void> startDownload({
+    required DownloadTask task,
+    required DownloadProgressCallback onProgress,
+    required void Function(DownloadTask task, String filePath) onComplete,
+    required void Function(DownloadTask task, String error) onError,
+    required AppLocalizations l10n,
+    bool autoSaveToGallery = true,
+  }) async {
+    task.status = DownloadStatus.downloading;
+    final done = _pending[task.id] = Completer<void>();
+    await done.future;
+    task
+      ..status = DownloadStatus.completed
+      ..progress = 1
+      ..filePath = '/downloads/${task.id}.mp4'
+      ..completedAt = DateTime.now();
+    onComplete(task, task.filePath!);
+  }
+
+  void finishAll() {
+    for (final done in _pending.values) {
+      done.complete();
+    }
+    _pending.clear();
+  }
 }
 
 Widget _host(Widget child, {List<SingleChildWidget> providers = const []}) {
@@ -429,6 +466,145 @@ void main() {
       await tester.pump();
 
       expect(settings.autoSaveGallery, isNot(before));
+    });
+    testWidgets('says the size is of local copies, not the gallery', (
+      tester,
+    ) async {
+      useTallViewport(tester);
+      await tester.pumpWidget(
+        _host(
+          const SettingsScreen(),
+          providers: [
+            ChangeNotifierProvider(
+              create: (_) =>
+                  SettingsProvider(measureLocalCopies: () async => 0),
+            ),
+            ChangeNotifierProvider(
+              create: (_) =>
+                  DownloadProvider(downloadService: InertDownloadService()),
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Local copies in NimbleClip'), findsOneWidget);
+      expect(
+        find.text('Files saved to your gallery are not counted'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('measures again each time the screen is shown', (tester) async {
+      useTallViewport(tester);
+      var measured = 0;
+      var bytes = 0;
+      final settings = SettingsProvider(
+        measureLocalCopies: () async {
+          measured++;
+          return bytes;
+        },
+      );
+      final shown = ValueNotifier<int>(0);
+      addTearDown(shown.dispose);
+      await tester.pumpWidget(
+        _host(
+          ValueListenableBuilder<int>(
+            valueListenable: shown,
+            builder: (_, index, _) => IndexedStack(
+              index: index,
+              children: const [SizedBox(), SettingsScreen()],
+            ),
+          ),
+          providers: [
+            ChangeNotifierProvider.value(value: settings),
+            ChangeNotifierProvider(
+              create: (_) =>
+                  DownloadProvider(downloadService: InertDownloadService()),
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+      final atLaunch = measured;
+
+      // A download kept in the app while another tab was on screen.
+      bytes = 2 * 1024 * 1024;
+      shown.value = 1;
+      await tester.pump();
+      await tester.pump();
+
+      expect(measured, atLaunch + 1);
+      expect(find.text('2.0 MB'), findsOneWidget);
+
+      shown.value = 0;
+      await tester.pump();
+      expect(measured, atLaunch + 1, reason: 'hiding it measures nothing');
+    });
+
+    testWidgets('measures again when a download leaves a file', (tester) async {
+      useTallViewport(tester);
+      var measured = 0;
+      final settings = SettingsProvider(
+        measureLocalCopies: () async {
+          measured++;
+          return measured * 1024;
+        },
+      );
+      final gateway = _FinishingDownloadService();
+      final downloads = DownloadProvider(
+        downloadService: gateway,
+        keepAlive: const NoProcessKeepAlive(),
+      );
+      await tester.pumpWidget(
+        _host(
+          const SettingsScreen(),
+          providers: [
+            ChangeNotifierProvider.value(value: settings),
+            ChangeNotifierProvider.value(value: downloads),
+          ],
+        ),
+      );
+      await tester.pump();
+      final before = measured;
+
+      final metadata = VideoMetadata(
+        id: 'post',
+        originalUrl: 'https://example.com/post',
+        title: 'Clip',
+        author: 'Creator',
+        coverUrl: '',
+        platform: VideoPlatform.facebook,
+        qualities: const [
+          VideoQualityOption.video(
+            id: 'clip-hd',
+            mediaId: 'clip',
+            label: VideoIndex(1),
+            quality: '720p',
+            format: 'mp4',
+            downloadUrl: 'https://cdn.example.com/hd.mp4',
+          ),
+        ],
+      );
+      await tester.runAsync(
+        () => downloads.startNewDownloads(
+          metadata: metadata,
+          qualities: metadata.qualities,
+          l10n: lookupAppLocalizations(const Locale('en')),
+          options: const DownloadOptions(autoSaveToGallery: false),
+        ),
+      );
+      await tester.pump();
+      expect(measured, before, reason: 'a started download has no file yet');
+
+      gateway.finishAll();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+
+      expect(measured, greaterThan(before));
+      expect(find.text('$measured.0 KB'), findsOneWidget);
     });
   });
 

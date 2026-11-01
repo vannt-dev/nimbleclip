@@ -6,6 +6,12 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- Settings now says plainly that its storage figure is the copies kept inside
+  NimbleClip ("Local copies in NimbleClip"), and that files saved to your
+  gallery are not counted. Cleaning up deletes only those copies; files in your
+  gallery stay. The figure also updates while the app is open, when you open
+  Settings and when a download finishes, instead of only after a restart.
+
 ## [1.15.2] - 2026-11-01
 
 - Tapping "Download now" on a video that the app joins or builds on your phone

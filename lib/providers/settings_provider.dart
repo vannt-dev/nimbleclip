@@ -7,6 +7,7 @@ import '../models/download_options.dart';
 
 class SettingsProvider extends ChangeNotifier {
   final ExtractionPolicy _extractionPolicy;
+  final Future<int> Function() _measureLocalCopies;
   ThemeMode _themeMode = ThemeMode.system;
   Locale? _locale;
   bool _autoSaveGallery = true;
@@ -36,8 +37,12 @@ class SettingsProvider extends ChangeNotifier {
   );
   late final Future<void> initialized;
 
-  SettingsProvider({ExtractionPolicy? extractionPolicy})
-    : _extractionPolicy = extractionPolicy ?? ExtractionPolicy() {
+  SettingsProvider({
+    ExtractionPolicy? extractionPolicy,
+    Future<int> Function()? measureLocalCopies,
+  }) : _extractionPolicy = extractionPolicy ?? ExtractionPolicy(),
+       _measureLocalCopies =
+           measureLocalCopies ?? StorageService().calculateCacheSize {
     initialized = _loadSettings();
   }
 
@@ -160,8 +165,39 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setBool(AppConstants.keyWifiOnlyDownloads, value);
   }
 
-  Future<void> refreshCacheSize() async {
-    _cacheSizeBytes = await StorageService().calculateCacheSize();
-    notifyListeners();
+  Future<void>? _measuring;
+  bool _measureAgain = false;
+
+  /// Measures the files NimbleClip keeps in its own folder again.
+  ///
+  /// Asked for when Settings comes on screen and when a download leaves or
+  /// removes a file, so several can arrive while one walk is running. They
+  /// share that walk plus one more, which sees every change made meanwhile;
+  /// separate walks could finish out of order and leave an older size up.
+  Future<void> refreshCacheSize() {
+    final running = _measuring;
+    if (running != null) {
+      _measureAgain = true;
+      return running;
+    }
+    return _measuring = _measureUntilSettled();
+  }
+
+  Future<void> _measureUntilSettled() async {
+    final before = _cacheSizeBytes;
+    try {
+      do {
+        _measureAgain = false;
+        try {
+          _cacheSizeBytes = await _measureLocalCopies();
+        } catch (_) {
+          // An unreadable folder is no reason to lose the last good figure.
+        }
+      } while (_measureAgain);
+    } finally {
+      _measuring = null;
+    }
+    // The whole app listens here; a size that did not move rebuilds nothing.
+    if (_cacheSizeBytes != before) notifyListeners();
   }
 }
