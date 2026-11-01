@@ -483,20 +483,25 @@ class AppLocalizationsVi extends AppLocalizations {
       'Kiểm tra liên kết video khi mở ứng dụng';
 
   @override
-  String get downloadedMediaSize => 'Dung lượng nội dung đã tải';
+  String get downloadedMediaSize => 'Bản lưu trong NimbleClip';
 
   @override
-  String get clearCacheTitle => 'Xóa các file đã tải?';
+  String get localCopiesGalleryNotCounted =>
+      'Không tính các file đã lưu vào thư viện';
+
+  @override
+  String get clearCacheTitle => 'Xóa các bản lưu trong NimbleClip?';
 
   @override
   String get clearCacheMessage =>
-      'Toàn bộ nội dung trong thư mục tải về của NimbleClip sẽ bị xóa.';
+      'Xóa các file NimbleClip giữ trong thư mục riêng, kể cả âm thanh, và xóa các lượt tải đã xong khỏi danh sách. File đã lưu vào thư viện vẫn được giữ.';
 
   @override
   String get deleteAll => 'Xóa tất cả';
 
   @override
-  String get cacheCleared => 'Đã xóa các file tải về.';
+  String get cacheCleared =>
+      'Đã xóa các bản lưu. File trong thư viện vẫn được giữ.';
 
   @override
   String get cleanUp => 'Dọn dẹp';

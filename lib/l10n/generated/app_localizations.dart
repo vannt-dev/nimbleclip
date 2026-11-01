@@ -893,19 +893,25 @@ abstract class AppLocalizations {
   /// No description provided for @downloadedMediaSize.
   ///
   /// In en, this message translates to:
-  /// **'Downloaded media size'**
+  /// **'Local copies in NimbleClip'**
   String get downloadedMediaSize;
+
+  /// No description provided for @localCopiesGalleryNotCounted.
+  ///
+  /// In en, this message translates to:
+  /// **'Files saved to your gallery are not counted'**
+  String get localCopiesGalleryNotCounted;
 
   /// No description provided for @clearCacheTitle.
   ///
   /// In en, this message translates to:
-  /// **'Clear downloaded files?'**
+  /// **'Delete local copies?'**
   String get clearCacheTitle;
 
   /// No description provided for @clearCacheMessage.
   ///
   /// In en, this message translates to:
-  /// **'All media stored in NimbleClip\'s download directory will be deleted.'**
+  /// **'Deletes the files NimbleClip keeps in its own folder, including audio, and clears finished downloads from the list. Files saved to your gallery are kept.'**
   String get clearCacheMessage;
 
   /// No description provided for @deleteAll.
@@ -917,7 +923,7 @@ abstract class AppLocalizations {
   /// No description provided for @cacheCleared.
   ///
   /// In en, this message translates to:
-  /// **'Downloaded files cleared.'**
+  /// **'Local copies deleted. Files in your gallery are kept.'**
   String get cacheCleared;
 
   /// No description provided for @cleanUp.

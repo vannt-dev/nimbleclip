@@ -107,6 +107,22 @@ class DownloadProvider extends ChangeNotifier {
   late final AsyncWorkQueue<_QueuedDownload> _queue;
   Future<void> _persistenceTail = Future.value();
 
+  /// Changes whenever a finished download's file in the app's own folder
+  /// appears or goes away: a download completing, its local copy removed
+  /// after a save to the gallery, an MP3 swapped in, an entry deleted.
+  ///
+  /// Read from the task list without touching the disk, and progress ticks do
+  /// not reach this provider, so a listener can compare it on every change
+  /// and only measure the folder when it moves.
+  int get localFilesSignature => Object.hashAll(
+    _tasks
+        .where(
+          (task) =>
+              task.status == DownloadStatus.completed && task.filePath != null,
+        )
+        .map((task) => task.filePath),
+  );
+
   static const int defaultMaxConcurrentDownloads = 3;
   int get maxConcurrentDownloads => _queue.maxConcurrent;
   set maxConcurrentDownloads(int value) {

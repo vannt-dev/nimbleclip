@@ -487,20 +487,25 @@ class AppLocalizationsEn extends AppLocalizations {
       'Check for a video link when the app opens';
 
   @override
-  String get downloadedMediaSize => 'Downloaded media size';
+  String get downloadedMediaSize => 'Local copies in NimbleClip';
 
   @override
-  String get clearCacheTitle => 'Clear downloaded files?';
+  String get localCopiesGalleryNotCounted =>
+      'Files saved to your gallery are not counted';
+
+  @override
+  String get clearCacheTitle => 'Delete local copies?';
 
   @override
   String get clearCacheMessage =>
-      'All media stored in NimbleClip\'s download directory will be deleted.';
+      'Deletes the files NimbleClip keeps in its own folder, including audio, and clears finished downloads from the list. Files saved to your gallery are kept.';
 
   @override
   String get deleteAll => 'Delete all';
 
   @override
-  String get cacheCleared => 'Downloaded files cleared.';
+  String get cacheCleared =>
+      'Local copies deleted. Files in your gallery are kept.';
 
   @override
   String get cleanUp => 'Clean up';

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -113,5 +114,53 @@ void main() {
     expect(provider.maxConcurrentDownloads, 5);
     await provider.setMaxConcurrentDownloads(-1);
     expect(provider.maxConcurrentDownloads, 1);
+  });
+
+  test('measures the local copies with the given reader', () async {
+    final provider = SettingsProvider(measureLocalCopies: () async => 2048);
+    await provider.initialized;
+
+    expect(provider.cacheSizeBytes, 2048);
+  });
+
+  test('a refresh asked for mid-measure runs once more, and wins', () async {
+    final measures = <Completer<int>>[];
+    final provider = SettingsProvider(
+      measureLocalCopies: () {
+        final measure = Completer<int>();
+        measures.add(measure);
+        return measure.future;
+      },
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(measures, hasLength(1));
+
+    // Two downloads finishing while the first walk is still running.
+    final first = provider.refreshCacheSize();
+    final second = provider.refreshCacheSize();
+    measures[0].complete(100);
+    await Future<void>.delayed(Duration.zero);
+    expect(measures, hasLength(2), reason: 'one more walk, not one per ask');
+    measures[1].complete(300);
+    await Future.wait<void>([first, second, provider.initialized]);
+
+    expect(provider.cacheSizeBytes, 300);
+    expect(measures, hasLength(2));
+  });
+
+  test('a failed measure keeps the last size instead of throwing', () async {
+    var fail = false;
+    final provider = SettingsProvider(
+      measureLocalCopies: () async {
+        if (fail) throw const FileSystemException('gone');
+        return 512;
+      },
+    );
+    await provider.initialized;
+    fail = true;
+
+    await provider.refreshCacheSize();
+
+    expect(provider.cacheSizeBytes, 512);
   });
 }

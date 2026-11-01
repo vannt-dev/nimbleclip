@@ -81,6 +81,29 @@ class _RecoveringDownloadService extends _ControlledDownloadService
   }
 }
 
+/// Leaves a file behind on completion, as the real downloaders do.
+class _FileDownloadService extends _ControlledDownloadService {
+  @override
+  Future<void> startDownload({
+    required DownloadTask task,
+    required DownloadProgressCallback onProgress,
+    required void Function(DownloadTask task, String filePath) onComplete,
+    required void Function(DownloadTask task, String error) onError,
+    required AppLocalizations l10n,
+    bool autoSaveToGallery = true,
+  }) => super.startDownload(
+    task: task,
+    onProgress: onProgress,
+    onComplete: (task, filePath) {
+      task.filePath = filePath;
+      onComplete(task, filePath);
+    },
+    onError: onError,
+    l10n: l10n,
+    autoSaveToGallery: autoSaveToGallery,
+  );
+}
+
 class _MemoryStorageService
     implements StorageService, DownloadHistoryRepository, MediaFileActions {
   List<Map<String, dynamic>> history = [];
@@ -393,6 +416,39 @@ void main() {
     expect(provider.activeTaskCount, 0);
     expect(provider.activeTaskCount, provider.activeTasks.length);
   });
+
+  test(
+    'the local files signature moves only when a file comes or goes',
+    () async {
+      final downloads = _FileDownloadService();
+      final storage = _MemoryStorageService();
+      final provider = _provider(downloads, storage);
+      final metadata = _metadata(1);
+      final empty = provider.localFilesSignature;
+
+      final tasks = await provider.startNewDownloads(
+        metadata: metadata,
+        qualities: metadata.qualities,
+        l10n: l10n,
+        options: const DownloadOptions(autoSaveToGallery: false),
+      );
+      tasks.single
+        ..receivedBytes = 10
+        ..notifyProgressChanged();
+      expect(
+        provider.localFilesSignature,
+        empty,
+        reason: 'nothing on disk yet',
+      );
+
+      downloads.finish(tasks.single.id);
+      await _flush();
+      expect(provider.localFilesSignature, isNot(empty));
+
+      await provider.deleteTask(tasks.single.id, deleteLocalFile: false);
+      expect(provider.localFilesSignature, empty);
+    },
+  );
 
   test('clear downloaded files also clears finished history', () async {
     final downloads = _ControlledDownloadService();
