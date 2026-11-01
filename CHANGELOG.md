@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.15.4] - 2026-11-01
+
 - Streamed videos, such as those on news and broadcaster sites, are now saved
   with their full sound. Some kept only the first few seconds of it, and many
   were saved with sound that players could not play, so they seemed silent.
