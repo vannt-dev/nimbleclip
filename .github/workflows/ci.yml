@@ -3,11 +3,17 @@ name: CI
 on:
   push:
     branches: [main]
+  # No paths filter: "CI result" is the required check, and a workflow that does
+  # not start never reports it. Jobs with nothing to check skip instead (see
+  # `changes`).
   pull_request:
 
+# A newer push to a pull request replaces the run in progress. On main runs
+# queue instead: a run there may be publishing a release, and cancelling it
+# half way could leave a tag without its release.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -46,247 +52,28 @@ jobs:
           done < <(git log --format=%s "$range")
           exit "$failed"
 
-  # Decides what a pull request has to prove. Every job below still exists on
-  # a pull request, so the required checks are reported; a job with nothing
-  # to check is skipped, which counts as passed. A push to main runs it all.
+  # Decides what this run has to prove. Every job below still exists on a pull
+  # request, so the required check is reported; a job with nothing to check is
+  # skipped, which counts as passed.
+  #
+  # On a push to main it also decides whether this commit is a release. A
+  # release is checked again on main (unit tests, the Web build and the Android
+  # emulator on the exact commit that gets tagged) before it is built. Any
+  # other push to main skips the checks when its pull request already proved
+  # the very same files; otherwise it runs them.
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      # Read only, to find the merged pull request and its "CI result".
+      pull-requests: read
+      checks: read
     outputs:
       code: ${{ steps.diff.outputs.code }}
       ios: ${{ steps.diff.outputs.ios }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - id: diff
-        name: Files the pull request changes
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.sha }}
-        run: |
-          if [ "$EVENT_NAME" != "pull_request" ] || ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
-            echo "full run ($EVENT_NAME)"
-            { echo "code=true"; echo "ios=true"; } >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
-          echo "$changed"
-          # Only these leave the app as it was.
-          if echo "$changed" | grep -Evq '^(docs/|[^/]+\.md$|LICENSE$)'; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "code=false" >> "$GITHUB_OUTPUT"
-          fi
-          # The iOS build can only be checked here, and the macOS runners are
-          # few: it runs when the iOS project, the plugins, the core or CI
-          # change, and on every push to main before a release.
-          if echo "$changed" | grep -Eq '^(ios/|pubspec\.(yaml|lock)$|lib/services/extractors$|\.github/)'; then
-            echo "ios=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ios=false" >> "$GITHUB_OUTPUT"
-          fi
-
-  flutter-quality:
-    name: Flutter quality and Web build
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/fetch-core
-        with:
-          deploy-key: ${{ secrets.CORE_DEPLOY_KEY }}
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          flutter-version: '3.47.0'
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - name: Check formatting
-        run: dart format --output=none --set-exit-if-changed lib test integration_test
-      - run: flutter analyze
-      - run: flutter test test lib/services/extractors/test
-      - run: flutter build web --release --no-wasm-dry-run
-
-  node:
-    name: Node.js server checks
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-      - run: node --check server.js
-      - run: node --check tool/fixture_server.js
-      - run: node --check tool/summarize_live_extractors.js
-      - run: sh -n tool/check.sh tool/run_android_integration_ci.sh
-      - run: node --test test/server_test.js test/live_extractor_summary_test.js
-
-  android:
-    name: Android integration tests
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/fetch-core
-        with:
-          deploy-key: ${{ secrets.CORE_DEPLOY_KEY }}
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
-        with:
-          distribution: temurin
-          java-version: 17
-      - name: Enable KVM acceleration
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
-        with:
-          cache-provider: basic
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          flutter-version: '3.47.0'
-          channel: stable
-          cache: true
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-      - uses: ./.github/actions/install-ndk
-      - run: flutter pub get
-      - name: Run Android integration tests
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
-        with:
-          api-level: 34
-          arch: x86_64
-          profile: pixel_6
-          disable-animations: true
-          # The action executes each YAML script line separately. Keep loops,
-          # PID ownership, and traps inside one shell process.
-          script: sh tool/run_android_integration_ci.sh
-
-  ios:
-    name: iOS build and Share Extension
-    needs: changes
-    if: needs.changes.outputs.ios == 'true'
-    runs-on: macos-15
-    timeout-minutes: 25
-    env:
-      # connectivity_plus (via background_downloader) uses iOS 26 APIs such as
-      # NWPath.isUltraConstrained, which the image's default Xcode 16.4 lacks.
-      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/fetch-core
-        with:
-          deploy-key: ${{ secrets.CORE_DEPLOY_KEY }}
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          flutter-version: '3.47.0'
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - name: Build iOS without signing
-        run: flutter build ios --debug --no-codesign
-      - name: Verify embedded Share Extension and App Group
-        run: |
-          test -d "build/ios/iphoneos/Runner.app/PlugIns/Share Extension.appex"
-          plutil -lint ios/Runner/Runner.entitlements
-          plutil -lint "ios/Share Extension/ShareExtension.entitlements"
-          grep -q 'group.com.vannt.nimbleclip' ios/Runner/Runner.entitlements
-          grep -q 'group.com.vannt.nimbleclip' "ios/Share Extension/ShareExtension.entitlements"
-
-  # What someone outside sees: this repository and nothing else. The private
-  # core cannot be fetched, so no deploy key here; the public core that is part
-  # of the repository is put in its place and the app has to analyse, pass the
-  # public core's tests and build. A pull request from a fork runs these two
-  # jobs the same way. They do not gate a release: a released build is made
-  # with the full core.
-  public-core:
-    name: Build from the public repository alone (Android)
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
-        with:
-          distribution: temurin
-          java-version: '17'
-      # Without the Gradle cache this build took five minutes; with it, about two.
-      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
-        with:
-          cache-provider: basic
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          flutter-version: '3.47.0'
-          channel: stable
-          cache: true
-      - name: The private core is not here
-        run: test ! -e lib/services/extractors/registry.dart
-      - name: Put the public core in its place
-        run: dart run tool/use_public_core.dart
-      - run: flutter pub get
-      - name: Nothing shows up as a change
-        run: test -z "$(git status --porcelain -- lib/services/extractors)"
-      - name: The app's own code analyses against the public core
-        run: flutter analyze lib
-      - run: flutter test test/public_core_test.dart
-      - uses: ./.github/actions/install-ndk
-      - run: flutter build apk --debug --target-platform android-arm64
-
-  public-core-ios:
-    name: Build from the public repository alone (iOS)
-    needs: changes
-    if: needs.changes.outputs.ios == 'true'
-    runs-on: macos-15
-    timeout-minutes: 25
-    env:
-      # As for the ios job above.
-      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          flutter-version: '3.47.0'
-          channel: stable
-          cache: true
-      - name: Put the public core in its place
-        run: dart run tool/use_public_core.dart
-      - run: flutter pub get
-      - name: Build iOS without signing
-        run: flutter build ios --debug --no-codesign
-
-  release-candidate:
-    name: Detect version release
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [commit-messages, flutter-quality, node, android, ios]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      should_release: ${{ steps.version.outputs.should_release }}
+      release: ${{ steps.version.outputs.should_release }}
       tag: ${{ steps.version.outputs.tag }}
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -296,6 +83,7 @@ jobs:
           persist-credentials: false
       - name: Detect a releasable version bump
         id: version
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           BEFORE_SHA: ${{ github.event.before }}
         run: |
@@ -352,16 +140,326 @@ jobs:
             echo "version=$current_version"
           } >> "$GITHUB_OUTPUT"
           echo "Release candidate detected: $tag"
+      - id: diff
+        name: Files this change touches
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+          RELEASE: ${{ steps.version.outputs.should_release }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          if ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+            echo "no base to compare with ($EVENT_NAME): full run"
+            { echo "code=true"; echo "ios=true"; } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "$changed"
+          # Only these leave the app as it was.
+          code=false
+          if echo "$changed" | grep -Evq '^(docs/|[^/]+\.md$|LICENSE$)'; then
+            code=true
+          fi
+          # The iOS build can only be checked here, and the macOS runners are
+          # few: it runs when the iOS project, the plugins, the core or CI change.
+          ios=false
+          if echo "$changed" | grep -Eq '^(ios/|pubspec\.(yaml|lock)$|lib/services/extractors$|\.github/)'; then
+            ios=true
+          fi
 
+          # True when the pull request merged as this commit held main as it
+          # was before the merge and has the same files as this commit: its
+          # last run then tested this very tree, and "CI result" says it passed.
+          # Anything unexpected answers false, and the checks run again.
+          proven_by_pull_request() {
+            pr_head=""
+            for _ in 1 2 3; do
+              pr_head=$(gh api "repos/$REPO/commits/$HEAD_SHA/pulls" \
+                --jq '[.[] | select(.merged_at != null and .base.ref == "main")][0].head.sha // empty' \
+                2>/dev/null) && [ -n "$pr_head" ] && break
+              sleep 5
+            done
+            if [ -z "$pr_head" ]; then
+              echo "no merged pull request found for $HEAD_SHA"
+              return 1
+            fi
+            status=$(gh api "repos/$REPO/compare/$BASE_SHA...$pr_head" --jq .status) || return 1
+            case "$status" in
+              ahead|identical) ;;
+              *) echo "pull request head $pr_head did not hold main before the merge ($status)"; return 1 ;;
+            esac
+            pr_tree=$(gh api "repos/$REPO/git/commits/$pr_head" --jq .tree.sha) || return 1
+            if [ "$pr_tree" != "$(git rev-parse "$HEAD_SHA^{tree}")" ]; then
+              echo "pull request head $pr_head has other files than $HEAD_SHA"
+              return 1
+            fi
+            result=$(gh api "repos/$REPO/commits/$pr_head/check-runs?check_name=CI%20result&per_page=100" \
+              --jq '[.check_runs[] | select(.app.slug == "github-actions")]
+                    | sort_by(.started_at) | last | .conclusion // empty') || return 1
+            if [ "$result" != "success" ]; then
+              echo "\"CI result\" on pull request head $pr_head is '${result:-missing}'"
+              return 1
+            fi
+            echo "pull request head $pr_head passed \"CI result\" on the same files"
+          }
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            if [ "$RELEASE" = "true" ]; then
+              # The released commit is checked again on main, whatever it changes.
+              code=true
+              # iOS is not part of a release; the release pull request built it.
+              if proven_by_pull_request; then ios=false; fi
+            elif [ "$code" = "true" ] || [ "$ios" = "true" ]; then
+              if proven_by_pull_request; then code=false; ios=false; fi
+            fi
+          fi
+          echo "code=$code ios=$ios"
+          { echo "code=$code"; echo "ios=$ios"; } >> "$GITHUB_OUTPUT"
+
+  flutter-quality:
+    name: Flutter quality and Web build
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/fetch-core
+        with:
+          deploy-key: ${{ secrets.CORE_DEPLOY_KEY }}
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test integration_test
+      - run: flutter analyze
+      - run: flutter test test lib/services/extractors/test
+      - run: flutter build web --release --no-wasm-dry-run
+
+  node:
+    name: Node.js server checks
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: node --check server.js
+      - run: node --check tool/fixture_server.js
+      - run: node --check tool/summarize_live_extractors.js
+      - run: sh -n tool/check.sh tool/run_android_integration_ci.sh
+      - run: node --test test/server_test.js test/live_extractor_summary_test.js
+
+  android:
+    name: Android integration tests
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The emulator needs about 7.4 GB for its data partition. A 1.15.3 run got
+      # a runner with 2.2 GB left once the SDKs were in place; the emulator quit
+      # at once ("Not enough space to create userdata partition") and the job
+      # waited out the boot timeout. These toolchains are never used here.
+      - name: Free disk space for the emulator
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/.ghcup /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/share/powershell /usr/share/swift /usr/local/share/boost
+          df -h /
+      - uses: ./.github/actions/fetch-core
+        with:
+          deploy-key: ${{ secrets.CORE_DEPLOY_KEY }}
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Enable KVM acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-provider: basic
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          channel: stable
+          cache: true
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - uses: ./.github/actions/install-ndk
+      - run: flutter pub get
+      - name: Run Android integration tests
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          # A healthy boot takes under a minute; an emulator that died at start
+          # should fail the job in 5 minutes, not 10.
+          emulator-boot-timeout: 300
+          # The action executes each YAML script line separately. Keep loops,
+          # PID ownership, and traps inside one shell process.
+          script: sh tool/run_android_integration_ci.sh
+
+  ios:
+    name: iOS build and Share Extension
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
+    runs-on: macos-15
+    timeout-minutes: 25
+    env:
+      # connectivity_plus (via background_downloader) uses iOS 26 APIs such as
+      # NWPath.isUltraConstrained, which the image's default Xcode 16.4 lacks.
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/fetch-core
+        with:
+          deploy-key: ${{ secrets.CORE_DEPLOY_KEY }}
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Build iOS without signing
+        run: flutter build ios --debug --no-codesign
+      - name: Verify embedded Share Extension and App Group
+        run: |
+          test -d "build/ios/iphoneos/Runner.app/PlugIns/Share Extension.appex"
+          plutil -lint ios/Runner/Runner.entitlements
+          plutil -lint "ios/Share Extension/ShareExtension.entitlements"
+          grep -q 'group.com.vannt.nimbleclip' ios/Runner/Runner.entitlements
+          grep -q 'group.com.vannt.nimbleclip' "ios/Share Extension/ShareExtension.entitlements"
+
+  # What someone outside sees: this repository and nothing else. The private
+  # core cannot be fetched, so no deploy key here; the public core that is part
+  # of the repository is put in its place and the app has to analyse, pass the
+  # public core's tests and build. A pull request from a fork runs these two
+  # jobs the same way. They do not gate a release: a released build is made
+  # with the full core, so a release run on main skips them (its pull request
+  # ran them on the same files).
+  public-core:
+    name: Build from the public repository alone (Android)
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.release != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      # Without the Gradle cache this build took five minutes; with it, about two.
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-provider: basic
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          channel: stable
+          cache: true
+      - name: The private core is not here
+        run: test ! -e lib/services/extractors/registry.dart
+      - name: Put the public core in its place
+        run: dart run tool/use_public_core.dart
+      - run: flutter pub get
+      - name: Nothing shows up as a change
+        run: test -z "$(git status --porcelain -- lib/services/extractors)"
+      - name: The app's own code analyses against the public core
+        run: flutter analyze lib
+      - run: flutter test test/public_core_test.dart
+      - uses: ./.github/actions/install-ndk
+      - run: flutter build apk --debug --target-platform android-arm64
+
+  public-core-ios:
+    name: Build from the public repository alone (iOS)
+    needs: changes
+    if: needs.changes.outputs.ios == 'true' && needs.changes.outputs.release != 'true'
+    runs-on: macos-15
+    timeout-minutes: 25
+    env:
+      # As for the ios job above.
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          channel: stable
+          cache: true
+      - name: Put the public core in its place
+        run: dart run tool/use_public_core.dart
+      - run: flutter pub get
+      - name: Build iOS without signing
+        run: flutter build ios --debug --no-codesign
+
+  # The one check a ruleset needs to require. Passes when every job above
+  # passed or was skipped as not needed; fails on a failure or a cancellation,
+  # including a macOS job that never got a runner (re-run it rather than merge
+  # around it).
+  ci-result:
+    name: CI result
+    if: always()
+    needs:
+      - commit-messages
+      - changes
+      - flutter-quality
+      - node
+      - android
+      - ios
+      - public-core
+      - public-core-ios
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every needed job passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "job results: $RESULTS"
+          case " $RESULTS " in
+            *" failure "*|*" cancelled "*) exit 1 ;;
+          esac
+
+  # Only a release run gets here with every job below having run on this very
+  # commit: `changes` turns the checks on for it.
   publish-release:
     name: Publish release
-    needs: release-candidate
-    if: needs.release-candidate.outputs.should_release == 'true'
+    needs: [changes, commit-messages, flutter-quality, node, android]
+    if: needs.changes.outputs.release == 'true'
     permissions:
       contents: write
     uses: ./.github/workflows/release.yml
     with:
-      tag: ${{ needs.release-candidate.outputs.tag }}
+      tag: ${{ needs.changes.outputs.tag }}
       ref: ${{ github.sha }}
     secrets:
       CORE_DEPLOY_KEY: ${{ secrets.CORE_DEPLOY_KEY }}
