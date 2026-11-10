@@ -6,6 +6,17 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- SoundCloud playlists and albums are now supported. A link to one
+  (`soundcloud.com/<artist>/sets/…`, or a short link that leads to one) is
+  opened as its tracks, the first 20 in the playlist's order, with a notice
+  when the playlist holds more. A track link that names the playlist it was
+  playing from is still that one track.
+- Flickr albums are now supported, from `flickr.com/photos/<user>/albums/…`,
+  the older `/sets/…` form and `flic.kr/s/…` short links. An album opens as
+  one result with its first 25 photos to choose from, each at its largest
+  size, and says so when the album holds more or includes videos. An album
+  whose owner turned downloads off is refused, as a single photo is.
+
 ## [1.15.5] - 2026-11-10
 
 - Share links copied from the Threads and Instagram apps

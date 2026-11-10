@@ -1,4 +1,4 @@
-/// Why a result may be holding fewer photos than the post does.
+/// Why a result may be holding fewer photos than the post or album does.
 ///
 /// A gallery reaches the app only through the external fallback service:
 /// Facebook serves an anonymous request no photo set of its own, just the
@@ -23,4 +23,9 @@ enum GalleryNotice {
   /// Facebook shows an anonymous reader the first few of a personal post and
   /// only a count of the rest.
   somePhotosMissing,
+
+  /// The photos are an album's first ones, or the album also holds videos.
+  /// An album is read up to a fixed number of photos, and a video in it is
+  /// opened from its own link.
+  albumPartlyListed,
 }

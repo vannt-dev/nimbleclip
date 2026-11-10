@@ -605,7 +605,11 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get soundcloudNotATrack =>
-      'Link SoundCloud này không phải một bài nhạc. Hãy mở bài nhạc rồi sao chép link của nó.';
+      'Link SoundCloud này không phải một bài nhạc hay một danh sách phát. Hãy mở bài nhạc hoặc danh sách phát rồi sao chép link của nó.';
+
+  @override
+  String get soundcloudSetUnavailable =>
+      'Không tìm thấy bài nào trong danh sách phát SoundCloud này. Danh sách có thể ở chế độ riêng tư, đã bị xoá hoặc đang trống.';
 
   @override
   String get soundcloudUnavailable =>
@@ -617,15 +621,19 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get flickrInvalidLink =>
-      'Không nhận diện được link Flickr. Hãy dùng link của một ảnh hoặc một video.';
+      'Không nhận diện được link Flickr. Hãy dùng link của một ảnh, một video hoặc một album.';
 
   @override
   String get flickrUnavailable =>
       'Flickr không cung cấp ảnh này. Ảnh có thể ở chế độ riêng tư hoặc đã bị xoá.';
 
   @override
+  String get flickrAlbumUnavailable =>
+      'Flickr không cung cấp album này. Album có thể ở chế độ riêng tư, đã bị xoá hoặc đang trống.';
+
+  @override
   String get flickrDownloadDisabled =>
-      'Chủ ảnh đã tắt tính năng tải xuống cho ảnh này trên Flickr.';
+      'Chủ ảnh đã tắt tính năng tải xuống cho những ảnh này trên Flickr.';
 
   @override
   String get originalMp4 => 'MP4 (Chất lượng gốc)';
@@ -755,6 +763,10 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get gallerySomePhotosMissing =>
       'Bài này còn nhiều ảnh hơn số ảnh ở đây. Facebook chỉ hiện những ảnh đầu khi chưa đăng nhập.';
+
+  @override
+  String get galleryAlbumPartlyListed =>
+      'Album này còn nhiều hơn số ảnh ở đây. Album dài chỉ được liệt kê những ảnh đầu, còn video trong album cần link riêng của nó.';
 
   @override
   String get copyLink => 'Sao chép liên kết';
