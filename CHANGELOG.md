@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-11-11
+
 - SoundCloud playlists and albums are now supported. A link to one
   (`soundcloud.com/<artist>/sets/…`, or a short link that leads to one) is
   opened as its tracks, the first 20 in the playlist's order, with a notice
