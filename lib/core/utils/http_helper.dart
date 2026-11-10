@@ -239,16 +239,53 @@ class ExtractorHttp {
       // preserving package:http's automatic redirect behavior in production.
       final uri = Uri.parse(url);
       final override = getOverride;
-      final response = override != null
-          ? await override(uri, buildHeaders())
-          : await _client.get(uri, headers: buildHeaders()).timeout(timeout);
-      final usable = response.statusCode < 400 && response.body.isNotEmpty;
-      return (
-        url: response.request?.url.toString() ?? url,
-        page: usable ? response : null,
-      );
+      if (override != null) {
+        final response = await override(uri, buildHeaders());
+        return (
+          url: response.request?.url.toString() ?? url,
+          page: _usable(response) ? response : null,
+        );
+      }
+      // A response keeps the request it answered, which names the link asked
+      // for. Only the streamed response knows where the redirects ended, and
+      // it gives the last Location header as sent, often a bare path.
+      final request = http.Request('GET', uri)..headers.addAll(buildHeaders());
+      final streamed = await _client.send(request).timeout(timeout);
+      final landed = streamed is http.BaseResponseWithUrl
+          ? uri
+                .resolveUri((streamed as http.BaseResponseWithUrl).url)
+                .toString()
+          : url;
+      final response = await http.Response.fromStream(
+        streamed,
+      ).timeout(timeout);
+      // A shortener may answer a browser with a page that forwards it instead
+      // of with a redirect. That page is not the destination's.
+      final forwarded = landed == url ? _forwardedTo(response.body) : null;
+      if (forwarded != null) return (url: forwarded, page: null);
+      return (url: landed, page: _usable(response) ? response : null);
     } catch (_) {
       return (url: url, page: null);
     }
   }
+
+  static final RegExp _metaRefresh = RegExp(
+    r'''<meta\s+http-equiv=["']?refresh["']?\s+content=["']\d+;\s*url=([^"'>\s]+)''',
+    caseSensitive: false,
+  );
+
+  /// Where a page that only forwards its reader sends them. Such a page is a
+  /// few lines long; anything larger is a real page that happens to refresh.
+  static String? _forwardedTo(String body) {
+    if (body.length > 2048) return null;
+    final target = _metaRefresh.firstMatch(body)?.group(1);
+    final uri = Uri.tryParse(target ?? '');
+    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+      return null;
+    }
+    return uri.toString();
+  }
+
+  static bool _usable(http.Response response) =>
+      response.statusCode < 400 && response.body.isNotEmpty;
 }

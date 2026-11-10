@@ -73,6 +73,12 @@ void main() {
       minimumMedia: 1,
       minimumVideos: 1,
     ),
+    // A short link names no post: it is only good for where it leads.
+    'X video from a short link': (
+      url: 'https://t.co/ebJtkpD5uM',
+      minimumMedia: 1,
+      minimumVideos: 1,
+    ),
     'TikTok slideshow': (
       url: 'https://www.tiktok.com/@qq.mm.pp/photo/7479037796326362385',
       minimumMedia: 2,
@@ -135,8 +141,18 @@ void main() {
       minimumMedia: 1,
       minimumVideos: 0,
     ),
+    'Pinterest pin on a country domain': (
+      url: 'https://www.pinterest.com.vn/pin/703335666829201694/',
+      minimumMedia: 1,
+      minimumVideos: 1,
+    ),
     'SoundCloud track': (
       url: 'https://soundcloud.com/forss/flickermood',
+      minimumMedia: 1,
+      minimumVideos: 0,
+    ),
+    'SoundCloud track from the mobile site': (
+      url: 'https://m.soundcloud.com/forss/flickermood',
       minimumMedia: 1,
       minimumVideos: 0,
     ),

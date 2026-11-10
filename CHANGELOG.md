@@ -6,6 +6,18 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- Share links copied from the Threads and Instagram apps
+  (`threads.com/share/…`, `instagram.com/share/…`) are now recognised. They
+  used to be refused as not being a post.
+- Short links are followed to the post they lead to. An X short link (`t.co`)
+  was refused before.
+- More addresses of the same sites are recognised: every country domain of
+  Pinterest, SoundCloud's mobile site, player and older short links, and the
+  mirror sites people use to share X posts.
+- A Facebook post with several photos that offered only its first one, as posts
+  on a personal profile did, now offers the photos Facebook shows without a
+  login, and says so when the post holds more than those.
+
 ## [1.15.4] - 2026-11-01
 
 - Streamed videos, such as those on news and broadcaster sites, are now saved

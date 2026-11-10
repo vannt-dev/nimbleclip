@@ -19,13 +19,20 @@ void main() {
     }
   });
 
-  test('the two notices read differently', () {
+  test('the notices read differently', () {
     // They report different situations and only one of them is the reader's
-    // to fix, so the same sentence for both would be a bug.
-    expect(
-      describeGalleryNotice(GalleryNotice.externalServicesDisabled, en),
-      isNot(describeGalleryNotice(GalleryNotice.galleryCheckUnavailable, en)),
-    );
+    // to fix, so the same sentence for two of them would be a bug.
+    final texts = {
+      for (final notice in GalleryNotice.values)
+        describeGalleryNotice(notice, en),
+    };
+    expect(texts, hasLength(GalleryNotice.values.length));
+  });
+
+  test('a partly read post does not claim to hold only its cover', () {
+    final text = describeGalleryNotice(GalleryNotice.somePhotosMissing, en);
+    expect(text, isNot(contains('cover')));
+    expect(text, contains('more'));
   });
 
   test('translations actually differ between locales', () {

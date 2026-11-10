@@ -10,38 +10,41 @@ class UrlHelper {
       'youtube-nocookie.com',
       'm.youtube.com',
     ],
-    VideoPlatform.tiktok: ['tiktok.com', 'douyin.com'],
+    VideoPlatform.tiktok: ['tiktok.com', 'tiktokv.com', 'douyin.com'],
     VideoPlatform.facebook: ['facebook.com', 'fb.watch', 'fb.com', 'fb.me'],
-    VideoPlatform.twitter: ['twitter.com', 'x.com', 't.co'],
+    // The last five are mirrors people paste so that a preview shows in a
+    // chat. Their links name the post the same way X's own do.
+    VideoPlatform.twitter: [
+      'twitter.com',
+      'x.com',
+      't.co',
+      'fxtwitter.com',
+      'vxtwitter.com',
+      'fixupx.com',
+      'fixvx.com',
+      'twittpr.com',
+    ],
     VideoPlatform.instagram: ['instagram.com', 'instagr.am', 'ig.me'],
     VideoPlatform.threads: ['threads.net', 'threads.com'],
-    // Pinterest answers on a domain per country as well as on pinterest.com.
-    VideoPlatform.pinterest: [
-      'pinterest.com',
-      'pin.it',
-      'pinterest.co.uk',
-      'pinterest.ca',
-      'pinterest.com.au',
-      'pinterest.de',
-      'pinterest.fr',
-      'pinterest.es',
-      'pinterest.it',
-      'pinterest.jp',
-      'pinterest.co.kr',
-      'pinterest.com.mx',
-      'pinterest.pt',
-      'pinterest.nz',
-      'pinterest.ph',
-      'pinterest.se',
-      'pinterest.ch',
-      'pinterest.at',
-      'pinterest.cl',
-      'pinterest.dk',
-      'pinterest.ie',
-    ],
-    VideoPlatform.soundcloud: ['soundcloud.com'],
+    // Its country domains are matched by [_pinterestHost] instead of listed.
+    VideoPlatform.pinterest: ['pinterest.com', 'pin.it'],
+    // The second is the short link older versions of the app shared.
+    VideoPlatform.soundcloud: ['soundcloud.com', 'soundcloud.app.goo.gl'],
     VideoPlatform.flickr: ['flickr.com', 'flic.kr'],
   };
+
+  /// Pinterest answers on a domain per country (pinterest.de, pinterest.co.uk,
+  /// pinterest.com.vn and some thirty more), too many to keep a list of.
+  static final RegExp _pinterestHost = RegExp(
+    r'(?:^|\.)pinterest\.(?:com|co|[a-z]{2})(?:\.[a-z]{2})?$',
+  );
+
+  /// `/share/<token>`, `/share/p/<token>` and `/share/reel/<token>`: what the
+  /// Share action of Instagram and Threads hands out. The token is not the
+  /// post's code, and only the redirect it answers with names the post.
+  static final RegExp _metaSharePath = RegExp(
+    r'^/share/(?:(?:p|reel)/)?[A-Za-z0-9_-]+/?$',
+  );
 
   static final RegExp _singleUrl = RegExp(r'https?://[^\s<>"]+');
   static final RegExp _multipleUrls = RegExp(r'''https?://[^\s<>"']+''');
@@ -103,6 +106,7 @@ class UrlHelper {
         if (hostMatches(host, candidate)) return entry.key;
       }
     }
+    if (_pinterestHost.hasMatch(host)) return VideoPlatform.pinterest;
     return VideoPlatform.generic;
   }
 
@@ -133,6 +137,7 @@ class UrlHelper {
       'ig.me',
       'pin.it',
       'on.soundcloud.com',
+      'soundcloud.app.goo.gl',
     ];
     if (shortHosts.any((candidate) => hostMatches(host, candidate))) {
       return true;
@@ -144,6 +149,11 @@ class UrlHelper {
     if (hostMatches(host, 'facebook.com')) {
       final path = Uri.tryParse(url.trim())?.path.toLowerCase() ?? '';
       return _facebookSharePath.hasMatch(path);
+    }
+    if (hostMatches(host, 'instagram.com') ||
+        hostMatches(host, 'threads.com') ||
+        hostMatches(host, 'threads.net')) {
+      return _metaSharePath.hasMatch(Uri.tryParse(url.trim())?.path ?? '');
     }
     return false;
   }

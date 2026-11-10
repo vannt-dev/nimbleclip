@@ -756,6 +756,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Only the cover photo could be read, and the service that lists the rest did not answer. This post may hold more.';
 
   @override
+  String get gallerySomePhotosMissing =>
+      'This post holds more photos than these. Facebook shows only the first ones without a login.';
+
+  @override
   String get copyLink => 'Copy link';
 
   @override

@@ -753,6 +753,10 @@ class AppLocalizationsVi extends AppLocalizations {
       'Chỉ đọc được ảnh bìa, và dịch vụ liệt kê các ảnh còn lại không phản hồi. Bài này có thể còn ảnh khác.';
 
   @override
+  String get gallerySomePhotosMissing =>
+      'Bài này còn nhiều ảnh hơn số ảnh ở đây. Facebook chỉ hiện những ảnh đầu khi chưa đăng nhập.';
+
+  @override
   String get copyLink => 'Sao chép liên kết';
 
   @override

@@ -1310,6 +1310,12 @@ abstract class AppLocalizations {
   /// **'Only the cover photo could be read, and the service that lists the rest did not answer. This post may hold more.'**
   String get galleryCheckUnavailable;
 
+  /// No description provided for @gallerySomePhotosMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'This post holds more photos than these. Facebook shows only the first ones without a login.'**
+  String get gallerySomePhotosMissing;
+
   /// No description provided for @copyLink.
   ///
   /// In en, this message translates to:
