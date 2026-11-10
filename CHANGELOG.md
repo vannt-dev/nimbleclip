@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.15.5] - 2026-11-10
+
 - Share links copied from the Threads and Instagram apps
   (`threads.com/share/…`, `instagram.com/share/…`) are now recognised. They
   used to be refused as not being a post.
