@@ -176,4 +176,64 @@ void main() {
       );
     });
   });
+
+  group('link forms people paste', () {
+    test('a platform is known on its other domains too', () {
+      const expected = {
+        'https://www.pinterest.com.vn/pin/1084663891475263837/':
+            VideoPlatform.pinterest,
+        'https://www.pinterest.ru/pin/1084663891475263837/':
+            VideoPlatform.pinterest,
+        'https://uk.pinterest.com/pin/1084663891475263837/':
+            VideoPlatform.pinterest,
+        'https://www.tiktokv.com/share/video/7623867888713190687/':
+            VideoPlatform.tiktok,
+        'https://soundcloud.app.goo.gl/tiDW5': VideoPlatform.soundcloud,
+        'https://vxtwitter.com/NASA/status/2068333045510291908':
+            VideoPlatform.twitter,
+        'https://fixupx.com/NASA/status/2068333045510291908':
+            VideoPlatform.twitter,
+        'https://fxtwitter.com/NASA/status/2068333045510291908':
+            VideoPlatform.twitter,
+      };
+      expected.forEach((url, platform) {
+        expect(UrlHelper.detectPlatform(url), platform, reason: url);
+      });
+    });
+
+    test('a look-alike host is not taken for the platform', () {
+      for (final url in const [
+        'https://pinterest.example.com/pin/1/',
+        'https://notpinterest.com/pin/1/',
+        'https://pinterest.com.evil.example/pin/1/',
+      ]) {
+        expect(
+          UrlHelper.detectPlatform(url),
+          VideoPlatform.generic,
+          reason: url,
+        );
+      }
+    });
+
+    test('a share link is one whose destination needs a redirect', () {
+      for (final url in const [
+        'https://www.instagram.com/share/_a7bsO89b/',
+        'https://www.instagram.com/share/reel/_k5BtbW2p/',
+        'https://instagram.com/share/p/BAD5Z-nNdK/?igsh=abc',
+        'https://www.threads.com/share/BAbo8RNsoL',
+        'https://www.threads.net/share/_kBEIkuDC/',
+        'https://soundcloud.app.goo.gl/tiDW5',
+      ]) {
+        expect(UrlHelper.isShortLink(url), isTrue, reason: url);
+      }
+      for (final url in const [
+        'https://www.instagram.com/p/DES1lYXOon0/',
+        'https://www.instagram.com/reel/Chunk8-jurw/',
+        'https://www.threads.com/@nasa/post/Dcqa7s8gu-P',
+        'https://example.com/share/BAbo8RNsoL',
+      ]) {
+        expect(UrlHelper.isShortLink(url), isFalse, reason: url);
+      }
+    });
+  });
 }

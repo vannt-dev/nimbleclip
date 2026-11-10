@@ -18,4 +18,9 @@ enum GalleryNotice {
   /// status, or a payload that did not parse. Whether more photos exist is
   /// unknown, which is precisely what is worth saying.
   galleryCheckUnavailable,
+
+  /// Several photos were read and the post is known to hold more than those.
+  /// Facebook shows an anonymous reader the first few of a personal post and
+  /// only a count of the rest.
+  somePhotosMissing,
 }

@@ -24,6 +24,7 @@ const REFUSED_FROM_GITHUB = new Map([
   ['TikTok slideshow', 'TikTok'],
   ['Pinterest video pin', 'Pinterest'],
   ['Pinterest picture pin', 'Pinterest'],
+  ['Pinterest pin on a country domain', 'Pinterest'],
 ]);
 const REFUSED_LAST_VERIFIED = '2026-10-11';
 
