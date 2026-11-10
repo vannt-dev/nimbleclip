@@ -11,7 +11,7 @@ it into the empty `lib/services/extractors` of a checkout without access.
 | --- | --- |
 | `base_extractor.dart`, `extraction_failure.dart` | The interface and the failure kinds, as in the full core |
 | `registry.dart`, `generic_extractor.dart` | One extractor: a link to a media file, or a page that names its media in Open Graph or Twitter Card metadata. A link to a site the full core reads by name is answered with "no downloadable media" |
-| `youtube_playlist.dart` | The types the app uses; no playlist is read |
+| `youtube_playlist.dart`, `soundcloud_set.dart` | The types the app uses; no playlist is read |
 | `streams/stream_fetcher.dart` | A file fetched in one request, and the length probe the parts transfer uses |
 | `streams/hls_fetcher.dart`, `streams/dash_fetcher.dart`, `streams/hls_decryptor.dart` | Stand-ins that report an unreadable stream; the extractor above never offers one |
 | `android/kotlin/…/PublicCoreEncoders.kt` | The Kotlin names `MainActivity` is written against (slideshow, stream join, segment cipher, MP3), each reporting that it is not here |

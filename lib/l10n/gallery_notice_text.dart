@@ -10,5 +10,6 @@ String describeGalleryNotice(GalleryNotice notice, AppLocalizations l10n) {
     GalleryNotice.externalServicesDisabled => l10n.galleryMayBeIncomplete,
     GalleryNotice.galleryCheckUnavailable => l10n.galleryCheckUnavailable,
     GalleryNotice.somePhotosMissing => l10n.gallerySomePhotosMissing,
+    GalleryNotice.albumPartlyListed => l10n.galleryAlbumPartlyListed,
   };
 }

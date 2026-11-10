@@ -1079,8 +1079,14 @@ abstract class AppLocalizations {
   /// No description provided for @soundcloudNotATrack.
   ///
   /// In en, this message translates to:
-  /// **'This SoundCloud link is not a single track. Open the track and copy its link.'**
+  /// **'This SoundCloud link is not a track or a playlist. Open the track or the playlist and copy its link.'**
   String get soundcloudNotATrack;
+
+  /// No description provided for @soundcloudSetUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No tracks were found in this SoundCloud playlist. It may be private, removed or empty.'**
+  String get soundcloudSetUnavailable;
 
   /// No description provided for @soundcloudUnavailable.
   ///
@@ -1097,7 +1103,7 @@ abstract class AppLocalizations {
   /// No description provided for @flickrInvalidLink.
   ///
   /// In en, this message translates to:
-  /// **'Could not recognize this Flickr link. Use the link of a single photo or video.'**
+  /// **'Could not recognize this Flickr link. Use the link of a photo, a video or an album.'**
   String get flickrInvalidLink;
 
   /// No description provided for @flickrUnavailable.
@@ -1106,10 +1112,16 @@ abstract class AppLocalizations {
   /// **'Flickr did not provide this photo. It may be private or deleted.'**
   String get flickrUnavailable;
 
+  /// No description provided for @flickrAlbumUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Flickr did not provide this album. It may be private, deleted or empty.'**
+  String get flickrAlbumUnavailable;
+
   /// No description provided for @flickrDownloadDisabled.
   ///
   /// In en, this message translates to:
-  /// **'The owner has turned off downloads for this photo on Flickr.'**
+  /// **'The owner has turned off downloads of these photos on Flickr.'**
   String get flickrDownloadDisabled;
 
   /// No description provided for @originalMp4.
@@ -1315,6 +1327,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This post holds more photos than these. Facebook shows only the first ones without a login.'**
   String get gallerySomePhotosMissing;
+
+  /// No description provided for @galleryAlbumPartlyListed.
+  ///
+  /// In en, this message translates to:
+  /// **'This album holds more than these photos. Only the first photos of a long album are listed, and a video in it needs its own link.'**
+  String get galleryAlbumPartlyListed;
 
   /// No description provided for @copyLink.
   ///

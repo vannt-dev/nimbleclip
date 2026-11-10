@@ -7,16 +7,19 @@ import '../models/video_metadata.dart';
 import '../services/extractors/registry.dart';
 import '../l10n/extraction_failure_text.dart';
 import '../services/extractors/base_extractor.dart';
+import '../services/extractors/soundcloud_set.dart';
 import '../services/extractors/youtube_playlist.dart';
 
 class VideoExtractorProvider extends ChangeNotifier {
   VideoExtractorProvider({
     ExtractorRegistry? extractorRegistry,
     this._playlistReader = const YouTubePlaylistReader(),
+    this._setReader = const SoundCloudSetReader(),
   }) : _extractorRegistry = extractorRegistry ?? ExtractorRegistry();
 
   final ExtractorRegistry _extractorRegistry;
   final YouTubePlaylistReader _playlistReader;
+  final SoundCloudSetReader _setReader;
   VideoMetadata? _metadata;
   VideoQualityOption? _selectedQuality;
   bool _isAnalyzing = false;
@@ -37,8 +40,10 @@ class VideoExtractorProvider extends ChangeNotifier {
   static const int maximumParallelAnalyses = 3;
 
   /// Whether [url] names a playlist, which [analyzeUrls] turns into a batch
-  /// of its videos and [analyzeUrl] cannot read.
-  static bool isPlaylistLink(String url) => youtubePlaylistIdFrom(url) != null;
+  /// of its videos or tracks and [analyzeUrl] cannot read. A link that only
+  /// may name one counts: it is followed, and stands for itself otherwise.
+  static bool isPlaylistLink(String url) =>
+      youtubePlaylistIdFrom(url) != null || mayBeSoundCloudSet(url);
 
   VideoMetadata? get metadata => _metadata;
   VideoQualityOption? get selectedQuality => _selectedQuality;
@@ -134,11 +139,11 @@ class VideoExtractorProvider extends ChangeNotifier {
         .toSet();
     _batchTruncated = false;
 
-    // A playlist link stands for its videos, so it is replaced by their
-    // links before the batch is cut to size. One that cannot be read stays
+    // A playlist link stands for its videos or tracks, so it is replaced by
+    // their links before the batch is cut to size. One that cannot be read stays
     // in the results as a failed row instead of disappearing.
     var unreadPlaylists = const <BatchAnalysisResult>[];
-    if (candidates.any((url) => youtubePlaylistIdFrom(url) != null)) {
+    if (candidates.any(isPlaylistLink)) {
       final sequence = ++_requestSequence;
       _isAnalyzing = true;
       _errorMessage = null;
@@ -230,41 +235,62 @@ class VideoExtractorProvider extends ChangeNotifier {
     return _batchResults;
   }
 
-  /// Replaces each playlist link in [urls] with links to its videos, keeping
-  /// the order the links were given in.
+  /// Replaces each playlist link in [urls] with links to its videos or
+  /// tracks, keeping the order the links were given in.
   ///
-  /// A playlist is asked for no more videos than a whole batch holds; one
+  /// A playlist is asked for no more entries than a whole batch holds; one
   /// that lists more marks the batch as truncated.
   Future<({Set<String> urls, List<BatchAnalysisResult> failures})>
   _expandPlaylists(Set<String> urls, AppLocalizations l10n) async {
     final expanded = <String>{};
     final failures = <BatchAnalysisResult>[];
     for (final url in urls) {
-      if (youtubePlaylistIdFrom(url) == null) {
+      if (!isPlaylistLink(url)) {
         expanded.add(url);
         continue;
       }
       final stopwatch = Stopwatch()..start();
+      final isYouTube = youtubePlaylistIdFrom(url) != null;
       try {
-        final playlist = await _playlistReader.read(url);
-        if (playlist.videoIds.length > maximumBatchUrls) {
-          _batchTruncated = true;
-        }
-        expanded.addAll(playlist.videoUrls(limit: maximumBatchUrls));
+        final playlist = await _entriesOf(url, isYouTube: isYouTube);
+        if (playlist.total > maximumBatchUrls) _batchTruncated = true;
+        expanded.addAll(playlist.urls);
       } catch (error) {
         failures.add(
           BatchAnalysisResult(
             url: url,
             error: _readableError(error, l10n.unableToAnalyze, l10n),
-            diagnosticCode: error is ExtractionException
-                ? error.diagnosticCode ?? 'youtube_playlist_failed'
-                : 'youtube_playlist_failed',
+            diagnosticCode:
+                (error is ExtractionException ? error.diagnosticCode : null) ??
+                (isYouTube
+                    ? 'youtube_playlist_failed'
+                    : 'soundcloud_set_failed'),
             analysisDuration: stopwatch.elapsed,
           ),
         );
       }
     }
     return (urls: expanded, failures: failures);
+  }
+
+  /// The first links of the playlist at [url], no more than a batch holds,
+  /// and how many the playlist lists in all.
+  Future<({List<String> urls, int total})> _entriesOf(
+    String url, {
+    required bool isYouTube,
+  }) async {
+    if (isYouTube) {
+      final playlist = await _playlistReader.read(url);
+      return (
+        urls: playlist.videoUrls(limit: maximumBatchUrls),
+        total: playlist.videoIds.length,
+      );
+    }
+    final set = await _setReader.read(url, limit: maximumBatchUrls);
+    return (
+      urls: set.trackUrls.take(maximumBatchUrls).toList(),
+      total: set.trackCount,
+    );
   }
 
   Future<void> retryBatchResult(

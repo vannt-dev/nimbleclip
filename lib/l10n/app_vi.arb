@@ -163,12 +163,14 @@
   "xNoVideo": "Bài đăng không có video tải được hoặc tài khoản đang được bảo vệ.",
   "threadsInvalidPost": "Không nhận diện được link Threads. Hãy dùng link bài đăng dạng threads.com/@<tài khoản>/post/<id>.",
   "threadsNoMedia": "Không tìm thấy ảnh hay video trong bài Threads này. Bài có thể chỉ có chữ, ở chế độ riêng tư, hoặc đã bị xoá.",
-  "soundcloudNotATrack": "Link SoundCloud này không phải một bài nhạc. Hãy mở bài nhạc rồi sao chép link của nó.",
+  "soundcloudNotATrack": "Link SoundCloud này không phải một bài nhạc hay một danh sách phát. Hãy mở bài nhạc hoặc danh sách phát rồi sao chép link của nó.",
+  "soundcloudSetUnavailable": "Không tìm thấy bài nào trong danh sách phát SoundCloud này. Danh sách có thể ở chế độ riêng tư, đã bị xoá hoặc đang trống.",
   "soundcloudUnavailable": "SoundCloud không cung cấp bản đầy đủ của bài này. Bài có thể chỉ cho nghe thử nếu không trả phí, hoặc không khả dụng ở nước bạn.",
   "pinterestNoMedia": "Không tìm thấy ảnh hay video trong ghim này. Ghim có thể ở chế độ riêng tư hoặc đã bị xoá.",
-  "flickrInvalidLink": "Không nhận diện được link Flickr. Hãy dùng link của một ảnh hoặc một video.",
+  "flickrInvalidLink": "Không nhận diện được link Flickr. Hãy dùng link của một ảnh, một video hoặc một album.",
   "flickrUnavailable": "Flickr không cung cấp ảnh này. Ảnh có thể ở chế độ riêng tư hoặc đã bị xoá.",
-  "flickrDownloadDisabled": "Chủ ảnh đã tắt tính năng tải xuống cho ảnh này trên Flickr.",
+  "flickrAlbumUnavailable": "Flickr không cung cấp album này. Album có thể ở chế độ riêng tư, đã bị xoá hoặc đang trống.",
+  "flickrDownloadDisabled": "Chủ ảnh đã tắt tính năng tải xuống cho những ảnh này trên Flickr.",
   "originalMp4": "MP4 (Chất lượng gốc)",
   "animatedGif": "GIF (ảnh động)",
   "xPostBy": "Bài đăng của @{handle}",
@@ -203,6 +205,7 @@
   ,"galleryMayBeIncomplete": "Chỉ đọc được ảnh bìa. Bật dịch vụ bên ngoài trong Cài đặt để tìm nốt những ảnh còn lại."
   ,"galleryCheckUnavailable": "Chỉ đọc được ảnh bìa, và dịch vụ liệt kê các ảnh còn lại không phản hồi. Bài này có thể còn ảnh khác."
   ,"gallerySomePhotosMissing": "Bài này còn nhiều ảnh hơn số ảnh ở đây. Facebook chỉ hiện những ảnh đầu khi chưa đăng nhập."
+  ,"galleryAlbumPartlyListed": "Album này còn nhiều hơn số ảnh ở đây. Album dài chỉ được liệt kê những ảnh đầu, còn video trong album cần link riêng của nó."
   ,"copyLink": "Sao chép liên kết"
   ,"linkCopied": "Đã sao chép liên kết"
   ,"slideshowMusicUnavailable": "Không thêm được nhạc, nên video từ ảnh này không có tiếng."

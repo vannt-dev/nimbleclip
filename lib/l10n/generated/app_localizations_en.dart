@@ -608,7 +608,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get soundcloudNotATrack =>
-      'This SoundCloud link is not a single track. Open the track and copy its link.';
+      'This SoundCloud link is not a track or a playlist. Open the track or the playlist and copy its link.';
+
+  @override
+  String get soundcloudSetUnavailable =>
+      'No tracks were found in this SoundCloud playlist. It may be private, removed or empty.';
 
   @override
   String get soundcloudUnavailable =>
@@ -620,15 +624,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get flickrInvalidLink =>
-      'Could not recognize this Flickr link. Use the link of a single photo or video.';
+      'Could not recognize this Flickr link. Use the link of a photo, a video or an album.';
 
   @override
   String get flickrUnavailable =>
       'Flickr did not provide this photo. It may be private or deleted.';
 
   @override
+  String get flickrAlbumUnavailable =>
+      'Flickr did not provide this album. It may be private, deleted or empty.';
+
+  @override
   String get flickrDownloadDisabled =>
-      'The owner has turned off downloads for this photo on Flickr.';
+      'The owner has turned off downloads of these photos on Flickr.';
 
   @override
   String get originalMp4 => 'MP4 (Original quality)';
@@ -758,6 +766,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get gallerySomePhotosMissing =>
       'This post holds more photos than these. Facebook shows only the first ones without a login.';
+
+  @override
+  String get galleryAlbumPartlyListed =>
+      'This album holds more than these photos. Only the first photos of a long album are listed, and a video in it needs its own link.';
 
   @override
   String get copyLink => 'Copy link';

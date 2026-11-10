@@ -8,6 +8,7 @@ import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/services/extractors_public/base_extractor.dart';
 import 'package:nimble_clip/services/extractors_public/extraction_failure.dart';
 import 'package:nimble_clip/services/extractors_public/registry.dart';
+import 'package:nimble_clip/services/extractors_public/soundcloud_set.dart';
 import 'package:nimble_clip/services/extractors_public/youtube_playlist.dart';
 
 /// The public core: what a checkout without the private one is built with.
@@ -172,6 +173,13 @@ void main() {
     await expectLater(
       const YouTubePlaylistReader().read(link),
       fails(ExtractionFailureKind.youtubePlaylistUnavailable),
+    );
+
+    const set = 'https://soundcloud.com/someone/sets/a-set';
+    expect(mayBeSoundCloudSet(set), isFalse);
+    await expectLater(
+      const SoundCloudSetReader().read(set, limit: 20),
+      fails(ExtractionFailureKind.soundcloudSetUnavailable),
     );
   });
 }

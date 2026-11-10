@@ -166,6 +166,12 @@ void main() {
       minimumMedia: 1,
       minimumVideos: 1,
     ),
+    'Flickr album': (
+      url:
+          'https://www.flickr.com/photos/nasawebbtelescope/albums/72157711779155886',
+      minimumMedia: 2,
+      minimumVideos: 0,
+    ),
   };
 
   for (final entry in cases.entries) {

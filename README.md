@@ -56,9 +56,9 @@ flowchart LR
   options together, and keeps the latest 20 analyzed links locally.
 - Limits batch analysis to 20 links with three concurrent extractors, while
   allowing per-link quality selection, retry, and cancellation.
-- Expands a YouTube playlist link into its videos and analyzes them as a
-  batch: the first 20 in the playlist's order, with a notice when the playlist
-  holds more.
+- Expands a YouTube playlist link, or a SoundCloud playlist or album link,
+  into its videos or tracks and analyzes them as a batch: the first 20 in the
+  playlist's order, with a notice when the playlist holds more.
 - Parses large posts on a background isolate, so the interface keeps responding
   while a link whose page embeds megabytes of inline data is analyzed.
 - Extracts available video, audio, and image options before downloading.
@@ -144,8 +144,8 @@ flowchart LR
 | Instagram | Public image/carousel posts, video posts, Reels, mixed-media posts, and story/highlight links (these need external services) |
 | Threads | Public posts containing images, videos, carousels mixing the two, or a GIF (saved as MP4 or GIF) |
 | Pinterest | A public pin's video or picture, from `pinterest.com`, its country domains and `pin.it` short links. On Android the video is also offered in the other sizes of its stream |
-| SoundCloud | On Android, a public track as M4A audio (AAC), or as MP3 with Save audio as MP3 turned on. Not playlists, and not tracks that only offer a preview without a subscription |
-| Flickr | A public photo at its largest size, or a video's MP4 files, from `flickr.com` and `flic.kr` short links. A photo whose owner turned downloads off is refused |
+| SoundCloud | On Android, a public track as M4A audio (AAC), or as MP3 with Save audio as MP3 turned on; a public playlist or album link (`/<artist>/sets/…`) stands for its first 20 tracks. Not tracks that only offer a preview without a subscription |
+| Flickr | A public photo at its largest size, or a video's MP4 files, from `flickr.com` and `flic.kr` short links; a public album (`/albums/…`, `/sets/…`, `flic.kr/s/…`) as its first 25 photos, videos in it left out. A photo or album whose owner turned downloads off is refused |
 | Other links | A direct link to an image, video, or audio file, and pages that declare their media in a standard way: Open Graph or Twitter card tags, `<video>` / `<audio>` elements, or JSON-LD (`VideoObject`, `AudioObject`, `ImageObject`) |
 
 On Android, a video served as an HLS stream (`.m3u8`) or a DASH stream
