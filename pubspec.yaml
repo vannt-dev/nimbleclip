@@ -50,7 +50,7 @@ dependencies:
   uuid: ^4.6.0
   xml: ^6.6.1
   package_info_plus: ^10.2.1
-  background_downloader: ^9.5.8
+  background_downloader: ^9.6.6
   connectivity_plus: ^7.3.2
   font_awesome_flutter: ^11.0.0
 
