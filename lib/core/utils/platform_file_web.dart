@@ -3,6 +3,7 @@ import 'file_action_result.dart';
 class PlatformFileHelper {
   static Future<String?> getDownloadDirectoryPath() async => null;
   static Future<bool> requestStoragePermissions() async => true;
+  static bool get canSaveAudioToLibrary => false;
   static Future<bool> saveToGallery(
     String filePath, {
     bool isAudio = false,
@@ -11,10 +12,12 @@ class PlatformFileHelper {
   static Future<bool?> galleryFileExists(
     String filePath, {
     required bool isImage,
+    bool isAudio = false,
   }) async => null;
   static Future<String?> galleryFileUri(
     String filePath, {
     required bool isImage,
+    bool isAudio = false,
   }) async => null;
   static Future<FileActionResult> openGalleryUri(String uri) async =>
       FileActionResult.unsupported;

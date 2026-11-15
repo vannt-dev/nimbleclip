@@ -458,6 +458,7 @@ class DownloadProvider extends ChangeNotifier {
         final checked = await _fileActions.galleryExists(
           task.filePath!,
           isImage: task.isImage,
+          isAudio: task.isAudioOnly,
         );
         galleryExists = checked ?? true;
         if (checked == false) {
@@ -841,7 +842,7 @@ class DownloadProvider extends ChangeNotifier {
         task
           ..totalBytes = size
           ..receivedBytes = size;
-        if (autoSaveToGallery) {
+        if (autoSaveToGallery && !task.isAudioOnly) {
           // Best effort, as for a fetched download: the file is complete in
           // the app either way, and Save to gallery stays on offer.
           await saveToGalleryManually(task).catchError((_) => false);
@@ -850,6 +851,7 @@ class DownloadProvider extends ChangeNotifier {
       // Sound joined from a stream is converted like a fetched download, so
       // the setting means the same whichever way a track arrived.
       if (_wantsMp3(task)) await _convertToMp3(task, l10n);
+      if (isMerge && autoSaveToGallery) await _autoSaveAudio(task);
     } catch (error) {
       // A cancel is the user's own decision, already recorded on the task by
       // cancelTask. Overwriting it with `failed` would report their choice back
@@ -1236,14 +1238,15 @@ class DownloadProvider extends ChangeNotifier {
     if (task.status == DownloadStatus.completed && _wantsMp3(task)) {
       await _convertToMp3(task, l10n);
     }
+    if (options.autoSaveToGallery) await _autoSaveAudio(task);
     final localPath = task.filePath;
     if (task.status == DownloadStatus.completed &&
         task.isSavedToGallery &&
-        !task.isAudioOnly &&
         localPath != null) {
       task.galleryUri = await _fileActions.galleryUri(
         localPath,
         isImage: task.isImage,
+        isAudio: task.isAudioOnly,
       );
       // Only remove the app-local copy when Android returned a durable
       // MediaStore URI. This keeps Open/Share functional and avoids data loss
@@ -1258,6 +1261,21 @@ class DownloadProvider extends ChangeNotifier {
     await _saveHistory(
       receipt: task.status == DownloadStatus.completed ? task : null,
     );
+  }
+
+  /// Adds a finished audio download to the device's Music library.
+  ///
+  /// Audio is saved here rather than by the download itself, as a video is,
+  /// because the file that should reach the library is the one left after an
+  /// MP3 conversion, not the one that was fetched. Best effort: the download
+  /// is whole in the app either way, and Save stays on offer.
+  Future<void> _autoSaveAudio(DownloadTask task) async {
+    if (!task.isAudioOnly ||
+        task.status != DownloadStatus.completed ||
+        task.isSavedToGallery) {
+      return;
+    }
+    await saveToGalleryManually(task).catchError((_) => false);
   }
 
   bool _wantsMp3(DownloadTask task) =>
@@ -1543,8 +1561,9 @@ class DownloadProvider extends ChangeNotifier {
     return true;
   }
 
+  /// Copies [task]'s file to the gallery, or to the Music library for audio.
   Future<bool> saveToGalleryManually(DownloadTask task) async {
-    if (task.filePath == null || task.isAudioOnly) return false;
+    if (task.filePath == null) return false;
     final success = await _storageService.saveToGallery(
       task.filePath!,
       isAudio: task.isAudioOnly,
@@ -1555,6 +1574,7 @@ class DownloadProvider extends ChangeNotifier {
       task.galleryUri = await _fileActions.galleryUri(
         task.filePath!,
         isImage: task.isImage,
+        isAudio: task.isAudioOnly,
       );
       notifyListeners();
       await _saveHistory(receipt: task);
@@ -1611,10 +1631,11 @@ class DownloadProvider extends ChangeNotifier {
       ..downloadSpeed = 0;
 
     var galleryStillExists = false;
-    if (task.isSavedToGallery && !task.isAudioOnly && missingPath != null) {
+    if (task.isSavedToGallery && missingPath != null) {
       final checked = await _fileActions.galleryExists(
         missingPath,
         isImage: task.isImage,
+        isAudio: task.isAudioOnly,
       );
       galleryStillExists = checked ?? true;
       if (checked == false) {

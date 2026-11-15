@@ -17,6 +17,10 @@ class CompletedDownloadCard extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback? onRetry;
 
+  /// Whether Save is offered for an audio download too. Only where the device
+  /// has a shared music library the app can add to.
+  final bool canSaveAudioToLibrary;
+
   const CompletedDownloadCard({
     super.key,
     required this.task,
@@ -26,6 +30,7 @@ class CompletedDownloadCard extends StatelessWidget {
     required this.onOpenExternal,
     required this.onDelete,
     this.onRetry,
+    this.canSaveAudioToLibrary = false,
   });
 
   @override
@@ -322,13 +327,17 @@ class CompletedDownloadCard extends StatelessWidget {
                   color: AppColors.primary,
                   onTap: onPlay,
                 ),
-                if (!task.isAudioOnly)
+                if (!task.isAudioOnly || canSaveAudioToLibrary)
                   _ActionButton(
                     icon: task.isSavedToGallery
                         ? Icons.check_circle_rounded
+                        : task.isAudioOnly
+                        ? Icons.library_music_outlined
                         : Icons.photo_library_outlined,
                     label: task.isSavedToGallery
                         ? context.l10n.saved
+                        : task.isAudioOnly
+                        ? context.l10n.saveToMusicLibrary
                         : context.l10n.saveToGallery,
                     color: task.isSavedToGallery
                         ? AppColors.success

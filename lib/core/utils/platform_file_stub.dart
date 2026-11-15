@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 
 import 'file_action_result.dart';
+import 'media_format_helper.dart';
 
 class PlatformFileHelper {
   static const MethodChannel _mediaStoreChannel = MethodChannel(
@@ -40,12 +41,20 @@ class PlatformFileHelper {
     return true;
   }
 
+  /// Whether this platform has a shared music library the app can add to.
+  ///
+  /// Android only: iOS offers an app no way to add a file to the Music
+  /// library, and the desktop builds keep downloads in their own folder.
+  static bool get canSaveAudioToLibrary => Platform.isAndroid;
+
+  /// Copies a video or picture to the gallery, or an audio file to the
+  /// device's Music library (`Music/NimbleClip`).
   static Future<bool> saveToGallery(
     String filePath, {
     bool isAudio = false,
     bool isImage = false,
   }) async {
-    if (isAudio) return false;
+    if (isAudio) return _saveAudioToLibrary(filePath);
     try {
       final hasAccess = await Gal.hasAccess();
       if (!hasAccess) {
@@ -63,17 +72,43 @@ class PlatformFileHelper {
     }
   }
 
+  static Future<bool> _saveAudioToLibrary(String filePath) async {
+    if (!canSaveAudioToLibrary) return false;
+    try {
+      // Only Android 9 and older ask for anything here; newer systems let an
+      // app add its own files to the shared library without a permission.
+      final hasAccess = await Gal.hasAccess();
+      if (!hasAccess) {
+        final granted = await Gal.requestAccess();
+        if (!granted) return false;
+      }
+      final fileName = _fileNameOf(filePath);
+      final uri = await _mediaStoreChannel.invokeMethod<String>('saveAudio', {
+        'path': filePath,
+        'fileName': fileName,
+        'mimeType': MediaFormatHelper.audioMimeType(fileName),
+      });
+      return uri != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static String _fileNameOf(String filePath) =>
+      filePath.replaceAll('\\', '/').split('/').last;
+
   /// Returns null on platforms where Gallery contents cannot be queried.
   static Future<bool?> galleryFileExists(
     String filePath, {
     required bool isImage,
+    bool isAudio = false,
   }) async {
     if (!Platform.isAndroid) return null;
     try {
-      final fileName = filePath.replaceAll('\\', '/').split('/').last;
       return await _mediaStoreChannel.invokeMethod<bool>('mediaExists', {
-            'fileName': fileName,
+            'fileName': _fileNameOf(filePath),
             'isImage': isImage,
+            'isAudio': isAudio,
           }) ??
           false;
     } on PlatformException {
@@ -84,13 +119,14 @@ class PlatformFileHelper {
   static Future<String?> galleryFileUri(
     String filePath, {
     required bool isImage,
+    bool isAudio = false,
   }) async {
     if (!Platform.isAndroid) return null;
     try {
-      final fileName = filePath.replaceAll('\\', '/').split('/').last;
       return await _mediaStoreChannel.invokeMethod<String>('findMediaUri', {
-        'fileName': fileName,
+        'fileName': _fileNameOf(filePath),
         'isImage': isImage,
+        'isAudio': isAudio,
       });
     } on PlatformException {
       return null;

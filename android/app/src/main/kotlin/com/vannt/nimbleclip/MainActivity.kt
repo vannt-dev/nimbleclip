@@ -99,12 +99,39 @@ class MainActivity : FlutterActivity() {
                     "mediaExists", "findMediaUri" -> {
                         val fileName = call.argument<String>("fileName")
                         val isImage = call.argument<Boolean>("isImage") ?: false
+                        val isAudio = call.argument<Boolean>("isAudio") ?: false
                         if (fileName.isNullOrBlank()) {
                             result.success(if (call.method == "mediaExists") false else null)
                             return@setMethodCallHandler
                         }
-                        val uri = findMediaUri(fileName, isImage)
+                        val uri = findMediaUri(fileName, isImage, isAudio)
                         result.success(if (call.method == "mediaExists") uri != null else uri?.toString())
+                    }
+                    "saveAudio" -> {
+                        val path = call.argument<String>("path")
+                        val fileName = call.argument<String>("fileName")
+                        val mimeType = call.argument<String>("mimeType")
+                        if (path.isNullOrBlank() || fileName.isNullOrBlank() || mimeType.isNullOrBlank()) {
+                            result.success(null)
+                            return@setMethodCallHandler
+                        }
+                        // A track is megabytes; copying it on the platform
+                        // thread would freeze the UI for as long as it takes.
+                        Thread {
+                            try {
+                                val uri = AudioLibrary.save(
+                                    applicationContext,
+                                    java.io.File(path),
+                                    fileName,
+                                    mimeType,
+                                )
+                                runOnUiThread { result.success(uri.toString()) }
+                            } catch (error: Exception) {
+                                runOnUiThread {
+                                    result.error("audio_save_failed", error.message, null)
+                                }
+                            }
+                        }.start()
                     }
                     "openMediaUri" -> {
                         val uri = call.argument<String>("uri")?.let(Uri::parse)
@@ -350,11 +377,11 @@ class MainActivity : FlutterActivity() {
         private const val MAX_CAUSE_DEPTH = 32
     }
 
-    private fun findMediaUri(fileName: String, isImage: Boolean): Uri? {
-        val collection = if (isImage) {
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        } else {
-            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+    private fun findMediaUri(fileName: String, isImage: Boolean, isAudio: Boolean): Uri? {
+        val collection = when {
+            isAudio -> MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+            isImage -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            else -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         }
         val dotIndex = fileName.lastIndexOf('.')
         val baseName = if (dotIndex > 0) fileName.substring(0, dotIndex) else fileName

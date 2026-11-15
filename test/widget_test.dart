@@ -482,6 +482,56 @@ void main() {
     expect(find.text('Open with'), findsOneWidget);
   });
 
+  testWidgets('completed audio offers Save where there is a Music library', (
+    WidgetTester tester,
+  ) async {
+    final task = DownloadTask(
+      id: 'audio-task',
+      videoId: 'post',
+      title: 'Audio clip',
+      author: 'Author',
+      thumbnailUrl: '',
+      downloadUrl: 'https://example.com/audio.m4a',
+      originalUrl: 'https://example.com/post',
+      platform: VideoPlatform.generic,
+      qualityLabel: 'Audio',
+      format: 'm4a',
+      kind: MediaKind.audio,
+      status: DownloadStatus.completed,
+      filePath: '/tmp/audio.m4a',
+    );
+    var saves = 0;
+
+    Future<void> pump() => tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: CompletedDownloadCard(
+            task: task,
+            canSaveAudioToLibrary: true,
+            onPlay: () {},
+            onSaveGallery: () => saves++,
+            onShare: () {},
+            onOpenExternal: () {},
+            onDelete: () {},
+          ),
+        ),
+      ),
+    );
+
+    await pump();
+    expect(find.byIcon(Icons.library_music_outlined), findsOneWidget);
+    await tester.tap(find.text('Save'));
+    expect(saves, 1);
+
+    task.isSavedToGallery = true;
+    await pump();
+    await tester.pump();
+    expect(find.text('Saved'), findsOneWidget);
+    expect(find.text('Save'), findsNothing);
+  });
+
   testWidgets(
     'mixed post downloads one video quality and every selected image',
     (WidgetTester tester) async {

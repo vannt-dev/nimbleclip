@@ -165,8 +165,11 @@ class _MemoryStorageService
   }
 
   @override
-  Future<bool?> galleryExists(String filePath, {required bool isImage}) async =>
-      galleryExistsResult;
+  Future<bool?> galleryExists(
+    String filePath, {
+    required bool isImage,
+    bool isAudio = false,
+  }) async => galleryExistsResult;
 
   @override
   bool exists(String filePath) => false;

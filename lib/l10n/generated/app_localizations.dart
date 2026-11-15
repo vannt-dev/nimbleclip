@@ -542,6 +542,18 @@ abstract class AppLocalizations {
   /// **'Could not save to the gallery. Please check the app permission.'**
   String get gallerySaveFailed;
 
+  /// No description provided for @savedToMusicLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio saved to your Music library!'**
+  String get savedToMusicLibrary;
+
+  /// No description provided for @musicLibrarySaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save to the Music library. Please check the app permission.'**
+  String get musicLibrarySaveFailed;
+
   /// No description provided for @resumeDownload.
   ///
   /// In en, this message translates to:
@@ -643,6 +655,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save'**
   String get saveToGallery;
+
+  /// No description provided for @saveToMusicLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get saveToMusicLibrary;
 
   /// No description provided for @share.
   ///
@@ -839,7 +857,7 @@ abstract class AppLocalizations {
   /// No description provided for @autoSaveGalleryDescription.
   ///
   /// In en, this message translates to:
-  /// **'Add media to your gallery after each download'**
+  /// **'Add videos and pictures to your gallery, and audio to your Music library, after each download'**
   String get autoSaveGalleryDescription;
 
   /// No description provided for @removeCacheAfterGallery.
