@@ -6,6 +6,15 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-11-15
+
+- Audio downloads are now saved to the phone's Music library, in
+  `Music/NimbleClip`, where music players and the Files app find them. With
+  "Automatically save to gallery" on this happens by itself, after the MP3
+  conversion when that is on; otherwise an audio download has a Save button,
+  as videos and pictures do. "Remove local copy after saving" applies to
+  audio too. Before, an audio file stayed inside the app's own folder.
+
 ## [1.16.0] - 2026-11-11
 
 - SoundCloud playlists and albums are now supported. A link to one
