@@ -28,6 +28,25 @@ void main() {
       );
     });
 
+    test('files every audio download under an audio type', () {
+      expect(MediaFormatHelper.audioMimeType('Song.mp3'), 'audio/mpeg');
+      expect(MediaFormatHelper.audioMimeType('Song.M4A'), 'audio/mp4');
+      expect(MediaFormatHelper.audioMimeType('Song.opus'), 'audio/ogg');
+      expect(MediaFormatHelper.audioMimeType('Song.aac'), 'audio/aac');
+      // Extensions the platform would otherwise file as video.
+      expect(MediaFormatHelper.audioMimeType('Song.webm'), 'audio/webm');
+      expect(MediaFormatHelper.audioMimeType('Song.mp4'), 'audio/mp4');
+      expect(MediaFormatHelper.audioMimeType('Song.ogg'), 'audio/ogg');
+      // A whole path, and a title that holds dots of its own.
+      expect(
+        MediaFormatHelper.audioMimeType('/files/NimbleClip/Vol. 2 - Intro.m4a'),
+        'audio/mp4',
+      );
+      // Unknown or missing extensions still land in the audio collection.
+      expect(MediaFormatHelper.audioMimeType('Song.xyz'), 'audio/mpeg');
+      expect(MediaFormatHelper.audioMimeType('Song'), 'audio/mpeg');
+    });
+
     test('detects image URLs without matching query text', () {
       expect(
         MediaFormatHelper.isImageUrl('https://cdn.example/a.png?q=1'),

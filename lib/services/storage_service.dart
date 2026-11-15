@@ -15,7 +15,8 @@ class StorageService {
     return await PlatformFileHelper.requestStoragePermissions();
   }
 
-  /// Saves video or audio to device gallery
+  /// Saves a video or picture to the device gallery, or audio to its Music
+  /// library.
   Future<bool> saveToGallery(
     String filePath, {
     bool isAudio = false,

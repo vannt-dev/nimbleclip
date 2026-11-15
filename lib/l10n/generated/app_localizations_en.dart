@@ -291,6 +291,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not save to the gallery. Please check the app permission.';
 
   @override
+  String get savedToMusicLibrary => 'Audio saved to your Music library!';
+
+  @override
+  String get musicLibrarySaveFailed =>
+      'Could not save to the Music library. Please check the app permission.';
+
+  @override
   String get resumeDownload => 'Resume download';
 
   @override
@@ -348,6 +355,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get saveToGallery => 'Save';
+
+  @override
+  String get saveToMusicLibrary => 'Save';
 
   @override
   String get share => 'Share';
@@ -456,7 +466,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get autoSaveGalleryDescription =>
-      'Add media to your gallery after each download';
+      'Add videos and pictures to your gallery, and audio to your Music library, after each download';
 
   @override
   String get removeCacheAfterGallery => 'Remove local copy after saving';

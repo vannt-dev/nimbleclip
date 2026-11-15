@@ -517,6 +517,7 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     return CompletedDownloadCard(
       key: ValueKey('download-${task.id}'),
       task: task,
+      canSaveAudioToLibrary: PlatformFileHelper.canSaveAudioToLibrary,
       onPlay: () => unawaited(_openMedia(context, task)),
       onSaveGallery: () async {
         final saved = await context
@@ -525,11 +526,12 @@ class _DownloadsScreenState extends State<DownloadsScreen>
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              saved
-                  ? context.l10n.savedToGallery
-                  : context.l10n.gallerySaveFailed,
-            ),
+            content: Text(switch ((saved, task.isAudioOnly)) {
+              (true, false) => context.l10n.savedToGallery,
+              (false, false) => context.l10n.gallerySaveFailed,
+              (true, true) => context.l10n.savedToMusicLibrary,
+              (false, true) => context.l10n.musicLibrarySaveFailed,
+            }),
             behavior: SnackBarBehavior.floating,
           ),
         );

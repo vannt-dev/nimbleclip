@@ -287,6 +287,13 @@ class AppLocalizationsVi extends AppLocalizations {
       'Không thể lưu vào thư viện. Vui lòng kiểm tra quyền ứng dụng.';
 
   @override
+  String get savedToMusicLibrary => 'Đã lưu âm thanh vào thư viện Nhạc!';
+
+  @override
+  String get musicLibrarySaveFailed =>
+      'Không thể lưu vào thư viện Nhạc. Vui lòng kiểm tra quyền ứng dụng.';
+
+  @override
   String get resumeDownload => 'Tiếp tục tải';
 
   @override
@@ -344,6 +351,9 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get saveToGallery => 'Lưu Album';
+
+  @override
+  String get saveToMusicLibrary => 'Lưu Nhạc';
 
   @override
   String get share => 'Chia sẻ';
@@ -452,7 +462,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get autoSaveGalleryDescription =>
-      'Thêm nội dung vào thư viện sau khi tải xong';
+      'Thêm video và ảnh vào thư viện, âm thanh vào thư viện Nhạc sau khi tải xong';
 
   @override
   String get removeCacheAfterGallery => 'Xóa bản lưu tạm sau khi lưu';
