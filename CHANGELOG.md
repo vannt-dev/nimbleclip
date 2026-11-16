@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.17.1] - 2026-11-16
+
 - New setting **Save folder**: saved files can go into a folder of your
   choice, `Pictures/<name>`, `Movies/<name>` and `Music/<name>` on Android
   (an album of that name on iOS), instead of the default places

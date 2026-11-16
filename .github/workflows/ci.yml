@@ -325,7 +325,7 @@ jobs:
     name: iOS build and Share Extension
     needs: changes
     if: needs.changes.outputs.ios == 'true'
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 25
     env:
       # connectivity_plus (via background_downloader) uses iOS 26 APIs such as
@@ -401,7 +401,7 @@ jobs:
     name: Build from the public repository alone (iOS)
     needs: changes
     if: needs.changes.outputs.ios == 'true' && needs.changes.outputs.release != 'true'
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 25
     env:
       # As for the ios job above.
