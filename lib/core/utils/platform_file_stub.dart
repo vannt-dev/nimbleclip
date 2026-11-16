@@ -48,13 +48,24 @@ class PlatformFileHelper {
   static bool get canSaveAudioToLibrary => Platform.isAndroid;
 
   /// Copies a video or picture to the gallery, or an audio file to the
-  /// device's Music library (`Music/NimbleClip`).
+  /// device's Music library (`Music/NimbleClip`). With a [folder] name, the
+  /// file goes into that folder instead: `Pictures/<folder>`,
+  /// `Movies/<folder>` or `Music/<folder>` on Android, an album of that
+  /// name on iOS.
+  ///
+  /// On Android every file goes through the app's own MediaStore code, which
+  /// dates the entry with the moment it was saved: pickers such as WhatsApp's
+  /// sort by that date, and a file without one is listed under 1970.
   static Future<bool> saveToGallery(
     String filePath, {
     bool isAudio = false,
     bool isImage = false,
+    String? folder,
   }) async {
-    if (isAudio) return _saveAudioToLibrary(filePath);
+    if (isAudio) return _saveAudioToLibrary(filePath, folder);
+    if (Platform.isAndroid) {
+      return _saveToMediaStore(filePath, isImage ? 'image' : 'video', folder);
+    }
     try {
       final hasAccess = await Gal.hasAccess();
       if (!hasAccess) {
@@ -62,9 +73,9 @@ class PlatformFileHelper {
         if (!granted) return false;
       }
       if (isImage) {
-        await Gal.putImage(filePath);
+        await Gal.putImage(filePath, album: folder);
       } else {
-        await Gal.putVideo(filePath);
+        await Gal.putVideo(filePath, album: folder);
       }
       return true;
     } catch (_) {
@@ -72,8 +83,19 @@ class PlatformFileHelper {
     }
   }
 
-  static Future<bool> _saveAudioToLibrary(String filePath) async {
+  static Future<bool> _saveAudioToLibrary(
+    String filePath,
+    String? folder,
+  ) async {
     if (!canSaveAudioToLibrary) return false;
+    return _saveToMediaStore(filePath, 'audio', folder);
+  }
+
+  static Future<bool> _saveToMediaStore(
+    String filePath,
+    String kind,
+    String? folder,
+  ) async {
     try {
       // Only Android 9 and older ask for anything here; newer systems let an
       // app add its own files to the shared library without a permission.
@@ -83,10 +105,16 @@ class PlatformFileHelper {
         if (!granted) return false;
       }
       final fileName = _fileNameOf(filePath);
-      final uri = await _mediaStoreChannel.invokeMethod<String>('saveAudio', {
+      final uri = await _mediaStoreChannel.invokeMethod<String>('saveMedia', {
         'path': filePath,
         'fileName': fileName,
-        'mimeType': MediaFormatHelper.audioMimeType(fileName),
+        'mimeType': switch (kind) {
+          'audio' => MediaFormatHelper.audioMimeType(fileName),
+          'image' => MediaFormatHelper.imageMimeType(fileName),
+          _ => MediaFormatHelper.videoMimeType(fileName),
+        },
+        'kind': kind,
+        'folder': folder,
       });
       return uri != null;
     } catch (_) {

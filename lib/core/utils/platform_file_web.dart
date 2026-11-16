@@ -8,6 +8,7 @@ class PlatformFileHelper {
     String filePath, {
     bool isAudio = false,
     bool isImage = false,
+    String? folder,
   }) async => false;
   static Future<bool?> galleryFileExists(
     String filePath, {

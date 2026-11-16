@@ -107,28 +107,39 @@ class MainActivity : FlutterActivity() {
                         val uri = findMediaUri(fileName, isImage, isAudio)
                         result.success(if (call.method == "mediaExists") uri != null else uri?.toString())
                     }
-                    "saveAudio" -> {
+                    "saveMedia" -> {
                         val path = call.argument<String>("path")
                         val fileName = call.argument<String>("fileName")
                         val mimeType = call.argument<String>("mimeType")
-                        if (path.isNullOrBlank() || fileName.isNullOrBlank() || mimeType.isNullOrBlank()) {
+                        val kind = when (call.argument<String>("kind")) {
+                            "image" -> MediaLibrary.Kind.IMAGE
+                            "video" -> MediaLibrary.Kind.VIDEO
+                            "audio" -> MediaLibrary.Kind.AUDIO
+                            else -> null
+                        }
+                        val folder = call.argument<String>("folder")
+                        if (path.isNullOrBlank() || fileName.isNullOrBlank() ||
+                            mimeType.isNullOrBlank() || kind == null
+                        ) {
                             result.success(null)
                             return@setMethodCallHandler
                         }
-                        // A track is megabytes; copying it on the platform
+                        // A video is megabytes; copying it on the platform
                         // thread would freeze the UI for as long as it takes.
                         Thread {
                             try {
-                                val uri = AudioLibrary.save(
+                                val uri = MediaLibrary.save(
                                     applicationContext,
                                     java.io.File(path),
                                     fileName,
                                     mimeType,
+                                    kind,
+                                    folder,
                                 )
                                 runOnUiThread { result.success(uri.toString()) }
                             } catch (error: Exception) {
                                 runOnUiThread {
-                                    result.error("audio_save_failed", error.message, null)
+                                    result.error("media_save_failed", error.message, null)
                                 }
                             }
                         }.start()

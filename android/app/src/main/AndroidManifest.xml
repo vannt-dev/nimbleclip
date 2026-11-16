@@ -3,8 +3,8 @@
     <!--
         No requestLegacyExternalStorage: the app writes downloads to its own
         external files dir (Android/data/<pkg>/files/NimbleClip) and publishes to
-        the gallery through MediaStore via `gal`, and audio to the Music library
-        through MediaStore directly. None of it needs the pre-scoped storage
+        the gallery and audio to the Music library through MediaStore directly
+        (MediaLibrary.kt). None of it needs the pre-scoped storage
         model, and the flag is ignored from Android 11 onwards anyway.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>

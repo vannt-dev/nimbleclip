@@ -155,6 +155,29 @@
   "autoSaveGalleryDescription": "Add videos and pictures to your gallery, and audio to your Music library, after each download",
   "removeCacheAfterGallery": "Remove local copy after saving",
   "removeCacheAfterGalleryDescription": "Avoid duplicate storage; the Gallery copy stays available",
+  "saveFolder": "Save folder",
+  "saveFolderDefault": "Default: Pictures, Movies and Music/NimbleClip",
+  "saveFolderCustom": "Pictures/{name}, Movies/{name} and Music/{name}",
+  "@saveFolderCustom": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "saveFolderHint": "Folder name, empty for the default",
+  "saveFolderNote": "Saved files stay in the gallery and the Music library, in a folder of this name. Files saved before keep their place.",
+  "saveFolderInvalidCharacters": "A folder name cannot contain /  : * ? \" < > |",
+  "saveFolderStartsWithDot": "A folder name cannot start with a dot",
+  "saveFolderTooLong": "At most {max} characters",
+  "@saveFolderTooLong": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "saveFolderSave": "Save",
   "allowExternalServices": "Allow external extraction services",
   "allowExternalServicesDescription": "Required for TikTok, X, and some Facebook or Instagram posts. The public post URL may be sent to these services.",
   "concurrentDownloads": "Simultaneous downloads",

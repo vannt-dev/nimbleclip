@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nimble_clip/core/constants/app_constants.dart';
 import 'package:nimble_clip/core/utils/external_service_policy.dart';
+import 'package:nimble_clip/core/utils/save_folder_name.dart';
 import 'package:nimble_clip/providers/settings_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -48,6 +49,38 @@ void main() {
     final restored = SettingsProvider();
     await restored.initialized;
     expect(restored.convertAudioToMp3, isTrue);
+  });
+
+  test(
+    'save folder name is unset by default, remembered and clearable',
+    () async {
+      final provider = SettingsProvider();
+      await provider.initialized;
+      expect(provider.saveFolderName, isNull);
+
+      expect(await provider.setSaveFolderName('  Clips  '), isNull);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(AppConstants.keySaveFolderName), 'Clips');
+      final restored = SettingsProvider();
+      await restored.initialized;
+      expect(restored.saveFolderName, 'Clips');
+
+      expect(await restored.setSaveFolderName(''), isNull);
+      expect(restored.saveFolderName, isNull);
+      expect(prefs.getString(AppConstants.keySaveFolderName), isNull);
+    },
+  );
+
+  test('a save folder name with a path separator is refused', () async {
+    final provider = SettingsProvider();
+    await provider.initialized;
+    await provider.setSaveFolderName('Clips');
+
+    expect(
+      await provider.setSaveFolderName('a/b'),
+      SaveFolderProblem.invalidCharacters,
+    );
+    expect(provider.saveFolderName, 'Clips');
   });
 
   test('Wi-Fi only downloads is off by default and remembered', () async {

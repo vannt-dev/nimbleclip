@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/app_constants.dart';
 import '../core/utils/external_service_policy.dart';
+import '../core/utils/save_folder_name.dart';
 import '../services/storage_service.dart';
 import '../models/download_options.dart';
 
@@ -19,6 +20,7 @@ class SettingsProvider extends ChangeNotifier {
   int _maxConcurrentDownloads = 3;
   bool _wifiOnlyDownloads = false;
   bool _convertAudioToMp3 = false;
+  String? _saveFolderName;
 
   ThemeMode get themeMode => _themeMode;
   Locale? get locale => _locale;
@@ -31,6 +33,9 @@ class SettingsProvider extends ChangeNotifier {
   int get maxConcurrentDownloads => _maxConcurrentDownloads;
   bool get wifiOnlyDownloads => _wifiOnlyDownloads;
   bool get convertAudioToMp3 => _convertAudioToMp3;
+
+  /// The folder saved files go into, or null for the default places.
+  String? get saveFolderName => _saveFolderName;
   DownloadOptions get downloadOptions => DownloadOptions(
     autoSaveToGallery: autoSaveGallery,
     removeCacheAfterGallery: removeCacheAfterGallery,
@@ -75,6 +80,7 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(AppConstants.keyWifiOnlyDownloads) ?? false;
     _convertAudioToMp3 =
         prefs.getBool(AppConstants.keyConvertAudioToMp3) ?? false;
+    _saveFolderName = prefs.getString(AppConstants.keySaveFolderName);
     final languageCode = prefs.getString(AppConstants.keyLanguageCode);
     _locale = languageCode == null ? null : Locale(languageCode);
 
@@ -149,6 +155,23 @@ class SettingsProvider extends ChangeNotifier {
       AppConstants.keyMaxConcurrentDownloads,
       _maxConcurrentDownloads,
     );
+  }
+
+  /// Sets the folder saved files go into; an empty name restores the
+  /// default places. Returns why a name was refused, leaving the current one.
+  Future<SaveFolderProblem?> setSaveFolderName(String input) async {
+    final problem = SaveFolderName.problemWith(input);
+    if (problem != null) return problem;
+    _saveFolderName = SaveFolderName.normalize(input);
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    final name = _saveFolderName;
+    if (name == null) {
+      await prefs.remove(AppConstants.keySaveFolderName);
+    } else {
+      await prefs.setString(AppConstants.keySaveFolderName, name);
+    }
+    return null;
   }
 
   Future<void> setConvertAudioToMp3(bool value) async {
