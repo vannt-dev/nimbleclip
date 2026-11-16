@@ -47,6 +47,28 @@ void main() {
       expect(MediaFormatHelper.audioMimeType('Song'), 'audio/mpeg');
     });
 
+    test('files pictures and videos under the type their folder accepts', () {
+      expect(MediaFormatHelper.imageMimeType('a.jpg'), 'image/jpeg');
+      expect(MediaFormatHelper.imageMimeType('a.JPEG'), 'image/jpeg');
+      expect(MediaFormatHelper.imageMimeType('a.png'), 'image/png');
+      expect(MediaFormatHelper.imageMimeType('a.webp'), 'image/webp');
+      expect(MediaFormatHelper.imageMimeType('a.gif'), 'image/gif');
+      expect(MediaFormatHelper.imageMimeType('a.heic'), 'image/heic');
+      // Unknown or missing extensions still land among the pictures.
+      expect(MediaFormatHelper.imageMimeType('a.xyz'), 'image/jpeg');
+      expect(MediaFormatHelper.imageMimeType('a'), 'image/jpeg');
+
+      expect(MediaFormatHelper.videoMimeType('v.mp4'), 'video/mp4');
+      expect(
+        MediaFormatHelper.videoMimeType('/x/Vol. 2.MOV'),
+        'video/quicktime',
+      );
+      expect(MediaFormatHelper.videoMimeType('v.webm'), 'video/webm');
+      expect(MediaFormatHelper.videoMimeType('v.mkv'), 'video/x-matroska');
+      expect(MediaFormatHelper.videoMimeType('v.3gp'), 'video/3gpp');
+      expect(MediaFormatHelper.videoMimeType('v.xyz'), 'video/mp4');
+    });
+
     test('detects image URLs without matching query text', () {
       expect(
         MediaFormatHelper.isImageUrl('https://cdn.example/a.png?q=1'),

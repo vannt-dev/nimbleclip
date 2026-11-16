@@ -78,6 +78,8 @@ dependencies {
     // Backports Direct Share targets to Android 9 and below, where the platform
     // has no share-target support of its own.
     implementation("androidx.sharetarget:sharetarget:1.2.0")
+    // Writes the capture date into saved pictures (already pulled in by Flutter plugins).
+    implementation("androidx.exifinterface:exifinterface:1.4.1")
 }
 
 kotlin {

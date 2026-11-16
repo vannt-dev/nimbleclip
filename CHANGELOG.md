@@ -6,6 +6,12 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- Saved videos and pictures now carry the date they were saved. Media
+  pickers that sort by the capture date, such as WhatsApp's, listed them under
+  1 January 1970, far below the recent items; they now appear at the top
+  ([#102](https://github.com/vannt-dev/nimbleclip/issues/102)). Files saved
+  before this version keep their old date in those pickers.
+
 - TikTok links work again. The app gave up with "Could not connect to the
   TikTok service: TimeoutException after 0:00:15" while the service was only
   slow to answer, and a video it did find could fail to download with
