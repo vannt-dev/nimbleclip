@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.17.1] - 2026-11-16
+
 - TikTok links work again. The app gave up with "Could not connect to the
   TikTok service: TimeoutException after 0:00:15" while the service was only
   slow to answer, and a video it did find could fail to download with
