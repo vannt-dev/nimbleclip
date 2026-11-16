@@ -67,6 +67,39 @@ class MediaFormatHelper {
     return _audioMimeTypes[extension] ?? 'audio/mpeg';
   }
 
+  static const _imageMimeTypes = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'webp': 'image/webp',
+    'avif': 'image/avif',
+    'bmp': 'image/bmp',
+    'heic': 'image/heic',
+  };
+
+  static const _videoMimeTypes = {
+    'mp4': 'video/mp4',
+    'm4v': 'video/mp4',
+    'mov': 'video/quicktime',
+    'webm': 'video/webm',
+    'mkv': 'video/x-matroska',
+    '3gp': 'video/3gpp',
+  };
+
+  /// The MIME type to file a picture under in the device's gallery. Always an
+  /// `image/` type, which is what the Pictures folder accepts.
+  static String imageMimeType(String fileName) =>
+      _imageMimeTypes[_extensionOf(fileName)] ?? 'image/jpeg';
+
+  /// The MIME type to file a video under in the device's gallery. Always a
+  /// `video/` type, which is what the Movies folder accepts.
+  static String videoMimeType(String fileName) =>
+      _videoMimeTypes[_extensionOf(fileName)] ?? 'video/mp4';
+
+  static String? _extensionOf(String fileName) =>
+      _normalize(_fileExtensionInsensitive.firstMatch(fileName)?.group(1));
+
   static String? _normalize(String? value) {
     final normalized = value?.replaceAll('.', '').trim().toLowerCase();
     return normalized == null || normalized.isEmpty ? null : normalized;
