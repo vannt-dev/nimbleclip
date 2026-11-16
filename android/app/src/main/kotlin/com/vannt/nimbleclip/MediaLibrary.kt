@@ -12,7 +12,8 @@ import java.io.IOException
 
 /**
  * Adds a finished download to the device's shared media: a picture to
- * `Pictures`, a video to `Movies`, an audio file to `Music/NimbleClip`.
+ * `Pictures`, a video to `Movies`, an audio file to `Music/NimbleClip`, or
+ * each into a folder of the name chosen in Settings (`Pictures/<name>`...).
  *
  * Every copy carries the moment it was saved as its capture date, written into
  * the file's metadata ([CaptureDate]): media pickers such as WhatsApp's sort by
@@ -54,14 +55,34 @@ object MediaLibrary {
      * thread. Throws when the file cannot be read or the library refuses it;
      * nothing is left behind in that case.
      */
-    fun save(context: Context, source: File, fileName: String, mimeType: String, kind: Kind): Uri {
+    fun save(
+        context: Context,
+        source: File,
+        fileName: String,
+        mimeType: String,
+        kind: Kind,
+        folder: String? = null,
+    ): Uri {
         if (!source.isFile) throw IOException("File is missing: ${source.path}")
         val savedAt = System.currentTimeMillis()
+        val album = albumFor(kind, folder)
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            saveScoped(context, source, fileName, mimeType, kind, savedAt)
+            saveScoped(context, source, fileName, mimeType, kind, album, savedAt)
         } else {
-            saveLegacy(context, source, fileName, mimeType, kind, savedAt)
+            saveLegacy(context, source, fileName, mimeType, kind, album, savedAt)
         }
+    }
+
+    /**
+     * The chosen folder, or the kind's default. The app checks the name when
+     * it is chosen; a name that slipped through anyway is not used, so a file
+     * never lands outside the folders the gallery and music apps read.
+     */
+    private fun albumFor(kind: Kind, folder: String?): String? {
+        val name = folder?.trim().orEmpty()
+        val usable = name.isNotEmpty() && name.length <= 40 && !name.startsWith(".") &&
+            name.none { it in INVALID_FOLDER_CHARS || it.code < 0x20 || it.code == 0x7F }
+        return if (usable) name else kind.defaultAlbum
     }
 
     /**
@@ -75,13 +96,14 @@ object MediaLibrary {
         fileName: String,
         mimeType: String,
         kind: Kind,
+        album: String?,
         savedAt: Long,
     ): Uri {
         val resolver = context.contentResolver
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
             put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-            put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath(kind))
+            put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath(kind, album))
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
         val uri = resolver.insert(kind.collection(), values)
@@ -118,10 +140,11 @@ object MediaLibrary {
         fileName: String,
         mimeType: String,
         kind: Kind,
+        album: String?,
         savedAt: Long,
     ): Uri {
         val root = Environment.getExternalStoragePublicDirectory(kind.directory)
-        val directory = kind.defaultAlbum?.let { File(root, it) } ?: root
+        val directory = album?.let { File(root, it) } ?: root
         if (!directory.isDirectory && !directory.mkdirs()) {
             throw IOException("The ${kind.directory} folder could not be created")
         }
@@ -148,8 +171,8 @@ object MediaLibrary {
         }
     }
 
-    private fun relativePath(kind: Kind): String =
-        kind.defaultAlbum?.let { "${kind.directory}/$it" } ?: kind.directory
+    private fun relativePath(kind: Kind, album: String?): String =
+        album?.let { "${kind.directory}/$it" } ?: kind.directory
 
     /** `name.mp3`, or `name (1).mp3` and so on when that is already taken. */
     private fun uniqueFile(directory: File, fileName: String): File {
@@ -164,6 +187,9 @@ object MediaLibrary {
         }
         return candidate
     }
+
+    /** Characters a folder name may not hold, path separators among them. */
+    private const val INVALID_FOLDER_CHARS = "/\\:*?\"<>|"
 
     /** `MediaColumns.DATE_TAKEN` from Android 10; the same column name before. */
     private const val DATE_TAKEN = "datetaken"

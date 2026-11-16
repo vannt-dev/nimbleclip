@@ -476,6 +476,40 @@ class AppLocalizationsEn extends AppLocalizations {
       'Avoid duplicate storage; the Gallery copy stays available';
 
   @override
+  String get saveFolder => 'Save folder';
+
+  @override
+  String get saveFolderDefault =>
+      'Default: Pictures, Movies and Music/NimbleClip';
+
+  @override
+  String saveFolderCustom(String name) {
+    return 'Pictures/$name, Movies/$name and Music/$name';
+  }
+
+  @override
+  String get saveFolderHint => 'Folder name, empty for the default';
+
+  @override
+  String get saveFolderNote =>
+      'Saved files stay in the gallery and the Music library, in a folder of this name. Files saved before keep their place.';
+
+  @override
+  String get saveFolderInvalidCharacters =>
+      'A folder name cannot contain /  : * ? \" < > |';
+
+  @override
+  String get saveFolderStartsWithDot => 'A folder name cannot start with a dot';
+
+  @override
+  String saveFolderTooLong(int max) {
+    return 'At most $max characters';
+  }
+
+  @override
+  String get saveFolderSave => 'Save';
+
+  @override
   String get allowExternalServices => 'Allow external extraction services';
 
   @override

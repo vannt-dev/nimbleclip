@@ -872,6 +872,60 @@ abstract class AppLocalizations {
   /// **'Avoid duplicate storage; the Gallery copy stays available'**
   String get removeCacheAfterGalleryDescription;
 
+  /// No description provided for @saveFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Save folder'**
+  String get saveFolder;
+
+  /// No description provided for @saveFolderDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default: Pictures, Movies and Music/NimbleClip'**
+  String get saveFolderDefault;
+
+  /// No description provided for @saveFolderCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Pictures/{name}, Movies/{name} and Music/{name}'**
+  String saveFolderCustom(String name);
+
+  /// No description provided for @saveFolderHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder name, empty for the default'**
+  String get saveFolderHint;
+
+  /// No description provided for @saveFolderNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved files stay in the gallery and the Music library, in a folder of this name. Files saved before keep their place.'**
+  String get saveFolderNote;
+
+  /// No description provided for @saveFolderInvalidCharacters.
+  ///
+  /// In en, this message translates to:
+  /// **'A folder name cannot contain /  : * ? \" < > |'**
+  String get saveFolderInvalidCharacters;
+
+  /// No description provided for @saveFolderStartsWithDot.
+  ///
+  /// In en, this message translates to:
+  /// **'A folder name cannot start with a dot'**
+  String get saveFolderStartsWithDot;
+
+  /// No description provided for @saveFolderTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'At most {max} characters'**
+  String saveFolderTooLong(int max);
+
+  /// No description provided for @saveFolderSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get saveFolderSave;
+
   /// No description provided for @allowExternalServices.
   ///
   /// In en, this message translates to:

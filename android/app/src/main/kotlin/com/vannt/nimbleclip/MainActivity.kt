@@ -117,6 +117,7 @@ class MainActivity : FlutterActivity() {
                             "audio" -> MediaLibrary.Kind.AUDIO
                             else -> null
                         }
+                        val folder = call.argument<String>("folder")
                         if (path.isNullOrBlank() || fileName.isNullOrBlank() ||
                             mimeType.isNullOrBlank() || kind == null
                         ) {
@@ -133,6 +134,7 @@ class MainActivity : FlutterActivity() {
                                     fileName,
                                     mimeType,
                                     kind,
+                                    folder,
                                 )
                                 runOnUiThread { result.success(uri.toString()) }
                             } catch (error: Exception) {
