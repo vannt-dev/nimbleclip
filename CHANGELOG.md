@@ -6,6 +6,13 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- New setting **Save folder**: saved files can go into a folder of your
+  choice, `Pictures/<name>`, `Movies/<name>` and `Music/<name>` on Android
+  (an album of that name on iOS), instead of the default places
+  ([#103](https://github.com/vannt-dev/nimbleclip/issues/103)). The folder
+  stays inside the gallery and the Music library, so other apps still find
+  the files.
+
 - Saved videos and pictures now carry the date they were saved. Media
   pickers that sort by the capture date, such as WhatsApp's, listed them under
   1 January 1970, far below the recent items; they now appear at the top

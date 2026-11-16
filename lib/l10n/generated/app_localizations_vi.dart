@@ -472,6 +472,41 @@ class AppLocalizationsVi extends AppLocalizations {
       'Tránh tốn dung lượng gấp đôi; bản trong Thư viện vẫn được giữ';
 
   @override
+  String get saveFolder => 'Thư mục lưu';
+
+  @override
+  String get saveFolderDefault =>
+      'Mặc định: Pictures, Movies và Music/NimbleClip';
+
+  @override
+  String saveFolderCustom(String name) {
+    return 'Pictures/$name, Movies/$name và Music/$name';
+  }
+
+  @override
+  String get saveFolderHint => 'Tên thư mục, để trống để dùng mặc định';
+
+  @override
+  String get saveFolderNote =>
+      'File đã lưu vẫn nằm trong Thư viện và thư viện Nhạc, trong thư mục có tên này. File lưu trước đó giữ nguyên chỗ cũ.';
+
+  @override
+  String get saveFolderInvalidCharacters =>
+      'Tên thư mục không được chứa /  : * ? \" < > |';
+
+  @override
+  String get saveFolderStartsWithDot =>
+      'Tên thư mục không được bắt đầu bằng dấu chấm';
+
+  @override
+  String saveFolderTooLong(int max) {
+    return 'Tối đa $max ký tự';
+  }
+
+  @override
+  String get saveFolderSave => 'Lưu';
+
+  @override
   String get allowExternalServices => 'Cho phép dịch vụ trích xuất bên ngoài';
 
   @override

@@ -8,6 +8,7 @@ import '../../core/utils/formatters.dart';
 import '../../l10n/l10n.dart';
 import '../../providers/download_provider.dart';
 import '../../providers/settings_provider.dart';
+import 'save_folder_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -265,6 +266,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: settings.autoSaveGallery
                       ? settings.setRemoveCacheAfterGallery
                       : null,
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  key: const ValueKey('saveFolderTile'),
+                  leading: const Icon(
+                    Icons.folder_outlined,
+                    color: AppColors.primary,
+                  ),
+                  title: Text(l10n.saveFolder),
+                  subtitle: Text(
+                    settings.saveFolderName == null
+                        ? l10n.saveFolderDefault
+                        : l10n.saveFolderCustom(settings.saveFolderName!),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => showDialog<void>(
+                    context: context,
+                    builder: (_) => SaveFolderDialog(settings: settings),
+                  ),
                 ),
                 const Divider(height: 1),
                 SwitchListTile(

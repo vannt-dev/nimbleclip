@@ -1,4 +1,8 @@
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../core/constants/app_constants.dart';
 import '../core/utils/platform_file.dart';
+import '../core/utils/save_folder_name.dart';
 
 class StorageService {
   static final StorageService _instance = StorageService._internal();
@@ -26,7 +30,25 @@ class StorageService {
       filePath,
       isAudio: isAudio,
       isImage: isImage,
+      folder: await _saveFolderName(),
     );
+  }
+
+  /// The folder chosen in Settings, read at save time so a download that
+  /// finishes in the background uses the current choice. Null for the
+  /// default places, and for anything stored that is not a valid name.
+  Future<String?> _saveFolderName() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      final stored = prefs.getString(AppConstants.keySaveFolderName);
+      if (stored == null || SaveFolderName.problemWith(stored) != null) {
+        return null;
+      }
+      return SaveFolderName.normalize(stored);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Calculates total size of downloaded files
