@@ -6,6 +6,12 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- TikTok links work again. The app gave up with "Could not connect to the
+  TikTok service: TimeoutException after 0:00:15" while the service was only
+  slow to answer, and a video it did find could fail to download with
+  "<!DOCTYPE html>". It now waits longer for the answer and downloads the
+  video straight from TikTok.
+
 ## [1.17.0] - 2026-11-15
 
 - Audio downloads are now saved to the phone's Music library, in
