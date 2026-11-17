@@ -38,7 +38,7 @@ flowchart LR
   subgraph download ["Download"]
     direction LR
     queue["Download queue<br/>1 to 5 at a time,<br/>runs in background<br/>on Android, iOS"]
-    gallery["Device gallery<br/>videos and images"]
+    gallery["Device gallery<br/>videos and images;<br/>Music library<br/>audio, on Android"]
     screen["Downloads screen<br/>play, open, share"]
     queue --> gallery
     queue --> screen
@@ -112,8 +112,14 @@ flowchart LR
 - Previews remote media and plays downloaded files inside the app. Previews are
   decoded at the size the screen can show, with headroom for zoom, so a
   full-resolution post photo never has to fit in memory at its native size.
-- Saves completed videos and images to the device gallery on Android and iOS;
-  audio remains available from NimbleClip's download directory.
+- Saves completed videos and images to the device gallery on Android and iOS.
+  On Android, audio goes to the Music library in `Music/NimbleClip`, where
+  music players and the Files app find it; on iOS, audio stays in NimbleClip's
+  download directory.
+- Can put saved files in a folder of your choice (Settings → **Save folder**):
+  `Pictures/<name>`, `Movies/<name>` and `Music/<name>` on Android, an album of
+  that name on iOS. Left empty, files go to the default places; files saved
+  before keep their place.
 - Keeps the Android MediaStore URI after Gallery export so media can still be
   opened or shared when the app-local cache copy is removed. Safe cache cleanup
   after Gallery export is enabled by default and can be changed in Settings.
@@ -529,8 +535,8 @@ cookies, private media, or personal account data.
 ## Disclaimer
 
 NimbleClip is not affiliated with, endorsed by, or sponsored by YouTube,
-TikTok, Meta, Instagram, Facebook, or X. Product names and trademarks belong to
-their respective owners.
+TikTok, Meta, Instagram, Facebook, X, Threads, Pinterest, SoundCloud, or
+Flickr. Product names and trademarks belong to their respective owners.
 
 ## License
 
