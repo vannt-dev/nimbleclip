@@ -6,6 +6,10 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- Flickr photo and video links work again. After a change on Flickr's side
+  they failed as if Flickr were unavailable, while albums still opened
+  ([#112](https://github.com/vannt-dev/nimbleclip/issues/112)).
+
 ## [1.17.1] - 2026-11-16
 
 - New setting **Save folder**: saved files can go into a folder of your
