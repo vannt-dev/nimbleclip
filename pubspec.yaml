@@ -35,7 +35,7 @@ dependencies:
 
   dio: ^5.11.0
   path_provider: ^2.1.6
-  gal: ^2.3.3
+  gal: ^3.0.1
   share_plus: ^13.3.0
   open_filex: ^5.0.0
   video_player: ^2.14.0

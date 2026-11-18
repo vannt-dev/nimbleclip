@@ -35,8 +35,8 @@ class PlatformFileHelper {
 
   static Future<bool> requestStoragePermissions() async {
     if (Platform.isAndroid || Platform.isIOS) {
-      final hasAccess = await Gal.hasAccess();
-      return hasAccess || await Gal.requestAccess();
+      final hasAccess = await Gal.hasPermission();
+      return hasAccess || await Gal.requestPermission();
     }
     return true;
   }
@@ -67,9 +67,9 @@ class PlatformFileHelper {
       return _saveToMediaStore(filePath, isImage ? 'image' : 'video', folder);
     }
     try {
-      final hasAccess = await Gal.hasAccess();
+      final hasAccess = await Gal.hasPermission();
       if (!hasAccess) {
-        final granted = await Gal.requestAccess();
+        final granted = await Gal.requestPermission();
         if (!granted) return false;
       }
       if (isImage) {
@@ -99,9 +99,9 @@ class PlatformFileHelper {
     try {
       // Only Android 9 and older ask for anything here; newer systems let an
       // app add its own files to the shared library without a permission.
-      final hasAccess = await Gal.hasAccess();
+      final hasAccess = await Gal.hasPermission();
       if (!hasAccess) {
-        final granted = await Gal.requestAccess();
+        final granted = await Gal.requestPermission();
         if (!granted) return false;
       }
       final fileName = _fileNameOf(filePath);
