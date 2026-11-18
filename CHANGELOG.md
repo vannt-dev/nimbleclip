@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.17.2] - 2026-11-18
+
 - Flickr photo and video links work again. After a change on Flickr's side
   they failed as if Flickr were unavailable, while albums still opened
   ([#112](https://github.com/vannt-dev/nimbleclip/issues/112)).
