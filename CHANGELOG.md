@@ -6,6 +6,11 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.17.3] - 2026-11-20
+
+- Updated the libraries that save to the gallery and show thumbnails. Saving
+  works as before; files still carry the date they were saved.
+
 ## [1.17.2] - 2026-11-18
 
 - Flickr photo and video links work again. After a change on Flickr's side
