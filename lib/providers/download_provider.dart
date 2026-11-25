@@ -28,6 +28,9 @@ import '../services/download_history_repository.dart';
 import '../services/async_work_queue.dart';
 import '../services/audio/audio_converter.dart';
 import '../services/keep_alive.dart';
+import '../services/lyrics/lrclib_client.dart';
+import '../services/lyrics/lyrics_file.dart';
+import '../services/lyrics/lyrics_query.dart';
 import '../services/connection_monitor.dart';
 import '../services/extractors/registry.dart';
 import '../services/media_file_actions.dart';
@@ -48,6 +51,7 @@ class DownloadProvider extends ChangeNotifier {
     DashFetcher? dashFetcher,
     ConnectionMonitor? connectionMonitor,
     AudioConverter? audioConverter,
+    LyricsSource? lyricsSource,
     ProcessKeepAlive? keepAlive,
     Duration keepAliveLinger = const Duration(seconds: 3),
   }) : _downloadService = downloadService ?? createDefaultDownloadService(),
@@ -56,6 +60,8 @@ class DownloadProvider extends ChangeNotifier {
        _keepAliveLinger = keepAliveLinger,
        _connectionMonitor = connectionMonitor ?? PlatformConnectionMonitor(),
        _audioConverter = audioConverter ?? createAudioConverter(),
+       // ignore: prefer_initializing_formals, the parameter is public, the field is not
+       _lyricsSource = lyricsSource,
        _streamFetcher = streamFetcher ?? _defaultStreamFetcher,
        _hlsFetcher = hlsFetcher ?? _defaultHlsFetcher,
        _dashFetcher = dashFetcher ?? _defaultDashFetcher,
@@ -141,6 +147,17 @@ class DownloadProvider extends ChangeNotifier {
   /// The Save audio as MP3 setting. Read when an audio download finishes, so
   /// a change applies to downloads already under way.
   bool convertAudioToMp3 = false;
+
+  /// The Save lyrics setting. Read when an audio download finishes.
+  bool saveLyrics = false;
+
+  /// Made on first use: most sessions never look lyrics up.
+  LyricsSource? _lyricsSource;
+  LyricsSource get _lyrics => _lyricsSource ??= LrclibClient();
+
+  /// Ids of audio downloads whose lyrics file also reached the Music library,
+  /// so removing the app's own copy does not take the only one away.
+  final Set<String> _lyricsInLibrary = {};
 
   final ConnectionMonitor _connectionMonitor;
   StreamSubscription<bool>? _connectionChanges;
@@ -585,6 +602,7 @@ class DownloadProvider extends ChangeNotifier {
             kind: quality.kind,
             headers: quality.headers,
             partBytes: quality.partBytes,
+            durationSeconds: metadata.duration?.inSeconds,
             totalBytes: quality.sizeBytes ?? 0,
           ),
         )
@@ -641,6 +659,7 @@ class DownloadProvider extends ChangeNotifier {
         qualityLabel: describeQuality(quality.label, l10n),
         format: quality.format,
         kind: quality.kind,
+        durationSeconds: metadata.duration?.inSeconds,
         totalBytes: quality.sizeBytes ?? 0,
         status: DownloadStatus.downloading,
       );
@@ -667,6 +686,7 @@ class DownloadProvider extends ChangeNotifier {
     }
     if (task.filePath != null) {
       await _fileActions.delete(task.filePath!);
+      await _deleteLyricsBeside(task, task.filePath!);
     }
     task
       ..status = DownloadStatus.downloading
@@ -851,6 +871,7 @@ class DownloadProvider extends ChangeNotifier {
       // Sound joined from a stream is converted like a fetched download, so
       // the setting means the same whichever way a track arrived.
       if (_wantsMp3(task)) await _convertToMp3(task, l10n);
+      await _saveLyrics(task, l10n);
       if (isMerge && autoSaveToGallery) await _autoSaveAudio(task);
     } catch (error) {
       // A cancel is the user's own decision, already recorded on the task by
@@ -1238,6 +1259,7 @@ class DownloadProvider extends ChangeNotifier {
     if (task.status == DownloadStatus.completed && _wantsMp3(task)) {
       await _convertToMp3(task, l10n);
     }
+    await _saveLyrics(task, l10n);
     if (options.autoSaveToGallery) await _autoSaveAudio(task);
     final localPath = task.filePath;
     if (task.status == DownloadStatus.completed &&
@@ -1253,8 +1275,15 @@ class DownloadProvider extends ChangeNotifier {
       // on platforms where Gallery cannot be addressed directly.
       if (options.removeCacheAfterGallery && task.galleryUri != null) {
         await _fileActions.delete(localPath);
+        if (await _deleteLyricsBeside(task, localPath) &&
+            !_lyricsInLibrary.contains(task.id) &&
+            _isLyricsNote(task.errorMessage, l10n)) {
+          // The lyrics never reached the library and went with this copy.
+          task.errorMessage = null;
+        }
         task.filePath = null;
       }
+      _lyricsInLibrary.remove(task.id);
     }
     // Covers the pause / cancel paths, which finish without a callback.
     notifyListeners();
@@ -1276,6 +1305,82 @@ class DownloadProvider extends ChangeNotifier {
       return;
     }
     await saveToGalleryManually(task).catchError((_) => false);
+  }
+
+  /// Looks up lyrics for a finished audio download and writes them beside
+  /// its file as an `.lrc`, when Save lyrics is on.
+  ///
+  /// Best effort: the lookup has a short time limit, nothing here fails or
+  /// holds back the download, and a track without lyrics is left as it was.
+  /// A note says the lyrics were saved, unless the task already has one.
+  Future<void> _saveLyrics(DownloadTask task, AppLocalizations l10n) async {
+    final audioPath = task.filePath;
+    if (!saveLyrics ||
+        !task.isAudioOnly ||
+        task.status != DownloadStatus.completed ||
+        audioPath == null) {
+      return;
+    }
+    try {
+      final seconds = task.durationSeconds;
+      final query = LyricsQuery.forDownload(
+        title: task.title,
+        author: task.author,
+        duration: seconds == null ? null : Duration(seconds: seconds),
+      );
+      if (query == null) return;
+      final lyrics = await _lyrics.find(query);
+      // Removed or replaced while the lookup ran: the file is not there.
+      if (lyrics == null ||
+          task.status != DownloadStatus.completed ||
+          task.filePath != audioPath ||
+          !_tasks.contains(task)) {
+        return;
+      }
+      await writeLyricsBeside(audioPath, lyrics);
+      task.errorMessage ??= lyrics.synced
+          ? l10n.lyricsSaved
+          : l10n.lyricsSavedPlain;
+    } catch (error) {
+      debugPrint('Lyrics not saved: $error');
+    }
+  }
+
+  bool _isLyricsNote(String? note, AppLocalizations l10n) =>
+      note != null &&
+      (note == l10n.lyricsSaved || note == l10n.lyricsSavedPlain);
+
+  /// Removes the lyrics file beside an audio download's local copy. Returns
+  /// whether there was one.
+  Future<bool> _deleteLyricsBeside(DownloadTask task, String audioPath) async {
+    if (!task.isAudioOnly) return false;
+    try {
+      final file = File(lyricsPathFor(audioPath));
+      if (!await file.exists()) return false;
+      await file.delete();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Puts the lyrics file of an audio download beside its copy in the Music
+  /// library, so music players find it there as well.
+  Future<void> _copyLyricsToLibrary(DownloadTask task) async {
+    final audioPath = task.filePath;
+    final audioUri = task.galleryUri;
+    if (!task.isAudioOnly || audioPath == null || audioUri == null) return;
+    try {
+      final lyricsPath = lyricsPathFor(audioPath);
+      if (!await File(lyricsPath).exists()) return;
+      final saved = await _storageService.saveLyricsToLibrary(
+        lyricsPath,
+        audioUri: audioUri,
+      );
+      if (saved) _lyricsInLibrary.add(task.id);
+    } catch (error) {
+      debugPrint('Lyrics not added to the library: $error');
+    }
   }
 
   bool _wantsMp3(DownloadTask task) =>
@@ -1435,6 +1540,7 @@ class DownloadProvider extends ChangeNotifier {
 
     if (task.filePath != null) {
       await _fileActions.delete(task.filePath!);
+      await _deleteLyricsBeside(task, task.filePath!);
     }
 
     final refreshedUrl = await _refreshDownloadUrl(task, l10n);
@@ -1521,6 +1627,7 @@ class DownloadProvider extends ChangeNotifier {
     }
     if (deleteLocalFile && task.filePath != null) {
       await _fileActions.delete(task.filePath!);
+      await _deleteLyricsBeside(task, task.filePath!);
     }
     _tasks.removeAt(index);
     task.dispose();
@@ -1534,6 +1641,7 @@ class DownloadProvider extends ChangeNotifier {
     for (final task in finished) {
       if (deleteLocalFiles && task.filePath != null) {
         await _fileActions.delete(task.filePath!);
+        await _deleteLyricsBeside(task, task.filePath!);
       }
     }
     _tasks.removeWhere((t) => t.isDone);
@@ -1576,6 +1684,7 @@ class DownloadProvider extends ChangeNotifier {
         isImage: task.isImage,
         isAudio: task.isAudioOnly,
       );
+      await _copyLyricsToLibrary(task);
       notifyListeners();
       await _saveHistory(receipt: task);
     }

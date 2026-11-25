@@ -167,6 +167,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not convert to MP3 — kept in the original format';
 
   @override
+  String get saveLyrics => 'Save lyrics';
+
+  @override
+  String get saveLyricsDescription =>
+      'Saves an .lrc lyrics file beside downloaded audio. Track names are sent to lrclib.net';
+
+  @override
+  String get lyricsSaved => 'Lyrics saved as an .lrc file';
+
+  @override
+  String get lyricsSavedPlain =>
+      'Lyrics saved as an .lrc file, without timings';
+
+  @override
   String get keepAliveTitle => 'NimbleClip is downloading';
 
   @override

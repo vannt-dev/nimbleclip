@@ -65,6 +65,7 @@ class NimbleClipApp extends StatelessWidget {
             provider.maxConcurrentDownloads = settings.maxConcurrentDownloads;
             provider.wifiOnlyDownloads = settings.wifiOnlyDownloads;
             provider.convertAudioToMp3 = settings.convertAudioToMp3;
+            provider.saveLyrics = settings.saveLyrics;
             return provider;
           },
         ),

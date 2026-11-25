@@ -36,6 +36,9 @@ class DownloadTask extends ChangeNotifier {
   /// task was made from asked. Null for a file fetched in one request.
   final int? partBytes;
 
+  /// The length of the media in whole seconds, when the source gave one.
+  final int? durationSeconds;
+
   DownloadStatus status;
   double progress; // 0.0 to 1.0
   int totalBytes;
@@ -66,6 +69,7 @@ class DownloadTask extends ChangeNotifier {
     this.kind = MediaKind.video,
     this.headers,
     this.partBytes,
+    this.durationSeconds,
     this.status = DownloadStatus.queued,
     this.progress = 0.0,
     this.totalBytes = 0,
@@ -190,6 +194,7 @@ class DownloadTask extends ChangeNotifier {
       kind: kind,
       headers: headers ?? this.headers,
       partBytes: partBytes,
+      durationSeconds: durationSeconds,
       status: DownloadStatus.queued,
       createdAt: createdAt,
       galleryUri: galleryUri,
@@ -212,6 +217,7 @@ class DownloadTask extends ChangeNotifier {
     'kind': kind.name,
     'headers': headers,
     'partBytes': ?partBytes,
+    'durationSeconds': ?durationSeconds,
     'status': status.name,
     'progress': progress,
     'totalBytes': totalBytes,
@@ -251,6 +257,7 @@ class DownloadTask extends ChangeNotifier {
       (k, v) => MapEntry(k, v.toString()),
     ),
     partBytes: json['partBytes'] as int?,
+    durationSeconds: json['durationSeconds'] as int?,
     // A task persisted as queued/downloading/paused belongs to a process
     // that no longer exists — nothing resumes it, so restoring it as-is
     // would leave it pinned to the "active" list forever. Mark it failed so

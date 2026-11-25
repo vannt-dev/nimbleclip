@@ -171,6 +171,79 @@ object MediaLibrary {
         }
     }
 
+    /**
+     * Copies the lyrics file [source] beside the library's audio entry
+     * [audioUri]: into the same folder, under the audio file's name with
+     * `.lrc`, which is where music players look for lyrics. Returns the new
+     * entry's URI.
+     *
+     * Blocks for the copy, so it must not run on the main thread. Throws when
+     * the audio entry cannot be read or the library refuses the file.
+     */
+    fun saveLyricsBeside(context: Context, source: File, audioUri: Uri): Uri {
+        if (!source.isFile) throw IOException("File is missing: ${source.path}")
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            saveLyricsScoped(context, source, audioUri)
+        } else {
+            saveLyricsLegacy(context, source, audioUri)
+        }
+    }
+
+    private fun saveLyricsScoped(context: Context, source: File, audioUri: Uri): Uri {
+        val resolver = context.contentResolver
+        val columns = arrayOf(
+            MediaStore.MediaColumns.DISPLAY_NAME,
+            MediaStore.MediaColumns.RELATIVE_PATH,
+        )
+        val (audioName, folder) = resolver.query(audioUri, columns, null, null, null)?.use {
+            if (it.moveToFirst()) it.getString(0) to it.getString(1) else null
+        } ?: throw IOException("The library entry is missing: $audioUri")
+        if (audioName.isNullOrBlank() || folder.isNullOrBlank()) {
+            throw IOException("The library entry has no name or folder: $audioUri")
+        }
+        val values = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, lyricsName(audioName))
+            put(MediaStore.MediaColumns.MIME_TYPE, LYRICS_MIME_TYPE)
+            put(MediaStore.MediaColumns.RELATIVE_PATH, folder)
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+        }
+        val files = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        val uri = resolver.insert(files, values)
+            ?: throw IOException("The media library did not accept the lyrics")
+        try {
+            val output = resolver.openOutputStream(uri)
+                ?: throw IOException("The lyrics entry could not be opened")
+            output.use { sink -> source.inputStream().use { it.copyTo(sink) } }
+            val published = ContentValues().apply {
+                put(MediaStore.MediaColumns.IS_PENDING, 0)
+            }
+            resolver.update(uri, published, null, null)
+            return uri
+        } catch (error: Exception) {
+            runCatching { resolver.delete(uri, null, null) }
+            throw error
+        }
+    }
+
+    /** Android 9 and older: written straight into the audio file's folder. */
+    @Suppress("DEPRECATION")
+    private fun saveLyricsLegacy(context: Context, source: File, audioUri: Uri): Uri {
+        val columns = arrayOf(MediaStore.MediaColumns.DATA)
+        val audioPath = context.contentResolver.query(audioUri, columns, null, null, null)?.use {
+            if (it.moveToFirst()) it.getString(0) else null
+        } ?: throw IOException("The library entry is missing: $audioUri")
+        val audioFile = File(audioPath)
+        val directory = audioFile.parentFile
+            ?: throw IOException("The library entry has no folder: $audioPath")
+        val target = File(directory, lyricsName(audioFile.name))
+        source.copyTo(target, overwrite = true)
+        return Uri.fromFile(target)
+    }
+
+    /** `song.m4a` becomes `song.lrc`. */
+    private fun lyricsName(audioName: String): String =
+        audioName.substringBeforeLast('.', audioName) + ".lrc"
+
     private fun relativePath(kind: Kind, album: String?): String =
         album?.let { "${kind.directory}/$it" } ?: kind.directory
 
@@ -190,6 +263,9 @@ object MediaLibrary {
 
     /** Characters a folder name may not hold, path separators among them. */
     private const val INVALID_FOLDER_CHARS = "/\\:*?\"<>|"
+
+    /** The type music players and the media library know lyrics files by. */
+    private const val LYRICS_MIME_TYPE = "application/lrc"
 
     /** `MediaColumns.DATE_TAKEN` from Android 10; the same column name before. */
     private const val DATE_TAKEN = "datetaken"

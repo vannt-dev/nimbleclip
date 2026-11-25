@@ -165,6 +165,20 @@ class AppLocalizationsVi extends AppLocalizations {
       'Không chuyển được sang MP3 — giữ nguyên định dạng gốc';
 
   @override
+  String get saveLyrics => 'Lưu lời bài hát';
+
+  @override
+  String get saveLyricsDescription =>
+      'Lưu tệp lời bài hát .lrc cạnh tệp âm thanh đã tải. Tên bài hát được gửi tới lrclib.net';
+
+  @override
+  String get lyricsSaved => 'Đã lưu lời bài hát vào tệp .lrc';
+
+  @override
+  String get lyricsSavedPlain =>
+      'Đã lưu lời bài hát vào tệp .lrc, không kèm thời gian';
+
+  @override
   String get keepAliveTitle => 'NimbleClip đang tải';
 
   @override

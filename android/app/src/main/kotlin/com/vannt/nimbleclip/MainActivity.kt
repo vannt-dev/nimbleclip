@@ -144,6 +144,28 @@ class MainActivity : FlutterActivity() {
                             }
                         }.start()
                     }
+                    "saveLyricsBeside" -> {
+                        val path = call.argument<String>("path")
+                        val audioUri = call.argument<String>("audioUri")?.let(Uri::parse)
+                        if (path.isNullOrBlank() || audioUri == null) {
+                            result.success(null)
+                            return@setMethodCallHandler
+                        }
+                        Thread {
+                            try {
+                                val uri = MediaLibrary.saveLyricsBeside(
+                                    applicationContext,
+                                    java.io.File(path),
+                                    audioUri,
+                                )
+                                runOnUiThread { result.success(uri.toString()) }
+                            } catch (error: Exception) {
+                                runOnUiThread {
+                                    result.error("lyrics_save_failed", error.message, null)
+                                }
+                            }
+                        }.start()
+                    }
                     "openMediaUri" -> {
                         val uri = call.argument<String>("uri")?.let(Uri::parse)
                         if (uri == null) {

@@ -34,6 +34,13 @@ class StorageService {
     );
   }
 
+  /// Puts the lyrics file at [lyricsPath] beside the audio file [audioUri]
+  /// names in the device's Music library. Returns whether it is there.
+  Future<bool> saveLyricsToLibrary(
+    String lyricsPath, {
+    required String audioUri,
+  }) => PlatformFileHelper.saveLyricsBeside(lyricsPath, audioUri: audioUri);
+
   /// The folder chosen in Settings, read at save time so a download that
   /// finishes in the background uses the current choice. Null for the
   /// default places, and for anything stored that is not a valid name.

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -333,6 +334,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     value: settings.convertAudioToMp3,
                     onChanged: settings.setConvertAudioToMp3,
+                  ),
+                  const Divider(height: 1),
+                ],
+                // The web build keeps no files of its own to put lyrics beside.
+                if (!kIsWeb) ...[
+                  SwitchListTile(
+                    key: const Key('save_lyrics_switch'),
+                    secondary: const Icon(
+                      Icons.lyrics_rounded,
+                      color: AppColors.primary,
+                    ),
+                    title: Text(l10n.saveLyrics),
+                    subtitle: Text(
+                      l10n.saveLyricsDescription,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    value: settings.saveLyrics,
+                    onChanged: settings.setSaveLyrics,
                   ),
                   const Divider(height: 1),
                 ],

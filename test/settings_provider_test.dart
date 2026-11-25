@@ -51,6 +51,20 @@ void main() {
     expect(restored.convertAudioToMp3, isTrue);
   });
 
+  test('Save lyrics is off by default and remembered', () async {
+    final provider = SettingsProvider();
+    await provider.initialized;
+    expect(provider.saveLyrics, isFalse);
+
+    await provider.setSaveLyrics(true);
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(AppConstants.keySaveLyrics), isTrue);
+    final restored = SettingsProvider();
+    await restored.initialized;
+    expect(restored.saveLyrics, isTrue);
+  });
+
   test(
     'save folder name is unset by default, remembered and clearable',
     () async {

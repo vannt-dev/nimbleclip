@@ -467,6 +467,35 @@ void main() {
 
       expect(settings.autoSaveGallery, isNot(before));
     });
+
+    testWidgets('Save lyrics is off and says where track names go', (
+      tester,
+    ) async {
+      useTallViewport(tester);
+      final settings = SettingsProvider();
+      await tester.pumpWidget(
+        _host(
+          const SettingsScreen(),
+          providers: [
+            ChangeNotifierProvider.value(value: settings),
+            ChangeNotifierProvider(
+              create: (_) =>
+                  DownloadProvider(downloadService: InertDownloadService()),
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      final toggle = find.byKey(const Key('save_lyrics_switch'));
+      expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+      expect(find.textContaining('lrclib.net'), findsOneWidget);
+
+      await tester.tap(toggle);
+      await tester.pump();
+
+      expect(settings.saveLyrics, isTrue);
+    });
     testWidgets('says the size is of local copies, not the gallery', (
       tester,
     ) async {
