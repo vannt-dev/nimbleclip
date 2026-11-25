@@ -218,6 +218,14 @@ object MediaLibrary {
                 put(MediaStore.MediaColumns.IS_PENDING, 0)
             }
             resolver.update(uri, published, null, null)
+            // The library may rename a file it accepts; one that no longer
+            // matches the track's name would not be found by music players.
+            val (savedName, savedFolder) = resolver.query(uri, columns, null, null, null)?.use {
+                if (it.moveToFirst()) it.getString(0) to it.getString(1) else null
+            } ?: throw IOException("The lyrics entry could not be read back")
+            if (savedName != lyricsName(audioName) || savedFolder != folder) {
+                throw IOException("The lyrics were filed as $savedFolder$savedName")
+            }
             return uri
         } catch (error: Exception) {
             runCatching { resolver.delete(uri, null, null) }

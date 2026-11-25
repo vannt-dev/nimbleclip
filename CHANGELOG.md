@@ -11,7 +11,7 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   name, beside the file in the app and, on Android, beside the track in the
   Music library. Timed lyrics are used when they exist, plain text otherwise.
   A track without lyrics downloads as before. When the setting is on, the
-  artist, track name and length of each audio download are sent to
+  title, uploader name and length of each audio download are sent to
   lrclib.net.
 
 ## [1.17.3] - 2026-11-20
