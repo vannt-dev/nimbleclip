@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-11-25
+
 - New setting **Save lyrics** (off by default): audio downloads get their
   lyrics from [LRCLIB](https://lrclib.net) as an `.lrc` file with the same
   name, beside the file in the app and, on Android, beside the track in the
