@@ -344,6 +344,30 @@ abstract class AppLocalizations {
   /// **'Could not convert to MP3 — kept in the original format'**
   String get mp3ConversionFailed;
 
+  /// No description provided for @saveLyrics.
+  ///
+  /// In en, this message translates to:
+  /// **'Save lyrics'**
+  String get saveLyrics;
+
+  /// No description provided for @saveLyricsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Saves an .lrc lyrics file beside downloaded audio. Track names are sent to lrclib.net'**
+  String get saveLyricsDescription;
+
+  /// No description provided for @lyricsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Lyrics saved as an .lrc file'**
+  String get lyricsSaved;
+
+  /// No description provided for @lyricsSavedPlain.
+  ///
+  /// In en, this message translates to:
+  /// **'Lyrics saved as an .lrc file, without timings'**
+  String get lyricsSavedPlain;
+
   /// No description provided for @keepAliveTitle.
   ///
   /// In en, this message translates to:

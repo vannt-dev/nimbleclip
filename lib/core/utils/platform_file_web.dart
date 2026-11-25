@@ -10,6 +10,10 @@ class PlatformFileHelper {
     bool isImage = false,
     String? folder,
   }) async => false;
+  static Future<bool> saveLyricsBeside(
+    String lyricsPath, {
+    required String audioUri,
+  }) async => false;
   static Future<bool?> galleryFileExists(
     String filePath, {
     required bool isImage,

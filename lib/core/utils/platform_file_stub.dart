@@ -122,6 +122,26 @@ class PlatformFileHelper {
     }
   }
 
+  /// Copies the lyrics file at [lyricsPath] into the folder that holds the
+  /// Music library entry [audioUri], under the audio file's name with `.lrc`,
+  /// where music players look for it. Android only; false elsewhere and when
+  /// the library refuses the file.
+  static Future<bool> saveLyricsBeside(
+    String lyricsPath, {
+    required String audioUri,
+  }) async {
+    if (!Platform.isAndroid) return false;
+    try {
+      final uri = await _mediaStoreChannel.invokeMethod<String>(
+        'saveLyricsBeside',
+        {'path': lyricsPath, 'audioUri': audioUri},
+      );
+      return uri != null;
+    } on PlatformException {
+      return false;
+    }
+  }
+
   static String _fileNameOf(String filePath) =>
       filePath.replaceAll('\\', '/').split('/').last;
 

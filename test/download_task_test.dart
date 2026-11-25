@@ -155,6 +155,32 @@ void main() {
         'image-3',
       );
     });
+
+    test('keeps the length of the media, and none when unknown', () {
+      final original = DownloadTask(
+        id: 'task',
+        videoId: 'track',
+        title: 'Song',
+        author: 'Artist',
+        thumbnailUrl: '',
+        downloadUrl: 'https://cdn.example/a.m4a',
+        originalUrl: 'https://example/track',
+        platform: VideoPlatform.soundcloud,
+        qualityLabel: 'M4A',
+        format: 'm4a',
+        kind: MediaKind.audio,
+        durationSeconds: 233,
+      );
+
+      final json = original.toJson();
+      expect(DownloadTask.fromJson(json).durationSeconds, 233);
+      expect(
+        original.withRefreshedSource(downloadUrl: 'x').durationSeconds,
+        233,
+      );
+      json.remove('durationSeconds');
+      expect(DownloadTask.fromJson(json).durationSeconds, isNull);
+    });
   });
 
   group('DownloadTask.withRefreshedSource', () {

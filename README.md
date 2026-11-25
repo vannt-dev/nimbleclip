@@ -84,6 +84,16 @@ flowchart LR
   it is whole, with the bundled LAME encoder, at a bitrate chosen from the
   source's own. If the conversion cannot be done the download is kept in its
   original format. The switch is hidden on platforms without the encoder.
+- Can save lyrics beside downloaded audio (Settings → **Save lyrics**, off by
+  default): when an audio download finishes, its lyrics are looked up on
+  [LRCLIB](https://lrclib.net), a free open lyrics catalogue, and written as
+  an `.lrc` file with the audio file's name, timed lines when LRCLIB has them
+  and plain text otherwise. On Android the `.lrc` also goes beside the track
+  in the Music library, where music players look for it. The lookup is best
+  effort: a track without lyrics, or a service that does not answer within a
+  few seconds, leaves the download as it was. Turning it on sends the title,
+  uploader name and length of each audio download to lrclib.net. Not in the
+  Web build.
 - Uses one shared download queue with a configurable limit of one to five
   concurrent transfers, so separate batches cannot overload the device or
   network.

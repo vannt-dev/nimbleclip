@@ -20,6 +20,7 @@ class SettingsProvider extends ChangeNotifier {
   int _maxConcurrentDownloads = 3;
   bool _wifiOnlyDownloads = false;
   bool _convertAudioToMp3 = false;
+  bool _saveLyrics = false;
   String? _saveFolderName;
 
   ThemeMode get themeMode => _themeMode;
@@ -33,6 +34,10 @@ class SettingsProvider extends ChangeNotifier {
   int get maxConcurrentDownloads => _maxConcurrentDownloads;
   bool get wifiOnlyDownloads => _wifiOnlyDownloads;
   bool get convertAudioToMp3 => _convertAudioToMp3;
+
+  /// Whether lyrics are looked up on lrclib.net for audio downloads and saved
+  /// beside them. Off unless chosen: it sends track names to that service.
+  bool get saveLyrics => _saveLyrics;
 
   /// The folder saved files go into, or null for the default places.
   String? get saveFolderName => _saveFolderName;
@@ -80,6 +85,7 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(AppConstants.keyWifiOnlyDownloads) ?? false;
     _convertAudioToMp3 =
         prefs.getBool(AppConstants.keyConvertAudioToMp3) ?? false;
+    _saveLyrics = prefs.getBool(AppConstants.keySaveLyrics) ?? false;
     _saveFolderName = prefs.getString(AppConstants.keySaveFolderName);
     final languageCode = prefs.getString(AppConstants.keyLanguageCode);
     _locale = languageCode == null ? null : Locale(languageCode);
@@ -179,6 +185,13 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(AppConstants.keyConvertAudioToMp3, value);
+  }
+
+  Future<void> setSaveLyrics(bool value) async {
+    _saveLyrics = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(AppConstants.keySaveLyrics, value);
   }
 
   Future<void> setWifiOnlyDownloads(bool value) async {

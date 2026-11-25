@@ -17,6 +17,7 @@ class AppConstants {
   static const String keyWifiOnlyDownloads = 'wifi_only_downloads';
   static const String keyConvertAudioToMp3 = 'convert_audio_to_mp3';
   static const String keySaveFolderName = 'save_folder_name';
+  static const String keySaveLyrics = 'save_lyrics';
 
   // Network timeouts
   static const Duration connectTimeout = Duration(seconds: 15);

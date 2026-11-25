@@ -11,6 +11,7 @@ import 'package:nimble_clip/models/video_platform.dart';
 import 'package:nimble_clip/services/download_service.dart';
 import 'package:nimble_clip/services/background_download_service.dart';
 import 'package:nimble_clip/services/background_stream_pairs.dart';
+import 'package:nimble_clip/services/lyrics/lyrics_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 
@@ -478,6 +479,43 @@ void main() {
       );
 
       await File(task.filePath!).delete();
+    });
+
+    test('a lyrics file lands beside audio in the Music library', () async {
+      final audio = File('$downloadDir/generic_lyricscheck.mp3');
+      // An MPEG-1 Layer III frame header followed by silence.
+      await audio.writeAsBytes([
+        0xFF,
+        0xFB,
+        0x90,
+        0x64,
+        ...List.filled(4096, 0),
+      ]);
+      final lyrics = File(lyricsPathFor(audio.path));
+      await lyrics.writeAsString('[00:01.00] First line\n');
+
+      expect(
+        await PlatformFileHelper.saveToGallery(audio.path, isAudio: true),
+        isTrue,
+        reason: 'the audio file did not reach the Music library',
+      );
+      final audioUri = await PlatformFileHelper.galleryFileUri(
+        audio.path,
+        isImage: false,
+        isAudio: true,
+      );
+      expect(audioUri, startsWith('content://media/'));
+      expect(
+        await PlatformFileHelper.saveLyricsBeside(
+          lyrics.path,
+          audioUri: audioUri!,
+        ),
+        isTrue,
+        reason: 'the media library refused the .lrc beside the audio',
+      );
+
+      await audio.delete();
+      await lyrics.delete();
     });
   });
 
