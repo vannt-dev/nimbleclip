@@ -322,6 +322,8 @@ void main() {
       provider(_FakeLyrics(_synced)),
       options: const DownloadOptions(removeCacheAfterGallery: true),
     );
+    // Saving to the library records the task before its copy is removed.
+    await _until(() => task.filePath == null);
 
     final saved = storage.lyricsSaved.single;
     expect(saved.audioUri, _LibraryStorage.audioUri);
@@ -338,6 +340,8 @@ void main() {
       provider(_FakeLyrics(_synced)),
       options: const DownloadOptions(removeCacheAfterGallery: true),
     );
+    // Saving to the library records the task before its copy is removed.
+    await _until(() => task.filePath == null);
 
     expect(storage.lyricsSaved, hasLength(1));
     expect(task.filePath, isNull);
