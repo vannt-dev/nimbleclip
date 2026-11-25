@@ -1366,10 +1366,18 @@ class DownloadProvider extends ChangeNotifier {
 
   /// Puts the lyrics file of an audio download beside its copy in the Music
   /// library, so music players find it there as well.
+  ///
+  /// Only while Save lyrics is on: with it off, saving works exactly as
+  /// before, with no extra look at the disk.
   Future<void> _copyLyricsToLibrary(DownloadTask task) async {
     final audioPath = task.filePath;
     final audioUri = task.galleryUri;
-    if (!task.isAudioOnly || audioPath == null || audioUri == null) return;
+    if (!saveLyrics ||
+        !task.isAudioOnly ||
+        audioPath == null ||
+        audioUri == null) {
+      return;
+    }
     try {
       final lyricsPath = lyricsPathFor(audioPath);
       if (!await File(lyricsPath).exists()) return;
