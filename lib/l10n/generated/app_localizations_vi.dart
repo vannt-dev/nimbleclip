@@ -228,6 +228,16 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String get saveSubtitles => 'Lưu phụ đề';
+
+  @override
+  String get saveSubtitlesDescription =>
+      'Lưu tệp phụ đề .srt cạnh video đã tải nếu video có phụ đề, ví dụ video YouTube';
+
+  @override
+  String get subtitlesSaved => 'Đã lưu phụ đề vào tệp .srt';
+
+  @override
   String get keepAliveTitle => 'NimbleClip đang tải';
 
   @override

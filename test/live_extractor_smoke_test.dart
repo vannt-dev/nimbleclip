@@ -333,4 +333,23 @@ void main() {
         : false,
     timeout: const Timeout(Duration(minutes: 2)),
   );
+
+  // What Save subtitles writes beside a YouTube video.
+  test(
+    'YouTube video with captions has subtitles',
+    () async {
+      final subtitles = await registry.subtitlesFor(
+        'https://www.youtube.com/watch?v=jNQXAC9IVRw',
+        languageCode: 'en',
+      );
+      expect(subtitles, isNotNull);
+      expect(subtitles!.languageCode, startsWith('en'));
+      expect(subtitles.webVtt, startsWith('WEBVTT'));
+      expect(subtitles.webVtt, contains('-->'));
+    },
+    skip: !_runLive
+        ? 'Run tool/check_live_extractors.ps1 to test live services.'
+        : false,
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
 }

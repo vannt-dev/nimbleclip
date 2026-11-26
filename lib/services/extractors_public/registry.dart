@@ -1,5 +1,6 @@
 import '../../core/utils/external_service_policy.dart';
 import '../../core/utils/url_helper.dart';
+import '../../models/subtitle_file.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 import 'base_extractor.dart';
@@ -61,5 +62,23 @@ class ExtractorRegistry {
       );
     }
     return metadata;
+  }
+
+  /// The subtitles of the video at [rawUrl], or null when its source offers
+  /// none or they cannot be fetched. Never throws: subtitles are an extra.
+  Future<SubtitleFile?> subtitlesFor(
+    String rawUrl, {
+    String? languageCode,
+  }) async {
+    final cleanUrl = UrlHelper.extractCleanUrl(rawUrl);
+    if (!UrlHelper.isValidVideoUrl(cleanUrl)) return null;
+    if (getExtractorFor(cleanUrl) case final SubtitleSource source) {
+      try {
+        return await source.subtitlesFor(cleanUrl, languageCode: languageCode);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
   }
 }

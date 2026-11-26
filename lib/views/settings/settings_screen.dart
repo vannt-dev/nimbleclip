@@ -355,6 +355,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onChanged: settings.setSaveLyrics,
                   ),
                   const Divider(height: 1),
+                  SwitchListTile(
+                    key: const Key('save_subtitles_switch'),
+                    secondary: const Icon(
+                      Icons.subtitles_rounded,
+                      color: AppColors.primary,
+                    ),
+                    title: Text(l10n.saveSubtitles),
+                    subtitle: Text(
+                      l10n.saveSubtitlesDescription,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    value: settings.saveSubtitles,
+                    onChanged: settings.setSaveSubtitles,
+                  ),
+                  const Divider(height: 1),
                 ],
                 // The share-sheet entry exists on Android only.
                 if (!kIsWeb &&

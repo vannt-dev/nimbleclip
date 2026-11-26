@@ -230,6 +230,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get saveSubtitles => 'Save subtitles';
+
+  @override
+  String get saveSubtitlesDescription =>
+      'Saves an .srt subtitles file beside downloaded videos that have subtitles, such as YouTube videos';
+
+  @override
+  String get subtitlesSaved => 'Subtitles saved as an .srt file';
+
+  @override
   String get keepAliveTitle => 'NimbleClip is downloading';
 
   @override
