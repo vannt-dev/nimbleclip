@@ -179,6 +179,55 @@ class AppLocalizationsVi extends AppLocalizations {
       'Đã lưu lời bài hát vào tệp .lrc, không kèm thời gian';
 
   @override
+  String get quickShareDownload => 'Tải nhanh từ menu chia sẻ';
+
+  @override
+  String get quickShareDownloadDescription =>
+      'Thêm mục Tải nhanh vào menu chia sẻ: liên kết được chia sẻ sẽ tải ngay theo chất lượng ưu tiên mà không cần mở ứng dụng';
+
+  @override
+  String quickDownloadStarted(String title) {
+    return 'Đang tải $title';
+  }
+
+  @override
+  String quickDownloadSaved(String title) {
+    return 'Đã tải xong $title';
+  }
+
+  @override
+  String quickDownloadFailed(String title) {
+    return 'Tải thất bại: $title';
+  }
+
+  @override
+  String quickDownloadUnreadable(String reason) {
+    return 'Không tải được liên kết này: $reason';
+  }
+
+  @override
+  String get quickDownloadNoLink =>
+      'Nội dung được chia sẻ không có liên kết để tải';
+
+  @override
+  String get quickDownloadPlaylist => 'Mở NimbleClip để tải danh sách phát';
+
+  @override
+  String quickDownloadAlreadySaved(String title) {
+    return 'Đã tải trước đó: $title';
+  }
+
+  @override
+  String quickDownloadAlreadyRunning(String title) {
+    return 'Đang tải rồi: $title';
+  }
+
+  @override
+  String quickDownloadWaitingForWifi(String title) {
+    return '$title sẽ được tải khi có Wi-Fi';
+  }
+
+  @override
   String get keepAliveTitle => 'NimbleClip đang tải';
 
   @override

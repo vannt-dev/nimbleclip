@@ -86,6 +86,9 @@ class BackgroundDownloadService
   final StorageService _storage;
   final MediaFileValidator validator;
   final bool requestNotificationPermission;
+
+  /// How long a download waits for the answer to the notification request.
+  static const Duration notificationRequestLimit = Duration(seconds: 20);
   late final StreamSubscription<bg.TaskUpdate> _updates;
   final Map<String, bg.DownloadTask> _nativeTasks = {};
   final Map<String, _BackgroundContext> _contexts = {};
@@ -324,9 +327,12 @@ class BackgroundDownloadService
       );
       if (requestNotificationPermission &&
           status != bg.PermissionStatus.granted) {
-        await bg.FileDownloader().permissions.request(
-          bg.PermissionType.notifications,
-        );
+        // Bounded: a request made while the app is behind another one, as a
+        // Quick download is, may never be answered, and the download would
+        // wait for it.
+        await bg.FileDownloader().permissions
+            .request(bg.PermissionType.notifications)
+            .timeout(notificationRequestLimit);
       }
     } catch (_) {
       // Notification permission is optional; the transfer itself can proceed.

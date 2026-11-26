@@ -6,6 +6,15 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- New Android setting **Quick download from the share menu** (off by
+  default): it adds a **Quick download** entry to the share menu. A link
+  shared there downloads at the preferred quality (the highest when the
+  setting is Ask) without opening NimbleClip; short messages say when it
+  starts, when it is done, or why it could not be downloaded. The download
+  shows in Downloads as usual. Playlists still open in the app. Turning the
+  setting on asks to show notifications, without which Android hides those
+  messages.
+
 ## [1.18.0] - 2026-11-25
 
 - New setting **Save lyrics** (off by default): audio downloads get their

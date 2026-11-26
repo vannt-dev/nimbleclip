@@ -68,6 +68,28 @@
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
         </activity>
+        <!-- Quick download: a second share-sheet entry that downloads the link
+             without opening the app. Off until the user turns it on in
+             Settings, which enables this component. It shows nothing and
+             closes at once; its own empty affinity keeps it from bringing the
+             app's task forward. -->
+        <activity
+            android:name=".QuickDownloadActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:label="@string/quick_download_label"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/*" />
+            </intent-filter>
+        </activity>
         <service
             android:name=".KeepAliveService"
             android:exported="false"

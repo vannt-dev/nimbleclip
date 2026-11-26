@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="share_target_label">Download link</string>
+    <string name="quick_download_label">Quick download</string>
+    <string name="quick_download_title" translatable="false">NimbleClip</string>
+    <string name="quick_download_preparing">Preparing download…</string>
 </resources>
