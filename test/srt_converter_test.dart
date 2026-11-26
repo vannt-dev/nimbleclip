@@ -80,23 +80,23 @@ kept
           '00:00:18.790 --> 00:00:18.800 align:start position:0%\n'
           ' \n \n\n'
           '00:00:18.800 --> 00:00:21.790 align:start position:0%\n'
-          " \nWe're<00:00:19.039><c> no</c><00:00:19.359><c> strangers</c>"
+          ' \nHere<00:00:19.039><c> we</c><00:00:19.359><c> go</c>'
           '<00:00:19.840><c> to</c>\n\n'
           '00:00:21.790 --> 00:00:21.800 align:start position:0%\n'
-          "We're no strangers to\n \n\n"
+          'Here we go to\n \n\n'
           '00:00:21.800 --> 00:00:25.950 align:start position:0%\n'
-          "We're no strangers to\n"
-          'love.<00:00:22.800><c> You</c><00:00:23.039><c> know</c>'
-          '<00:00:23.279><c> the</c><00:00:23.600><c> rules</c>\n\n'
+          'Here we go to\n'
+          'town.<00:00:22.800><c> You</c><00:00:23.039><c> know</c>'
+          '<00:00:23.279><c> the</c><00:00:23.600><c> way</c>\n\n'
           '00:00:25.950 --> 00:00:25.960 align:start position:0%\n'
-          'love. You know the rules\n \n\n'
+          'town. You know the way\n \n\n'
           '00:00:25.960 --> 00:00:29.109 align:start position:0%\n'
-          'love. You know the rules\nand so do I.\n';
+          'town. You know the way\nand so do I.\n';
       expect(
         webVttToSrt(vtt),
         '1\n00:00:00,320 --> 00:00:18,790\n[Music]\n\n'
-        "2\n00:00:18,800 --> 00:00:21,790\nWe're no strangers to\n\n"
-        '3\n00:00:21,800 --> 00:00:25,950\nlove. You know the rules\n\n'
+        '2\n00:00:18,800 --> 00:00:21,790\nHere we go to\n\n'
+        '3\n00:00:21,800 --> 00:00:25,950\ntown. You know the way\n\n'
         '4\n00:00:25,960 --> 00:00:29,109\nand so do I.\n\n',
       );
     });
