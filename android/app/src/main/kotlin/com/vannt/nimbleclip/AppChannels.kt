@@ -1,6 +1,8 @@
 package com.vannt.nimbleclip
 
 import android.app.Activity
+import android.app.Notification
+import android.app.NotificationManager
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
@@ -41,6 +43,22 @@ object AppChannels {
                 )
                 "stop" -> {
                     KeepAliveService.stop(context, holder)
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
+        MethodChannel(messenger, "com.vannt.nimbleclip/notifications").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "cancelByText" -> {
+                    val text = call.argument<String>("text")
+                    if (!text.isNullOrEmpty()) {
+                        val sweep = Runnable { cancelNotificationsWithText(context, text) }
+                        sweep.run()
+                        // The download library posts at most every 300 ms, so
+                        // a notice can land just after the first sweep.
+                        main.postDelayed(sweep, 1500)
+                    }
                     result.success(null)
                 }
                 else -> result.notImplemented()
@@ -331,6 +349,22 @@ object AppChannels {
                 }
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    /** Removes this app's notifications whose body is exactly [text]. */
+    private fun cancelNotificationsWithText(context: Context, text: String) {
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        try {
+            manager.activeNotifications
+                .filter {
+                    it.notification.extras
+                        .getCharSequence(Notification.EXTRA_TEXT)
+                        ?.toString() == text
+                }
+                .forEach { manager.cancel(it.tag, it.id) }
+        } catch (_: RuntimeException) {
+            // A notice left in place is only cosmetic.
         }
     }
 

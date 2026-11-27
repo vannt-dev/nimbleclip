@@ -52,10 +52,8 @@ class BackgroundDownloadService
         'NimbleClip',
         '{numFinished} of {numTotal} parts',
       ),
-      complete: const bg.TaskNotification(
-        'NimbleClip',
-        'Downloaded - open NimbleClip if it does not finish',
-      ),
+      // Removed again once the app has joined the parts.
+      complete: const bg.TaskNotification('NimbleClip', streamPartsDoneNotice),
       error: const bg.TaskNotification('NimbleClip', 'Download failed'),
       progressBar: true,
       groupNotificationId: streamPartGroup,
