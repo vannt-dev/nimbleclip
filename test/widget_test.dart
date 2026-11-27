@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nimble_clip/l10n/generated/app_localizations.dart';
 import 'package:nimble_clip/models/quality_descriptor.dart';
 import 'package:nimble_clip/core/utils/formatters.dart';
+import 'package:nimble_clip/app_services.dart';
 import 'package:nimble_clip/main.dart';
 import 'package:nimble_clip/l10n/gallery_notice_text.dart';
 import 'package:nimble_clip/models/gallery_notice.dart';
@@ -23,6 +24,7 @@ import 'package:nimble_clip/services/extractors/base_extractor.dart';
 import 'package:nimble_clip/services/extractors/extraction_failure.dart';
 import 'package:nimble_clip/services/extractors/facebook_extractor.dart';
 import 'package:nimble_clip/services/extractors/registry.dart';
+import 'package:nimble_clip/services/quick_share_channel.dart';
 import 'package:nimble_clip/views/home/home_screen.dart';
 import 'package:nimble_clip/views/home/widgets/video_result_card.dart';
 import 'package:nimble_clip/views/downloads/widgets/completed_download_card.dart';
@@ -194,7 +196,11 @@ void main() {
   testWidgets('the real app root builds and keeps one extractor registry', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const NimbleClipApp());
+    // The services main() builds, so the root under test is the one that
+    // ships, with the share entry kept off the platform.
+    await tester.pumpWidget(
+      NimbleClipApp(services: AppServices(quickShare: _SilentShareEntry())),
+    );
     await tester.pump();
 
     expect(tester.takeException(), isNull);
@@ -807,4 +813,22 @@ void main() {
       expect(find.text('HD 720p (High quality)'), findsWidgets);
     });
   });
+}
+
+/// Keeps the Quick download share entry off the platform in tests.
+class _SilentShareEntry implements QuickShareChannel {
+  @override
+  Stream<String> get shares => const Stream.empty();
+
+  @override
+  Future<void> setTargetEnabled(bool enabled) async {}
+
+  @override
+  Future<void> showMessage(String message) async {}
+
+  @override
+  Future<void> releaseKeepAlive() async {}
+
+  @override
+  Future<void> requestNotifications() async {}
 }

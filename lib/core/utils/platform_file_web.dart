@@ -14,6 +14,10 @@ class PlatformFileHelper {
     String lyricsPath, {
     required String audioUri,
   }) async => false;
+  static Future<bool> saveSubtitlesBeside(
+    String subtitlesPath, {
+    required String videoUri,
+  }) async => false;
   static Future<bool?> galleryFileExists(
     String filePath, {
     required bool isImage,

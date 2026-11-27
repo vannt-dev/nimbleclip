@@ -182,4 +182,15 @@ void main() {
       fails(ExtractionFailureKind.soundcloudSetUnavailable),
     );
   });
+
+  test('it has no subtitles to offer', () async {
+    final registry = ExtractorRegistry();
+    expect(
+      await registry.subtitlesFor(
+        'https://www.youtube.com/watch?v=abcdefghijk',
+      ),
+      isNull,
+    );
+    expect(await registry.subtitlesFor('https://example.com/a.mp4'), isNull);
+  });
 }

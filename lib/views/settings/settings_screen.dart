@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -352,6 +353,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     value: settings.saveLyrics,
                     onChanged: settings.setSaveLyrics,
+                  ),
+                  const Divider(height: 1),
+                  SwitchListTile(
+                    key: const Key('save_subtitles_switch'),
+                    secondary: const Icon(
+                      Icons.subtitles_rounded,
+                      color: AppColors.primary,
+                    ),
+                    title: Text(l10n.saveSubtitles),
+                    subtitle: Text(
+                      l10n.saveSubtitlesDescription,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    value: settings.saveSubtitles,
+                    onChanged: settings.setSaveSubtitles,
+                  ),
+                  const Divider(height: 1),
+                ],
+                // The share-sheet entry exists on Android only.
+                if (!kIsWeb &&
+                    defaultTargetPlatform == TargetPlatform.android) ...[
+                  SwitchListTile(
+                    key: const Key('quick_share_download_switch'),
+                    secondary: const Icon(
+                      Icons.bolt_rounded,
+                      color: AppColors.primary,
+                    ),
+                    title: Text(l10n.quickShareDownload),
+                    subtitle: Text(
+                      l10n.quickShareDownloadDescription,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    value: settings.quickShareDownload,
+                    onChanged: settings.setQuickShareDownload,
                   ),
                   const Divider(height: 1),
                 ],

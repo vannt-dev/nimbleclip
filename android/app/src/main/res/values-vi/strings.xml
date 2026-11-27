@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="share_target_label">Tải liên kết</string>
+    <string name="quick_download_label">Tải nhanh</string>
+    <string name="quick_download_preparing">Đang chuẩn bị tải…</string>
 </resources>

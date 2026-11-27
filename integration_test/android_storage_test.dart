@@ -12,6 +12,7 @@ import 'package:nimble_clip/services/download_service.dart';
 import 'package:nimble_clip/services/background_download_service.dart';
 import 'package:nimble_clip/services/background_stream_pairs.dart';
 import 'package:nimble_clip/services/lyrics/lyrics_file.dart';
+import 'package:nimble_clip/services/subtitles/subtitles_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 
@@ -516,6 +517,42 @@ void main() {
 
       await audio.delete();
       await lyrics.delete();
+    });
+
+    test('a subtitles file lands beside a video in the gallery', () async {
+      final task = fixtureTask(id: 'aaaaaa05-subs', title: 'Subtitles save');
+      String? failure;
+
+      await service.startDownload(
+        task: task,
+        l10n: l10n,
+        autoSaveToGallery: true,
+        onProgress: (_, _, _, _, _) {},
+        onComplete: (_, _) {},
+        onError: (_, error) => failure = error,
+      );
+      expect(failure, isNull, reason: 'download reported: $failure');
+      final videoUri = await PlatformFileHelper.galleryFileUri(
+        task.filePath!,
+        isImage: false,
+      );
+      expect(videoUri, startsWith('content://media/'));
+      final subtitles = File(subtitlesPathFor(task.filePath!));
+      await subtitles.writeAsString(
+        '1\n00:00:01,000 --> 00:00:02,000\nFirst line\n\n',
+      );
+
+      expect(
+        await PlatformFileHelper.saveSubtitlesBeside(
+          subtitles.path,
+          videoUri: videoUri!,
+        ),
+        isTrue,
+        reason: 'the media library refused the .srt beside the video',
+      );
+
+      await File(task.filePath!).delete();
+      await subtitles.delete();
     });
   });
 

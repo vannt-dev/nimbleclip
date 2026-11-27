@@ -1,14 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/app_constants.dart';
 import '../core/utils/external_service_policy.dart';
 import '../core/utils/save_folder_name.dart';
+import '../services/quick_share_channel.dart';
 import '../services/storage_service.dart';
 import '../models/download_options.dart';
 
 class SettingsProvider extends ChangeNotifier {
   final ExtractionPolicy _extractionPolicy;
   final Future<int> Function() _measureLocalCopies;
+  final QuickShareChannel _quickShare;
   ThemeMode _themeMode = ThemeMode.system;
   Locale? _locale;
   bool _autoSaveGallery = true;
@@ -21,6 +25,8 @@ class SettingsProvider extends ChangeNotifier {
   bool _wifiOnlyDownloads = false;
   bool _convertAudioToMp3 = false;
   bool _saveLyrics = false;
+  bool _saveSubtitles = false;
+  bool _quickShareDownload = false;
   String? _saveFolderName;
 
   ThemeMode get themeMode => _themeMode;
@@ -39,6 +45,14 @@ class SettingsProvider extends ChangeNotifier {
   /// beside them. Off unless chosen: it sends track names to that service.
   bool get saveLyrics => _saveLyrics;
 
+  /// Whether video downloads get their subtitles as an `.srt` file beside
+  /// them, when the source has some. Off unless chosen.
+  bool get saveSubtitles => _saveSubtitles;
+
+  /// Whether the share sheet offers Quick download, which downloads a shared
+  /// link at [preferredQuality] without opening the app. Off unless chosen.
+  bool get quickShareDownload => _quickShareDownload;
+
   /// The folder saved files go into, or null for the default places.
   String? get saveFolderName => _saveFolderName;
   DownloadOptions get downloadOptions => DownloadOptions(
@@ -50,6 +64,7 @@ class SettingsProvider extends ChangeNotifier {
   SettingsProvider({
     ExtractionPolicy? extractionPolicy,
     Future<int> Function()? measureLocalCopies,
+    this._quickShare = const PlatformQuickShareChannel(),
   }) : _extractionPolicy = extractionPolicy ?? ExtractionPolicy(),
        _measureLocalCopies =
            measureLocalCopies ?? StorageService().calculateCacheSize {
@@ -86,6 +101,12 @@ class SettingsProvider extends ChangeNotifier {
     _convertAudioToMp3 =
         prefs.getBool(AppConstants.keyConvertAudioToMp3) ?? false;
     _saveLyrics = prefs.getBool(AppConstants.keySaveLyrics) ?? false;
+    _saveSubtitles = prefs.getBool(AppConstants.keySaveSubtitles) ?? false;
+    _quickShareDownload =
+        prefs.getBool(AppConstants.keyQuickShareDownload) ?? false;
+    // The share entry is a system setting of its own; a restored backup or a
+    // reinstall can leave it out of step with the saved choice.
+    unawaited(_quickShare.setTargetEnabled(_quickShareDownload));
     _saveFolderName = prefs.getString(AppConstants.keySaveFolderName);
     final languageCode = prefs.getString(AppConstants.keyLanguageCode);
     _locale = languageCode == null ? null : Locale(languageCode);
@@ -192,6 +213,24 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(AppConstants.keySaveLyrics, value);
+  }
+
+  Future<void> setSaveSubtitles(bool value) async {
+    _saveSubtitles = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(AppConstants.keySaveSubtitles, value);
+  }
+
+  Future<void> setQuickShareDownload(bool value) async {
+    _quickShareDownload = value;
+    notifyListeners();
+    await _quickShare.setTargetEnabled(value);
+    // Asked now, while Settings is on screen: Quick download speaks only
+    // through messages, and it runs when the app is not in front.
+    if (value) await _quickShare.requestNotifications();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(AppConstants.keyQuickShareDownload, value);
   }
 
   Future<void> setWifiOnlyDownloads(bool value) async {

@@ -496,6 +496,62 @@ void main() {
 
       expect(settings.saveLyrics, isTrue);
     });
+
+    testWidgets('Save subtitles is off and says what it saves', (tester) async {
+      useTallViewport(tester);
+      final settings = SettingsProvider();
+      await tester.pumpWidget(
+        _host(
+          const SettingsScreen(),
+          providers: [
+            ChangeNotifierProvider.value(value: settings),
+            ChangeNotifierProvider(
+              create: (_) =>
+                  DownloadProvider(downloadService: InertDownloadService()),
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      final toggle = find.byKey(const Key('save_subtitles_switch'));
+      await tester.scrollUntilVisible(toggle, 200);
+      expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+      expect(find.textContaining('.srt'), findsOneWidget);
+
+      await tester.tap(toggle);
+      await tester.pump();
+
+      expect(settings.saveSubtitles, isTrue);
+    });
+
+    testWidgets('Quick download is off until turned on', (tester) async {
+      useTallViewport(tester);
+      final settings = SettingsProvider();
+      await tester.pumpWidget(
+        _host(
+          const SettingsScreen(),
+          providers: [
+            ChangeNotifierProvider.value(value: settings),
+            ChangeNotifierProvider(
+              create: (_) =>
+                  DownloadProvider(downloadService: InertDownloadService()),
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      final toggle = find.byKey(const Key('quick_share_download_switch'));
+      await tester.scrollUntilVisible(toggle, 200);
+      expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+      expect(find.textContaining('without opening the app'), findsOneWidget);
+
+      await tester.tap(toggle);
+      await tester.pump();
+
+      expect(settings.quickShareDownload, isTrue);
+    });
     testWidgets('says the size is of local copies, not the gallery', (
       tester,
     ) async {

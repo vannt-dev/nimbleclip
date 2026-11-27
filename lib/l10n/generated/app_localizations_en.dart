@@ -181,6 +181,65 @@ class AppLocalizationsEn extends AppLocalizations {
       'Lyrics saved as an .lrc file, without timings';
 
   @override
+  String get quickShareDownload => 'Quick download from the share menu';
+
+  @override
+  String get quickShareDownloadDescription =>
+      'Adds Quick download to the share menu: a shared link downloads at your preferred quality without opening the app';
+
+  @override
+  String quickDownloadStarted(String title) {
+    return 'Downloading $title';
+  }
+
+  @override
+  String quickDownloadSaved(String title) {
+    return 'Downloaded $title';
+  }
+
+  @override
+  String quickDownloadFailed(String title) {
+    return 'Download failed: $title';
+  }
+
+  @override
+  String quickDownloadUnreadable(String reason) {
+    return 'Could not download this link: $reason';
+  }
+
+  @override
+  String get quickDownloadNoLink =>
+      'There is no link to download in what was shared';
+
+  @override
+  String get quickDownloadPlaylist => 'Open NimbleClip to download a playlist';
+
+  @override
+  String quickDownloadAlreadySaved(String title) {
+    return 'Already downloaded: $title';
+  }
+
+  @override
+  String quickDownloadAlreadyRunning(String title) {
+    return 'Already downloading: $title';
+  }
+
+  @override
+  String quickDownloadWaitingForWifi(String title) {
+    return '$title will download when Wi-Fi is back';
+  }
+
+  @override
+  String get saveSubtitles => 'Save subtitles';
+
+  @override
+  String get saveSubtitlesDescription =>
+      'Saves an .srt subtitles file beside downloaded videos that have subtitles, such as YouTube videos';
+
+  @override
+  String get subtitlesSaved => 'Subtitles saved as an .srt file';
+
+  @override
   String get keepAliveTitle => 'NimbleClip is downloading';
 
   @override

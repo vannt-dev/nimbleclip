@@ -41,6 +41,14 @@ class StorageService {
     required String audioUri,
   }) => PlatformFileHelper.saveLyricsBeside(lyricsPath, audioUri: audioUri);
 
+  /// Puts the subtitles file at [subtitlesPath] beside the video [videoUri]
+  /// names in the device's gallery. Returns whether it is there.
+  Future<bool> saveSubtitlesToLibrary(
+    String subtitlesPath, {
+    required String videoUri,
+  }) =>
+      PlatformFileHelper.saveSubtitlesBeside(subtitlesPath, videoUri: videoUri);
+
   /// The folder chosen in Settings, read at save time so a download that
   /// finishes in the background uses the current choice. Null for the
   /// default places, and for anything stored that is not a valid name.

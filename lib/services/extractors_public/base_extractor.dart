@@ -1,5 +1,6 @@
 import '../../core/utils/url_helper.dart';
 import 'extraction_failure.dart';
+import '../../models/subtitle_file.dart';
 import '../../models/video_metadata.dart';
 import '../../models/video_platform.dart';
 
@@ -68,4 +69,14 @@ abstract class BaseVideoExtractor {
   bool canHandle(String url) => UrlHelper.detectPlatform(url) == platform;
 
   Future<VideoMetadata> extract(String url);
+}
+
+/// An extractor that can also fetch a video's subtitles.
+///
+/// Asked when a download finishes, not when a link is read, so reading a
+/// link costs nothing more for those who never save subtitles.
+abstract interface class SubtitleSource {
+  /// The subtitles of the video at [url], in [languageCode] when there are
+  /// some in it, or null when the video has none.
+  Future<SubtitleFile?> subtitlesFor(String url, {String? languageCode});
 }

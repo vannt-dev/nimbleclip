@@ -35,6 +35,7 @@ import '../services/connection_monitor.dart';
 import '../services/extractors/registry.dart';
 import '../services/media_file_actions.dart';
 import '../services/storage_service.dart';
+import '../services/subtitles/subtitles_file.dart';
 import '../services/stream_pair_gateway.dart';
 
 class DownloadProvider extends ChangeNotifier {
@@ -150,6 +151,13 @@ class DownloadProvider extends ChangeNotifier {
 
   /// The Save lyrics setting. Read when an audio download finishes.
   bool saveLyrics = false;
+
+  /// The Save subtitles setting. Read when a video download finishes.
+  bool saveSubtitles = false;
+
+  /// Ids of video downloads whose subtitles also reached the gallery, so
+  /// removing the app's own copy does not take the only one away.
+  final Set<String> _subtitlesInLibrary = {};
 
   /// Made on first use: most sessions never look lyrics up.
   LyricsSource? _lyricsSource;
@@ -310,6 +318,12 @@ class DownloadProvider extends ChangeNotifier {
       _syncKeepAlive(l10n);
     }
   }
+
+  /// Runs [work] with the process kept working while the app is off screen,
+  /// counted with the downloads' own work. For work that starts without the
+  /// app on screen and must not be cut off half way, such as Quick download.
+  Future<T> keepingAlive<T>(AppLocalizations l10n, Future<T> Function() work) =>
+      _keepingAlive(l10n, work);
 
   void _syncKeepAlive(AppLocalizations l10n) {
     if (!_keepAlive.isSupported || _isDisposed) return;
@@ -687,6 +701,7 @@ class DownloadProvider extends ChangeNotifier {
     if (task.filePath != null) {
       await _fileActions.delete(task.filePath!);
       await _deleteLyricsBeside(task, task.filePath!);
+      await _deleteSubtitlesBeside(task, task.filePath!);
     }
     task
       ..status = DownloadStatus.downloading
@@ -862,6 +877,8 @@ class DownloadProvider extends ChangeNotifier {
         task
           ..totalBytes = size
           ..receivedBytes = size;
+        // Before the gallery save, which takes them along.
+        await _saveSubtitles(task, l10n);
         if (autoSaveToGallery && !task.isAudioOnly) {
           // Best effort, as for a fetched download: the file is complete in
           // the app either way, and Save to gallery stays on offer.
@@ -1260,6 +1277,7 @@ class DownloadProvider extends ChangeNotifier {
       await _convertToMp3(task, l10n);
     }
     await _saveLyrics(task, l10n);
+    await _saveSubtitles(task, l10n);
     if (options.autoSaveToGallery) await _autoSaveAudio(task);
     final localPath = task.filePath;
     if (task.status == DownloadStatus.completed &&
@@ -1270,6 +1288,9 @@ class DownloadProvider extends ChangeNotifier {
         isImage: task.isImage,
         isAudio: task.isAudioOnly,
       );
+      // The download saved the video to the gallery itself; its subtitles
+      // follow it there before the app's own copy may be removed.
+      await _copySubtitlesToLibrary(task);
       // Only remove the app-local copy when Android returned a durable
       // MediaStore URI. This keeps Open/Share functional and avoids data loss
       // on platforms where Gallery cannot be addressed directly.
@@ -1281,9 +1302,16 @@ class DownloadProvider extends ChangeNotifier {
           // The lyrics never reached the library and went with this copy.
           task.errorMessage = null;
         }
+        if (await _deleteSubtitlesBeside(task, localPath) &&
+            !_subtitlesInLibrary.contains(task.id) &&
+            task.errorMessage == l10n.subtitlesSaved) {
+          // Likewise for the subtitles.
+          task.errorMessage = null;
+        }
         task.filePath = null;
       }
       _lyricsInLibrary.remove(task.id);
+      _subtitlesInLibrary.remove(task.id);
     }
     // Covers the pause / cancel paths, which finish without a callback.
     notifyListeners();
@@ -1388,6 +1416,84 @@ class DownloadProvider extends ChangeNotifier {
       if (saved) _lyricsInLibrary.add(task.id);
     } catch (error) {
       debugPrint('Lyrics not added to the library: $error');
+    }
+  }
+
+  /// Fetches a finished video download's subtitles, when its source has
+  /// some, and writes them beside its file as an `.srt`, when Save subtitles
+  /// is on.
+  ///
+  /// Best effort, like lyrics: nothing here fails or holds back the download,
+  /// and a video without subtitles is left as it was.
+  Future<void> _saveSubtitles(DownloadTask task, AppLocalizations l10n) async {
+    final videoPath = task.filePath;
+    if (!saveSubtitles ||
+        task.kind != MediaKind.video ||
+        task.status != DownloadStatus.completed ||
+        videoPath == null ||
+        task.originalUrl.isEmpty) {
+      return;
+    }
+    try {
+      final subtitles = await _extractorRegistry.subtitlesFor(
+        task.originalUrl,
+        languageCode: l10n.localeName,
+      );
+      // Removed or replaced while the lookup ran: the file is not there.
+      if (subtitles == null ||
+          task.status != DownloadStatus.completed ||
+          task.filePath != videoPath ||
+          !_tasks.contains(task)) {
+        return;
+      }
+      final written = await writeSubtitlesBeside(videoPath, subtitles);
+      if (written != null) task.errorMessage ??= l10n.subtitlesSaved;
+    } catch (error) {
+      debugPrint('Subtitles not saved: $error');
+    }
+  }
+
+  /// Removes the subtitles file beside a video download's local copy.
+  /// Returns whether there was one.
+  Future<bool> _deleteSubtitlesBeside(
+    DownloadTask task,
+    String videoPath,
+  ) async {
+    if (task.kind != MediaKind.video) return false;
+    try {
+      final file = File(subtitlesPathFor(videoPath));
+      if (!await file.exists()) return false;
+      await file.delete();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Puts the subtitles file of a video download beside its copy in the
+  /// gallery, so video players find it there as well.
+  ///
+  /// Only while Save subtitles is on: with it off, saving works exactly as
+  /// before, with no extra look at the disk.
+  Future<void> _copySubtitlesToLibrary(DownloadTask task) async {
+    final videoPath = task.filePath;
+    final videoUri = task.galleryUri;
+    if (!saveSubtitles ||
+        task.kind != MediaKind.video ||
+        videoPath == null ||
+        videoUri == null) {
+      return;
+    }
+    try {
+      final subtitlesPath = subtitlesPathFor(videoPath);
+      if (!await File(subtitlesPath).exists()) return;
+      final saved = await _storageService.saveSubtitlesToLibrary(
+        subtitlesPath,
+        videoUri: videoUri,
+      );
+      if (saved) _subtitlesInLibrary.add(task.id);
+    } catch (error) {
+      debugPrint('Subtitles not added to the gallery: $error');
     }
   }
 
@@ -1549,6 +1655,7 @@ class DownloadProvider extends ChangeNotifier {
     if (task.filePath != null) {
       await _fileActions.delete(task.filePath!);
       await _deleteLyricsBeside(task, task.filePath!);
+      await _deleteSubtitlesBeside(task, task.filePath!);
     }
 
     final refreshedUrl = await _refreshDownloadUrl(task, l10n);
@@ -1636,6 +1743,7 @@ class DownloadProvider extends ChangeNotifier {
     if (deleteLocalFile && task.filePath != null) {
       await _fileActions.delete(task.filePath!);
       await _deleteLyricsBeside(task, task.filePath!);
+      await _deleteSubtitlesBeside(task, task.filePath!);
     }
     _tasks.removeAt(index);
     task.dispose();
@@ -1650,6 +1758,8 @@ class DownloadProvider extends ChangeNotifier {
       if (deleteLocalFiles && task.filePath != null) {
         await _fileActions.delete(task.filePath!);
         await _deleteLyricsBeside(task, task.filePath!);
+        await _deleteSubtitlesBeside(task, task.filePath!);
+        await _deleteSubtitlesBeside(task, task.filePath!);
       }
     }
     _tasks.removeWhere((t) => t.isDone);
@@ -1693,6 +1803,7 @@ class DownloadProvider extends ChangeNotifier {
         isAudio: task.isAudioOnly,
       );
       await _copyLyricsToLibrary(task);
+      await _copySubtitlesToLibrary(task);
       notifyListeners();
       await _saveHistory(receipt: task);
     }
