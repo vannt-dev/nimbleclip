@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-11-27
+
 - New Android setting **Quick download from the share menu** (off by
   default): it adds a **Quick download** entry to the share menu. A link
   shared there downloads at the preferred quality (the highest when the
@@ -19,6 +21,7 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
   the file in the app and, on Android, beside the video in the gallery.
   Subtitles in the app's language are used when the video has them, written
   ones before automatic ones. A video without subtitles downloads as before.
+- Updated the video player library.
 
 ## [1.18.0] - 2026-11-25
 
