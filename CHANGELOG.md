@@ -6,6 +6,11 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.19.2] - 2026-11-27
+
+- Updated the libraries the app is built with to their latest compatible
+  versions, including the video player. No change in behaviour.
+
 ## [1.19.1] - 2026-11-27
 
 - With **Remove local copy after saving** on, an HD video joined on the
