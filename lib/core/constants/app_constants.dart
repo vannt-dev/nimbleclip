@@ -18,6 +18,7 @@ class AppConstants {
   static const String keyConvertAudioToMp3 = 'convert_audio_to_mp3';
   static const String keySaveFolderName = 'save_folder_name';
   static const String keySaveLyrics = 'save_lyrics';
+  static const String keySaveSubtitles = 'save_subtitles';
   static const String keyQuickShareDownload = 'quick_share_download';
 
   // Network timeouts

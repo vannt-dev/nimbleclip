@@ -89,6 +89,13 @@ flowchart LR
   it is whole, with the bundled LAME encoder, at a bitrate chosen from the
   source's own. If the conversion cannot be done the download is kept in its
   original format. The switch is hidden on platforms without the encoder.
+- Can save subtitles beside downloaded videos (Settings → **Save subtitles**,
+  off by default): when a YouTube video that has subtitles finishes
+  downloading, they are written as an `.srt` file with the video file's name,
+  in the app's language when the video has it, written subtitles before
+  automatic ones. On Android the `.srt` also goes beside the video in the
+  gallery, where video players look for it. Best effort: a video without
+  subtitles downloads as before. Not in the Web build.
 - Can save lyrics beside downloaded audio (Settings → **Save lyrics**, off by
   default): when an audio download finishes, its lyrics are looked up on
   [LRCLIB](https://lrclib.net), a free open lyrics catalogue, and written as

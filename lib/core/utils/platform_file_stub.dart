@@ -142,6 +142,26 @@ class PlatformFileHelper {
     }
   }
 
+  /// Copies the subtitles file at [subtitlesPath] into the folder that holds
+  /// the gallery entry [videoUri], under the video's name with `.srt`, where
+  /// video players look for it. Android only; false elsewhere and when the
+  /// library refuses the file.
+  static Future<bool> saveSubtitlesBeside(
+    String subtitlesPath, {
+    required String videoUri,
+  }) async {
+    if (!Platform.isAndroid) return false;
+    try {
+      final uri = await _mediaStoreChannel.invokeMethod<String>(
+        'saveSubtitlesBeside',
+        {'path': subtitlesPath, 'videoUri': videoUri},
+      );
+      return uri != null;
+    } on PlatformException {
+      return false;
+    }
+  }
+
   static String _fileNameOf(String filePath) =>
       filePath.replaceAll('\\', '/').split('/').last;
 

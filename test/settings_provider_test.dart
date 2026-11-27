@@ -89,6 +89,20 @@ void main() {
     expect(restoredEntry.states, [true]);
   });
 
+  test('Save subtitles is off by default and remembered', () async {
+    final provider = SettingsProvider();
+    await provider.initialized;
+    expect(provider.saveSubtitles, isFalse);
+
+    await provider.setSaveSubtitles(true);
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(AppConstants.keySaveSubtitles), isTrue);
+    final restored = SettingsProvider();
+    await restored.initialized;
+    expect(restored.saveSubtitles, isTrue);
+  });
+
   test(
     'save folder name is unset by default, remembered and clearable',
     () async {

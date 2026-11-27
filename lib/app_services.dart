@@ -59,4 +59,5 @@ DownloadProvider applyDownloadSettings(
   ..maxConcurrentDownloads = settings.maxConcurrentDownloads
   ..wifiOnlyDownloads = settings.wifiOnlyDownloads
   ..convertAudioToMp3 = settings.convertAudioToMp3
-  ..saveLyrics = settings.saveLyrics;
+  ..saveLyrics = settings.saveLyrics
+  ..saveSubtitles = settings.saveSubtitles;

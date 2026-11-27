@@ -43,11 +43,13 @@ void main() {
 
     await services.settings.setMaxConcurrentDownloads(5);
     await services.settings.setSaveLyrics(true);
+    await services.settings.setSaveSubtitles(true);
     await services.settings.setConvertAudioToMp3(true);
 
     // What Quick download relies on when the app starts without a screen.
     expect(services.downloads.maxConcurrentDownloads, 5);
     expect(services.downloads.saveLyrics, isTrue);
+    expect(services.downloads.saveSubtitles, isTrue);
     expect(services.downloads.convertAudioToMp3, isTrue);
     await services.quickDownloads.dispose();
   });

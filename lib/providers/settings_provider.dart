@@ -25,6 +25,7 @@ class SettingsProvider extends ChangeNotifier {
   bool _wifiOnlyDownloads = false;
   bool _convertAudioToMp3 = false;
   bool _saveLyrics = false;
+  bool _saveSubtitles = false;
   bool _quickShareDownload = false;
   String? _saveFolderName;
 
@@ -43,6 +44,10 @@ class SettingsProvider extends ChangeNotifier {
   /// Whether lyrics are looked up on lrclib.net for audio downloads and saved
   /// beside them. Off unless chosen: it sends track names to that service.
   bool get saveLyrics => _saveLyrics;
+
+  /// Whether video downloads get their subtitles as an `.srt` file beside
+  /// them, when the source has some. Off unless chosen.
+  bool get saveSubtitles => _saveSubtitles;
 
   /// Whether the share sheet offers Quick download, which downloads a shared
   /// link at [preferredQuality] without opening the app. Off unless chosen.
@@ -96,6 +101,7 @@ class SettingsProvider extends ChangeNotifier {
     _convertAudioToMp3 =
         prefs.getBool(AppConstants.keyConvertAudioToMp3) ?? false;
     _saveLyrics = prefs.getBool(AppConstants.keySaveLyrics) ?? false;
+    _saveSubtitles = prefs.getBool(AppConstants.keySaveSubtitles) ?? false;
     _quickShareDownload =
         prefs.getBool(AppConstants.keyQuickShareDownload) ?? false;
     // The share entry is a system setting of its own; a restored backup or a
@@ -207,6 +213,13 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(AppConstants.keySaveLyrics, value);
+  }
+
+  Future<void> setSaveSubtitles(bool value) async {
+    _saveSubtitles = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(AppConstants.keySaveSubtitles, value);
   }
 
   Future<void> setQuickShareDownload(bool value) async {

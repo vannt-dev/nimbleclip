@@ -434,6 +434,24 @@ abstract class AppLocalizations {
   /// **'{title} will download when Wi-Fi is back'**
   String quickDownloadWaitingForWifi(String title);
 
+  /// No description provided for @saveSubtitles.
+  ///
+  /// In en, this message translates to:
+  /// **'Save subtitles'**
+  String get saveSubtitles;
+
+  /// No description provided for @saveSubtitlesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Saves an .srt subtitles file beside downloaded videos that have subtitles, such as YouTube videos'**
+  String get saveSubtitlesDescription;
+
+  /// No description provided for @subtitlesSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitles saved as an .srt file'**
+  String get subtitlesSaved;
+
   /// No description provided for @keepAliveTitle.
   ///
   /// In en, this message translates to:

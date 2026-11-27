@@ -180,51 +180,79 @@ object MediaLibrary {
      * Blocks for the copy, so it must not run on the main thread. Throws when
      * the audio entry cannot be read or the library refuses the file.
      */
-    fun saveLyricsBeside(context: Context, source: File, audioUri: Uri): Uri {
+    fun saveLyricsBeside(context: Context, source: File, audioUri: Uri): Uri =
+        saveBeside(context, source, audioUri, ".lrc", LYRICS_MIME_TYPE)
+
+    /**
+     * Copies the subtitles file [source] beside the gallery's video entry
+     * [videoUri]: into the same folder, under the video file's name with
+     * `.srt`, which is where video players look for subtitles. Returns the
+     * new entry's URI.
+     *
+     * Blocks for the copy, so it must not run on the main thread. Throws when
+     * the video entry cannot be read or the library refuses the file.
+     */
+    fun saveSubtitlesBeside(context: Context, source: File, videoUri: Uri): Uri =
+        saveBeside(context, source, videoUri, ".srt", SUBTITLES_MIME_TYPE)
+
+    private fun saveBeside(
+        context: Context,
+        source: File,
+        mediaUri: Uri,
+        extension: String,
+        mimeType: String,
+    ): Uri {
         if (!source.isFile) throw IOException("File is missing: ${source.path}")
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            saveLyricsScoped(context, source, audioUri)
+            saveBesideScoped(context, source, mediaUri, extension, mimeType)
         } else {
-            saveLyricsLegacy(context, source, audioUri)
+            saveBesideLegacy(context, source, mediaUri, extension)
         }
     }
 
-    private fun saveLyricsScoped(context: Context, source: File, audioUri: Uri): Uri {
+    private fun saveBesideScoped(
+        context: Context,
+        source: File,
+        mediaUri: Uri,
+        extension: String,
+        mimeType: String,
+    ): Uri {
         val resolver = context.contentResolver
         val columns = arrayOf(
             MediaStore.MediaColumns.DISPLAY_NAME,
             MediaStore.MediaColumns.RELATIVE_PATH,
         )
-        val (audioName, folder) = resolver.query(audioUri, columns, null, null, null)?.use {
+        val (mediaName, folder) = resolver.query(mediaUri, columns, null, null, null)?.use {
             if (it.moveToFirst()) it.getString(0) to it.getString(1) else null
-        } ?: throw IOException("The library entry is missing: $audioUri")
-        if (audioName.isNullOrBlank() || folder.isNullOrBlank()) {
-            throw IOException("The library entry has no name or folder: $audioUri")
+        } ?: throw IOException("The library entry is missing: $mediaUri")
+        if (mediaName.isNullOrBlank() || folder.isNullOrBlank()) {
+            throw IOException("The library entry has no name or folder: $mediaUri")
         }
+        val sideName = sideName(mediaName, extension)
         val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, lyricsName(audioName))
-            put(MediaStore.MediaColumns.MIME_TYPE, LYRICS_MIME_TYPE)
+            put(MediaStore.MediaColumns.DISPLAY_NAME, sideName)
+            put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
             put(MediaStore.MediaColumns.RELATIVE_PATH, folder)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
         val files = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         val uri = resolver.insert(files, values)
-            ?: throw IOException("The media library did not accept the lyrics")
+            ?: throw IOException("The media library did not accept $sideName")
         try {
             val output = resolver.openOutputStream(uri)
-                ?: throw IOException("The lyrics entry could not be opened")
+                ?: throw IOException("The entry for $sideName could not be opened")
             output.use { sink -> source.inputStream().use { it.copyTo(sink) } }
             val published = ContentValues().apply {
                 put(MediaStore.MediaColumns.IS_PENDING, 0)
             }
             resolver.update(uri, published, null, null)
             // The library may rename a file it accepts; one that no longer
-            // matches the track's name would not be found by music players.
+            // matches the media file's name would not be found by players.
             val (savedName, savedFolder) = resolver.query(uri, columns, null, null, null)?.use {
                 if (it.moveToFirst()) it.getString(0) to it.getString(1) else null
-            } ?: throw IOException("The lyrics entry could not be read back")
-            if (savedName != lyricsName(audioName) || savedFolder != folder) {
-                throw IOException("The lyrics were filed as $savedFolder$savedName")
+            } ?: throw IOException("The entry for $sideName could not be read back")
+            if (savedName != sideName || savedFolder != folder) {
+                throw IOException("$sideName was filed as $savedFolder$savedName")
             }
             return uri
         } catch (error: Exception) {
@@ -233,24 +261,29 @@ object MediaLibrary {
         }
     }
 
-    /** Android 9 and older: written straight into the audio file's folder. */
+    /** Android 9 and older: written straight into the media file's folder. */
     @Suppress("DEPRECATION")
-    private fun saveLyricsLegacy(context: Context, source: File, audioUri: Uri): Uri {
+    private fun saveBesideLegacy(
+        context: Context,
+        source: File,
+        mediaUri: Uri,
+        extension: String,
+    ): Uri {
         val columns = arrayOf(MediaStore.MediaColumns.DATA)
-        val audioPath = context.contentResolver.query(audioUri, columns, null, null, null)?.use {
+        val mediaPath = context.contentResolver.query(mediaUri, columns, null, null, null)?.use {
             if (it.moveToFirst()) it.getString(0) else null
-        } ?: throw IOException("The library entry is missing: $audioUri")
-        val audioFile = File(audioPath)
-        val directory = audioFile.parentFile
-            ?: throw IOException("The library entry has no folder: $audioPath")
-        val target = File(directory, lyricsName(audioFile.name))
+        } ?: throw IOException("The library entry is missing: $mediaUri")
+        val mediaFile = File(mediaPath)
+        val directory = mediaFile.parentFile
+            ?: throw IOException("The library entry has no folder: $mediaPath")
+        val target = File(directory, sideName(mediaFile.name, extension))
         source.copyTo(target, overwrite = true)
         return Uri.fromFile(target)
     }
 
-    /** `song.m4a` becomes `song.lrc`. */
-    private fun lyricsName(audioName: String): String =
-        audioName.substringBeforeLast('.', audioName) + ".lrc"
+    /** `song.m4a` becomes `song.lrc`, `clip.mp4` becomes `clip.srt`. */
+    private fun sideName(mediaName: String, extension: String): String =
+        mediaName.substringBeforeLast('.', mediaName) + extension
 
     private fun relativePath(kind: Kind, album: String?): String =
         album?.let { "${kind.directory}/$it" } ?: kind.directory
@@ -274,6 +307,9 @@ object MediaLibrary {
 
     /** The type music players and the media library know lyrics files by. */
     private const val LYRICS_MIME_TYPE = "application/lrc"
+
+    /** The type the media library knows SubRip subtitles by. */
+    private const val SUBTITLES_MIME_TYPE = "application/x-subrip"
 
     /** `MediaColumns.DATE_TAKEN` from Android 10; the same column name before. */
     private const val DATE_TAKEN = "datetaken"
