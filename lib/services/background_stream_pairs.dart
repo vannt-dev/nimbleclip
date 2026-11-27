@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:background_downloader/background_downloader.dart' as bg;
+import 'package:flutter/services.dart';
 
 import '../models/merge_source.dart';
 import 'slideshow/slideshow_failure.dart';
@@ -12,6 +13,12 @@ import 'stream_pair_gateway.dart';
 /// The background_downloader group every stream part belongs to, so they share
 /// one notification rather than posting one each.
 const String streamPartGroup = 'stream_parts';
+
+/// The body of the notice shown once every part of [streamPartGroup] has
+/// arrived. The app joins the parts; it says what to do when the app was not
+/// running to do so, and is removed once the app has joined them.
+const String streamPartsDoneNotice =
+    'Parts downloaded. Open NimbleClip to finish the video';
 
 /// Byte ranges, inclusive, covering [total] bytes in parts of at most
 /// [partBytes].
@@ -31,10 +38,17 @@ abstract interface class StreamPartDownloader {
 
   /// Whether the operating system still holds [taskId], queued or running.
   Future<bool> isKnown(String taskId);
+
+  /// Removes the [streamPartsDoneNotice], once nothing is left to join.
+  Future<void> clearDoneNotice();
 }
 
 class NativeStreamPartDownloader implements StreamPartDownloader {
   const NativeStreamPartDownloader();
+
+  static const MethodChannel _notifications = MethodChannel(
+    'com.vannt.nimbleclip/notifications',
+  );
 
   @override
   Future<bool> enqueue(bg.DownloadTask task) =>
@@ -47,6 +61,19 @@ class NativeStreamPartDownloader implements StreamPartDownloader {
   @override
   Future<bool> isKnown(String taskId) async =>
       await bg.FileDownloader().taskForId(taskId) != null;
+
+  @override
+  Future<void> clearDoneNotice() async {
+    try {
+      await _notifications.invokeMethod<void>('cancelByText', {
+        'text': streamPartsDoneNotice,
+      });
+    } on PlatformException {
+      // A notice left in place is only cosmetic.
+    } on MissingPluginException {
+      // Platforms without the channel post no such notice.
+    }
+  }
 }
 
 /// Fetches merged videos' streams as ranged background_downloader tasks, one
@@ -359,6 +386,11 @@ class BackgroundStreamPairs implements StreamPairGateway {
     _transfers.remove(transfer.taskId);
     for (final part in transfer.parts) {
       _parts.remove(part.task.taskId);
+    }
+    // The parts' notice says to open the app to finish; the app is here and
+    // nothing is left to join, so it no longer applies.
+    if (_transfers.isEmpty) {
+      unawaited(_downloader.clearDoneNotice().catchError((_) {}));
     }
   }
 }

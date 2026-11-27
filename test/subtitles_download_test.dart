@@ -302,6 +302,22 @@ void main() {
     expect(task.errorMessage, l10n.subtitlesSaved);
   });
 
+  test('a joined video leaves no app copy once in the gallery', () async {
+    final task = await download(
+      provider(_CaptionedRegistry(subtitles)),
+      option: _merged,
+      options: const DownloadOptions(removeCacheAfterGallery: true),
+    );
+    // The gallery save records the task before the app copy goes.
+    await _until(() => task.filePath == null);
+
+    expect(task.status, DownloadStatus.completed);
+    expect(task.isSavedToGallery, isTrue);
+    expect(storage.downloadDir.listSync(), isEmpty);
+    expect(storage.subtitlesSaved.single.text, _srt);
+    expect(task.errorMessage, l10n.subtitlesSaved);
+  });
+
   test('subtitles the gallery refused are not claimed once gone', () async {
     storage.acceptsSubtitles = false;
     final task = await download(

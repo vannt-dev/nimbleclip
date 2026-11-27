@@ -38,6 +38,12 @@ class _FakeParts implements StreamPartDownloader {
   @override
   Future<bool> isKnown(String taskId) async => known.contains(taskId);
 
+  /// How often the parts' done notice was removed.
+  int noticeCleared = 0;
+
+  @override
+  Future<void> clearDoneNotice() async => noticeCleared++;
+
   /// Writes [task]'s range to disk, as a finished part, and returns the
   /// update background_downloader would send. [short] drops the last byte.
   Future<bg.TaskStatusUpdate> finish(
@@ -88,17 +94,19 @@ void main() {
     probeLength: (url) async => parts.streams[url]!.length,
   );
 
-  Future<StreamPairTransfer> start(BackgroundStreamPairs gateway) =>
-      gateway.startStreamPair(
-        taskId: 'task-1',
-        title: 'A video',
-        source: const MergeSource(
-          videoUrl: _videoUrl,
-          audioUrl: _audioUrl,
-          partBytes: 10,
-        ),
-        autoSaveToGallery: true,
-      );
+  Future<StreamPairTransfer> start(
+    BackgroundStreamPairs gateway, {
+    String taskId = 'task-1',
+  }) => gateway.startStreamPair(
+    taskId: taskId,
+    title: 'A video',
+    source: const MergeSource(
+      videoUrl: _videoUrl,
+      audioUrl: _audioUrl,
+      partBytes: 10,
+    ),
+    autoSaveToGallery: true,
+  );
 
   Future<void> finishAll(
     BackgroundStreamPairs gateway,
@@ -168,6 +176,23 @@ void main() {
         {'video.mp4', 'audio.m4a', 'manifest.json'},
       );
       expect(parts.queued.map((t) => t.taskId).any(gateway.owns), isFalse);
+    });
+
+    test('removes the parts notice once nothing is left to join', () async {
+      final gateway = pairs();
+      final first = await start(gateway);
+      final firstParts = List.of(parts.queued);
+      final second = await start(gateway, taskId: 'task-2');
+      final secondParts = parts.queued.skip(firstParts.length).toList();
+
+      await finishAll(gateway, firstParts);
+      await first.files;
+      // The other transfer still has parts on the way: its notice stays.
+      expect(parts.noticeCleared, 0);
+
+      await finishAll(gateway, secondParts);
+      await second.files;
+      expect(parts.noticeCleared, 1);
     });
 
     test('adds up progress across parts', () async {

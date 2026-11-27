@@ -6,6 +6,15 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+- With **Remove local copy after saving** on, an HD video joined on the
+  device (YouTube 720p and up) no longer keeps a second copy in the app once
+  it is in the gallery, as other downloads already did. A video whose
+  joining finishes only after the app was closed and opened again still
+  keeps its copy; **Clean up** in Settings removes it.
+- The notice an HD video's parts leave behind is removed once the app has
+  joined them. When the app was not running to do so, it now reads "Parts
+  downloaded. Open NimbleClip to finish the video".
+
 ## [1.19.0] - 2026-11-27
 
 - New Android setting **Quick download from the share menu** (off by

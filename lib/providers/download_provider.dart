@@ -747,6 +747,7 @@ class DownloadProvider extends ChangeNotifier {
       l10n,
       isMerge: merge != null || stream != null,
       autoSaveToGallery: options.autoSaveToGallery,
+      removeCacheAfterGallery: options.removeCacheAfterGallery,
       produce: (outputPath) async {
         try {
           if (stream != null) {
@@ -807,6 +808,9 @@ class DownloadProvider extends ChangeNotifier {
     l10n,
     isMerge: true,
     autoSaveToGallery: transfer.autoSaveToGallery,
+    // The transfer does not record this setting; keeping the app's copy is
+    // the choice that cannot lose a file.
+    removeCacheAfterGallery: false,
     produce: (outputPath) async =>
         (filePath: await _muxTransfer(task, transfer, outputPath), note: null),
   );
@@ -822,6 +826,7 @@ class DownloadProvider extends ChangeNotifier {
     AppLocalizations l10n, {
     required bool isMerge,
     required bool autoSaveToGallery,
+    required bool removeCacheAfterGallery,
     required Future<({String filePath, String? note})> Function(
       String outputPath,
     )
@@ -833,6 +838,7 @@ class DownloadProvider extends ChangeNotifier {
       l10n,
       isMerge: isMerge,
       autoSaveToGallery: autoSaveToGallery,
+      removeCacheAfterGallery: removeCacheAfterGallery,
       produce: produce,
     ),
   );
@@ -842,6 +848,7 @@ class DownloadProvider extends ChangeNotifier {
     AppLocalizations l10n, {
     required bool isMerge,
     required bool autoSaveToGallery,
+    required bool removeCacheAfterGallery,
     required Future<({String filePath, String? note})> Function(
       String outputPath,
     )
@@ -890,6 +897,14 @@ class DownloadProvider extends ChangeNotifier {
       if (_wantsMp3(task)) await _convertToMp3(task, l10n);
       await _saveLyrics(task, l10n);
       if (isMerge && autoSaveToGallery) await _autoSaveAudio(task);
+      if (isMerge && task.isSavedToGallery) {
+        // As for a fetched download: the gallery copy is the one kept.
+        if (removeCacheAfterGallery) {
+          await _removeLocalCopyAfterGallery(task, l10n);
+        }
+        _lyricsInLibrary.remove(task.id);
+        _subtitlesInLibrary.remove(task.id);
+      }
     } catch (error) {
       // A cancel is the user's own decision, already recorded on the task by
       // cancelTask. Overwriting it with `failed` would report their choice back
@@ -1294,21 +1309,8 @@ class DownloadProvider extends ChangeNotifier {
       // Only remove the app-local copy when Android returned a durable
       // MediaStore URI. This keeps Open/Share functional and avoids data loss
       // on platforms where Gallery cannot be addressed directly.
-      if (options.removeCacheAfterGallery && task.galleryUri != null) {
-        await _fileActions.delete(localPath);
-        if (await _deleteLyricsBeside(task, localPath) &&
-            !_lyricsInLibrary.contains(task.id) &&
-            _isLyricsNote(task.errorMessage, l10n)) {
-          // The lyrics never reached the library and went with this copy.
-          task.errorMessage = null;
-        }
-        if (await _deleteSubtitlesBeside(task, localPath) &&
-            !_subtitlesInLibrary.contains(task.id) &&
-            task.errorMessage == l10n.subtitlesSaved) {
-          // Likewise for the subtitles.
-          task.errorMessage = null;
-        }
-        task.filePath = null;
+      if (options.removeCacheAfterGallery) {
+        await _removeLocalCopyAfterGallery(task, l10n);
       }
       _lyricsInLibrary.remove(task.id);
       _subtitlesInLibrary.remove(task.id);
@@ -1318,6 +1320,34 @@ class DownloadProvider extends ChangeNotifier {
     await _saveHistory(
       receipt: task.status == DownloadStatus.completed ? task : null,
     );
+  }
+
+  /// Removes [task]'s app copy, with the lyrics and subtitles beside it, once
+  /// the file is in the gallery.
+  ///
+  /// Only when Android returned a durable MediaStore URI: that keeps Open and
+  /// Share working and avoids data loss where the gallery cannot be addressed
+  /// directly.
+  Future<void> _removeLocalCopyAfterGallery(
+    DownloadTask task,
+    AppLocalizations l10n,
+  ) async {
+    final localPath = task.filePath;
+    if (localPath == null || task.galleryUri == null) return;
+    await _fileActions.delete(localPath);
+    if (await _deleteLyricsBeside(task, localPath) &&
+        !_lyricsInLibrary.contains(task.id) &&
+        _isLyricsNote(task.errorMessage, l10n)) {
+      // The lyrics never reached the library and went with this copy.
+      task.errorMessage = null;
+    }
+    if (await _deleteSubtitlesBeside(task, localPath) &&
+        !_subtitlesInLibrary.contains(task.id) &&
+        task.errorMessage == l10n.subtitlesSaved) {
+      // Likewise for the subtitles.
+      task.errorMessage = null;
+    }
+    task.filePath = null;
   }
 
   /// Adds a finished audio download to the device's Music library.
