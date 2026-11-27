@@ -308,10 +308,11 @@ void main() {
       option: _merged,
       options: const DownloadOptions(removeCacheAfterGallery: true),
     );
+    // The gallery save records the task before the app copy goes.
+    await _until(() => task.filePath == null);
 
     expect(task.status, DownloadStatus.completed);
     expect(task.isSavedToGallery, isTrue);
-    expect(task.filePath, isNull);
     expect(storage.downloadDir.listSync(), isEmpty);
     expect(storage.subtitlesSaved.single.text, _srt);
     expect(task.errorMessage, l10n.subtitlesSaved);
