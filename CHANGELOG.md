@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/) and release tags in the form
 
 ## [Unreleased]
 
+## [1.19.1] - 2026-11-27
+
 - With **Remove local copy after saving** on, an HD video joined on the
   device (YouTube 720p and up) no longer keeps a second copy in the app once
   it is in the gallery, as other downloads already did. A video whose
