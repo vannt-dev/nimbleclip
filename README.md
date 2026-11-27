@@ -52,6 +52,11 @@ flowchart LR
 - Accepts links shared directly from other apps on Android and iOS, and
   registers an Android Direct Share target so it appears in the top row of the
   share sheet.
+- Can download a shared link without opening the app on Android (Settings →
+  **Quick download from the share menu**, off by default): it adds a
+  **Quick download** entry to the share menu, which downloads the link at the
+  preferred quality and reports with short messages while the app the link
+  came from stays on screen.
 - Analyzes multiple pasted/shared links in one pass, queues their best media
   options together, and keeps the latest 20 analyzed links locally.
 - Limits batch analysis to 20 links with three concurrent extractors, while

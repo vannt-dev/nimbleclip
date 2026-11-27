@@ -368,6 +368,72 @@ abstract class AppLocalizations {
   /// **'Lyrics saved as an .lrc file, without timings'**
   String get lyricsSavedPlain;
 
+  /// No description provided for @quickShareDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick download from the share menu'**
+  String get quickShareDownload;
+
+  /// No description provided for @quickShareDownloadDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Adds Quick download to the share menu: a shared link downloads at your preferred quality without opening the app'**
+  String get quickShareDownloadDescription;
+
+  /// No description provided for @quickDownloadStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading {title}'**
+  String quickDownloadStarted(String title);
+
+  /// No description provided for @quickDownloadSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded {title}'**
+  String quickDownloadSaved(String title);
+
+  /// No description provided for @quickDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed: {title}'**
+  String quickDownloadFailed(String title);
+
+  /// No description provided for @quickDownloadUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not download this link: {reason}'**
+  String quickDownloadUnreadable(String reason);
+
+  /// No description provided for @quickDownloadNoLink.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no link to download in what was shared'**
+  String get quickDownloadNoLink;
+
+  /// No description provided for @quickDownloadPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Open NimbleClip to download a playlist'**
+  String get quickDownloadPlaylist;
+
+  /// No description provided for @quickDownloadAlreadySaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Already downloaded: {title}'**
+  String quickDownloadAlreadySaved(String title);
+
+  /// No description provided for @quickDownloadAlreadyRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Already downloading: {title}'**
+  String quickDownloadAlreadyRunning(String title);
+
+  /// No description provided for @quickDownloadWaitingForWifi.
+  ///
+  /// In en, this message translates to:
+  /// **'{title} will download when Wi-Fi is back'**
+  String quickDownloadWaitingForWifi(String title);
+
   /// No description provided for @keepAliveTitle.
   ///
   /// In en, this message translates to:

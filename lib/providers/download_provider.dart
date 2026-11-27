@@ -311,6 +311,12 @@ class DownloadProvider extends ChangeNotifier {
     }
   }
 
+  /// Runs [work] with the process kept working while the app is off screen,
+  /// counted with the downloads' own work. For work that starts without the
+  /// app on screen and must not be cut off half way, such as Quick download.
+  Future<T> keepingAlive<T>(AppLocalizations l10n, Future<T> Function() work) =>
+      _keepingAlive(l10n, work);
+
   void _syncKeepAlive(AppLocalizations l10n) {
     if (!_keepAlive.isSupported || _isDisposed) return;
     if (_activeWork > 0) {

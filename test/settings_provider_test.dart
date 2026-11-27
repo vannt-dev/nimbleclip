@@ -8,6 +8,7 @@ import 'package:nimble_clip/core/constants/app_constants.dart';
 import 'package:nimble_clip/core/utils/external_service_policy.dart';
 import 'package:nimble_clip/core/utils/save_folder_name.dart';
 import 'package:nimble_clip/providers/settings_provider.dart';
+import 'package:nimble_clip/services/quick_share_channel.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -63,6 +64,29 @@ void main() {
     final restored = SettingsProvider();
     await restored.initialized;
     expect(restored.saveLyrics, isTrue);
+  });
+
+  test('Quick download is off by default, remembered and sets the share '
+      'entry', () async {
+    final entry = _RecordingShareEntry();
+    final provider = SettingsProvider(quickShare: entry);
+    await provider.initialized;
+    expect(provider.quickShareDownload, isFalse);
+    // Brought in line with the saved choice on every start.
+    expect(entry.states, [false]);
+
+    await provider.setQuickShareDownload(true);
+
+    expect(entry.states, [false, true]);
+    // Asked while Settings is on screen; the downloads run off screen.
+    expect(entry.notificationRequests, 1);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(AppConstants.keyQuickShareDownload), isTrue);
+    final restoredEntry = _RecordingShareEntry();
+    final restored = SettingsProvider(quickShare: restoredEntry);
+    await restored.initialized;
+    expect(restored.quickShareDownload, isTrue);
+    expect(restoredEntry.states, [true]);
   });
 
   test(
@@ -210,4 +234,20 @@ void main() {
 
     expect(provider.cacheSizeBytes, 512);
   });
+}
+
+/// Records what the setting asks of the share-sheet entry.
+class _RecordingShareEntry implements QuickShareChannel {
+  final List<bool> states = [];
+
+  int notificationRequests = 0;
+
+  @override
+  Future<void> setTargetEnabled(bool enabled) async => states.add(enabled);
+
+  @override
+  Future<void> requestNotifications() async => notificationRequests++;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

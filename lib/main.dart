@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:provider/single_child_widget.dart';
+import 'app_services.dart';
 import 'core/constants/app_constants.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/download_provider.dart';
@@ -20,56 +22,74 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   configureImageCacheBudget();
   registerBundledLicenses();
-  runApp(const NimbleClipApp());
+  // Made before the first frame: an engine started by Quick download has no
+  // screen and may never draw one, and its shared link still has to download.
+  final services = AppServices();
+  runApp(NimbleClipApp(services: services));
 }
 
 class NimbleClipApp extends StatelessWidget {
-  const NimbleClipApp({super.key});
+  const NimbleClipApp({super.key, this.services});
+
+  /// The app's state made ahead of the tree. Without it, as in a test, the
+  /// tree makes its own on first use.
+  final AppServices? services;
+
+  List<SingleChildWidget> _sharedProviders(AppServices services) => [
+    ChangeNotifierProvider.value(value: services.extractionPolicy),
+    Provider.value(value: services.extractorRegistry),
+    ChangeNotifierProvider.value(value: services.settings),
+    ChangeNotifierProvider.value(value: services.analysisHistory),
+    ChangeNotifierProvider.value(value: services.sharedIntent),
+    ChangeNotifierProvider(
+      create: (_) =>
+          VideoExtractorProvider(extractorRegistry: services.extractorRegistry),
+    ),
+    ChangeNotifierProvider.value(value: services.downloads),
+  ];
 
   @override
   Widget build(BuildContext context) {
+    final prebuilt = services;
     return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ExtractionPolicy()),
-        // Built once: the registry holds the policy by reference and every
-        // extractor reads `allowExternalServices` at call time, so toggling the
-        // setting already takes effect. Rebuilding it per change would only
-        // discard six fresh extractors that nothing downstream ever reads.
-        Provider(
-          create: (context) => ExtractorRegistry(
-            externalServiceAccess: context.read<ExtractionPolicy>(),
-          ),
-        ),
-        ChangeNotifierProvider(
-          create: (context) => SettingsProvider(
-            extractionPolicy: context.read<ExtractionPolicy>(),
-          ),
-        ),
-        ChangeNotifierProvider(create: (_) => AnalysisHistoryProvider()),
-        ChangeNotifierProvider(create: (_) => SharedIntentProvider()),
-        ChangeNotifierProvider(
-          create: (context) => VideoExtractorProvider(
-            extractorRegistry: context.read<ExtractorRegistry>(),
-          ),
-        ),
-        ChangeNotifierProxyProvider<SettingsProvider, DownloadProvider>(
-          create: (context) => DownloadProvider(
-            extractorRegistry: context.read<ExtractorRegistry>(),
-          ),
-          update: (context, settings, downloads) {
-            final provider =
-                downloads ??
-                DownloadProvider(
+      providers: prebuilt != null
+          ? _sharedProviders(prebuilt)
+          : [
+              ChangeNotifierProvider(create: (_) => ExtractionPolicy()),
+              // Built once: the registry holds the policy by reference and every
+              // extractor reads `allowExternalServices` at call time, so toggling the
+              // setting already takes effect. Rebuilding it per change would only
+              // discard six fresh extractors that nothing downstream ever reads.
+              Provider(
+                create: (context) => ExtractorRegistry(
+                  externalServiceAccess: context.read<ExtractionPolicy>(),
+                ),
+              ),
+              ChangeNotifierProvider(
+                create: (context) => SettingsProvider(
+                  extractionPolicy: context.read<ExtractionPolicy>(),
+                ),
+              ),
+              ChangeNotifierProvider(create: (_) => AnalysisHistoryProvider()),
+              ChangeNotifierProvider(create: (_) => SharedIntentProvider()),
+              ChangeNotifierProvider(
+                create: (context) => VideoExtractorProvider(
                   extractorRegistry: context.read<ExtractorRegistry>(),
-                );
-            provider.maxConcurrentDownloads = settings.maxConcurrentDownloads;
-            provider.wifiOnlyDownloads = settings.wifiOnlyDownloads;
-            provider.convertAudioToMp3 = settings.convertAudioToMp3;
-            provider.saveLyrics = settings.saveLyrics;
-            return provider;
-          },
-        ),
-      ],
+                ),
+              ),
+              ChangeNotifierProxyProvider<SettingsProvider, DownloadProvider>(
+                create: (context) => DownloadProvider(
+                  extractorRegistry: context.read<ExtractorRegistry>(),
+                ),
+                update: (context, settings, downloads) => applyDownloadSettings(
+                  settings,
+                  downloads ??
+                      DownloadProvider(
+                        extractorRegistry: context.read<ExtractorRegistry>(),
+                      ),
+                ),
+              ),
+            ],
       child: Consumer<SettingsProvider>(
         builder: (context, settings, _) {
           return MaterialApp(
